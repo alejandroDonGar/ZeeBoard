@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "zeeboard",
   "version": "0.1.0",
-  "identifier": "com.alexa.tauri-app",
+  "identifier": "com.zeeboard.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -10,10 +10,9 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "withGlobalTauri": true,
     "windows": [
       {
-        "title": "tauri-app",
+        "title": "zeeboard",
         "width": 800,
         "height": 600
       }

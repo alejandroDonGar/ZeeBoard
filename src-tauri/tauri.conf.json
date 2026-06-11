@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "zeeboard",
-        "width": 800,
-        "height": 600
+        "title": "ZeeBoard",
+        "width": 1200,
+        "height": 760,
+        "minWidth": 1050,
+        "minHeight": 680
       }
     ],
     "security": {

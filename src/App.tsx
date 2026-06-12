@@ -143,7 +143,8 @@ function CommissionsPage() {
   const [commissionCreated, setCommissionCreated] = useState(false);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [openCommissionTabs, setOpenCommissionTabs] = useState<Commission[]>([]);
-const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null);
+  const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null);
+  const [tabsRestored, setTabsRestored] = useState(false);
 
   useEffect(() => {
     getTemplates()
@@ -195,6 +196,56 @@ const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null
       setCreatingCommission(false);
     }
   }
+  useEffect(() => {
+    const savedTabs = localStorage.getItem("zeeboard-open-commission-tabs");
+    const savedActiveId = localStorage.getItem("zeeboard-active-commission-id");
+
+    getCommissions()
+      .then((data) => {
+        if (savedTabs) {
+          const tabIds = JSON.parse(savedTabs) as number[];
+
+          const restoredTabs = data.filter((commission) =>
+            tabIds.includes(commission.id),
+          );
+
+          setOpenCommissionTabs(restoredTabs);
+
+          if (savedActiveId) {
+            const activeId = Number(savedActiveId);
+            const activeExists = restoredTabs.some((tab) => tab.id === activeId);
+
+            setActiveCommissionId(activeExists ? activeId : null);
+          }
+        }
+
+        setTabsRestored(true);
+      })
+      .catch((error) => {
+        console.error(error);
+        setTabsRestored(true);
+      });
+  }, []);
+  
+  useEffect(() => {
+    if (!tabsRestored) {
+      return;
+    }
+
+    localStorage.setItem(
+      "zeeboard-open-commission-tabs",
+      JSON.stringify(openCommissionTabs.map((commission) => commission.id)),
+    );
+
+    if (activeCommissionId !== null) {
+      localStorage.setItem(
+        "zeeboard-active-commission-id",
+        String(activeCommissionId),
+      );
+    } else {
+      localStorage.removeItem("zeeboard-active-commission-id");
+    }
+  }, [openCommissionTabs, activeCommissionId, tabsRestored]);
 
   function handleOpenCommission(commission: Commission) {
     setOpenCommissionTabs((currentTabs: Commission[]) => {
@@ -221,6 +272,7 @@ const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null
       setActiveCommissionId(null);
     }
   }
+  const activeCommission = commissions.find((commission) => commission.id === activeCommissionId) ?? null;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
@@ -234,7 +286,8 @@ const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null
       <OpenTabs
         openCommissionTabs={openCommissionTabs}
         activeCommissionId={activeCommissionId}
-        onSelectCommission={setActiveCommissionId}
+        onSelectCommission={(commissionId) => setActiveCommissionId(commissionId)}
+        onShowAllCommissions={() => setActiveCommissionId(null)}
         onCloseCommission={handleCloseCommissionTab}
       />
 
@@ -242,15 +295,95 @@ const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null
         <div className="h-full min-h-0 rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <h3 className="text-xl font-black">Commission board</h3>
+              <h3 className="text-xl font-black">
+                {activeCommission ? activeCommission.title : "Commission board"}
+              </h3>
+
               <p className="mt-1 text-sm text-[#7c7163]">
-                Start with a template, then move each commission through its own stages.
+                {activeCommission
+                  ? `${activeCommission.client_name || "No client"} · ${
+                      activeCommission.platform || "No platform"
+                    }`
+                  : "Start with a template, then move each commission through its own stages."}
               </p>
             </div>
           </div>
 
           <div className="h-[calc(100%-76px)] min-h-0 overflow-y-auto px-1 pt-2">
-            {commissions.length === 0 ? (
+            {activeCommission ? (
+              <div className="grid h-full grid-cols-[minmax(0,1fr)_420px] gap-5">
+                <div className="rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+                    Workflow
+                  </p>
+
+                  <div className="mt-4 rounded-3xl border border-dashed border-[#d8cec0] bg-white p-4 text-sm text-[#9a8f82]">
+                    Workflow stages will appear here once we connect commissions to template
+                    stages.
+                  </div>
+                </div>
+
+                <aside className="rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+                    Commission detail
+                  </p>
+
+                  <h4 className="mt-2 text-2xl font-black">
+                    {activeCommission.title}
+                  </h4>
+
+                  <div className="mt-6 space-y-4">
+                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                        Client
+                      </p>
+                      <p className="mt-2 font-bold">
+                        {activeCommission.client_name || "No client"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                        Platform
+                      </p>
+                      <p className="mt-2 font-bold">
+                        {activeCommission.platform || "No platform"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                        Price
+                      </p>
+                      <p className="mt-2 font-bold">
+                        {activeCommission.price
+                          ? `${activeCommission.price} ${activeCommission.currency || "EUR"}`
+                          : "No price"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                        Deadline
+                      </p>
+                      <p className="mt-2 font-bold">
+                        {activeCommission.deadline || "No deadline"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                        Notes
+                      </p>
+
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#6f665c]">
+                        {activeCommission.notes || "No notes added."}
+                      </p>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            ) : commissions.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-md text-center">
                   <h4 className="text-xl font-black">No commissions yet</h4>
@@ -460,11 +593,13 @@ function OpenTabs({
   activeCommissionId,
   onSelectCommission,
   onCloseCommission,
+  onShowAllCommissions,
 }: {
   openCommissionTabs: Commission[];
   activeCommissionId: number | null;
   onSelectCommission: (commissionId: number) => void;
   onCloseCommission: (commissionId: number) => void;
+  onShowAllCommissions: () => void;
 }) {
   return (
     <section className="border-b border-[#ded7cc] bg-white px-8 py-3">
@@ -472,7 +607,16 @@ function OpenTabs({
         <span className="mr-1 text-xs font-bold uppercase tracking-[0.18em] text-[#9a8f82]">
           Open
         </span>
-
+        <button
+          onClick={onShowAllCommissions}
+          className={
+            activeCommissionId === null
+              ? "shrink-0 rounded-2xl border border-[#1f2933] bg-[#1f2933] px-4 py-2 text-sm font-bold text-white shadow-sm"
+              : "shrink-0 rounded-2xl border border-[#e6ded2] bg-[#fffaf2] px-4 py-2 text-sm font-semibold text-[#1f2933] shadow-sm"
+          }
+        >
+          All commissions
+        </button>
         {openCommissionTabs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#d8cec0] px-4 py-2 text-sm text-[#9a8f82]">
             No commissions open

@@ -1,5 +1,6 @@
-import { useState } from "react";
 import "./App.css";
+import { useEffect, useState } from "react";
+import { initializeDatabase } from "./lib/database";
 
 type Page = "commissions" | "clients" | "tags" | "templates" | "finished" | "settings";
 
@@ -27,6 +28,12 @@ const templates: {
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("commissions");
+
+  useEffect(() => {
+    initializeDatabase()
+      .then(() => console.log("Database initialized"))
+      .catch(console.error);
+  }, []);
 
   return (
     <div className="h-screen overflow-hidden bg-[#f6f3ee] text-[#1f2933]">

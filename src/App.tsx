@@ -2,6 +2,8 @@ import "./App.css";
 import { useEffect, useState } from "react";
 import {
   createTemplate,
+  deleteTemplate,
+  duplicateTemplate,
   getTemplateStages,
   getTemplates,
   initializeDatabase,
@@ -206,6 +208,8 @@ function TemplatesPage() {
   const [templateName, setTemplateName] = useState("");
   const [stageName, setStageName] = useState("");
   const [newStages, setNewStages] = useState<string[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
 
   async function loadTemplates() {
     const data = await getTemplates();
@@ -220,13 +224,19 @@ function TemplatesPage() {
 
   async function handleSelectTemplate(template: Template) {
     setSelectedTemplate(template);
+
     const stageData = await getTemplateStages(template.id);
+
+    console.log("Template:", template);
+    console.log("Stages:", stageData);
+
     setStages(stageData);
   }
 
   async function handleCreateTemplate() {
     try {
       await createTemplate(templateName, newStages);
+      
 
       setTemplateName("");
       setStageName("");
@@ -245,11 +255,54 @@ function TemplatesPage() {
       alert(`Template error: ${error}`);
     }
   }
+  async function handleDuplicateTemplate(templateId: number) {
+    try {
+      await duplicateTemplate(templateId);
 
+      const data = await getTemplates();
+      setTemplates(data);
+
+      if (data.length > 0) {
+        setSelectedTemplate(data[0]);
+        const stageData = await getTemplateStages(data[0].id);
+        setStages(stageData);
+      }
+    } catch (error) {
+      console.error(error);
+      alert(`Duplicate error: ${error}`);
+    }
+  }
+  async function confirmDeleteTemplate() {
+    if (!templateToDelete) {
+      return;
+    }
+
+    try {
+      await deleteTemplate(templateToDelete.id);
+
+      setShowDeleteModal(false);
+      setTemplateToDelete(null);
+
+      const data = await getTemplates();
+      setTemplates(data);
+
+      if (data.length > 0) {
+        setSelectedTemplate(data[0]);
+
+        const stageData = await getTemplateStages(data[0].id);
+        setStages(stageData);
+      } else {
+        setSelectedTemplate(null);
+        setStages([]);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
   useEffect(() => {
     loadTemplates().catch(console.error);
   }, []);
-  
+
   function handleAddStage() {
     const cleanStage = stageName.trim();
 
@@ -391,6 +444,24 @@ function TemplatesPage() {
               <h3 className="mt-2 text-2xl font-black">
                 {selectedTemplate.name}
               </h3>
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => handleDuplicateTemplate(selectedTemplate.id)}
+                  className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-2 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933]"
+                >
+                  Duplicate
+                </button>
+
+                <button
+                  onClick={() => {
+                    setTemplateToDelete(selectedTemplate);
+                    setShowDeleteModal(true);
+                  }}
+                  className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 transition hover:border-red-400"
+                >
+                  Delete
+                </button>
+              </div>
 
               <div className="mt-6 space-y-3">
                 {stages.length === 0 ? (
@@ -425,6 +496,43 @@ function TemplatesPage() {
           )}
         </div>
       </section>
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-[450px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              Delete template
+            </p>
+
+            <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+              {templateToDelete?.name}
+            </h3>
+
+            <p className="mt-4 text-sm text-[#7c7163]">
+              This action cannot be undone.
+              All stages inside this template will be deleted permanently.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setTemplateToDelete(null);
+                }}
+                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmDeleteTemplate}
+                className="rounded-2xl bg-red-500 px-4 py-2 font-bold text-white"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

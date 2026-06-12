@@ -17,9 +17,7 @@ export type TemplateStage = {
 };
 
 export async function getDatabase(): Promise<ZeeDatabase> {
-  if (db) {
-    return db;
-  }
+  if (db) return db;
 
   db = await Database.load("sqlite:zeeboard.db");
   return db;
@@ -96,9 +94,7 @@ export async function getTemplates(): Promise<Template[]> {
   `);
 }
 
-export async function getTemplateStages(
-  templateId: number,
-): Promise<TemplateStage[]> {
+export async function getTemplateStages(templateId: number): Promise<TemplateStage[]> {
   const database = await getDatabase();
 
   return await database.select<TemplateStage[]>(
@@ -112,42 +108,103 @@ export async function getTemplateStages(
   );
 }
 
-export async function createTemplate(
-  name: string,
-  stages: string[],
-): Promise<void> {
+export async function createTemplate(name: string, stages: string[]): Promise<void> {
   const database = await getDatabase();
 
-  const cleanName = name.trim();
-  const cleanStages = stages
+  const templateName = name.trim();
+  const templateStages = stages
     .map((stage) => stage.trim())
     .filter(Boolean);
 
-  if (!cleanName) {
+  if (!templateName) {
     throw new Error("Template name is required");
   }
 
-  await database.execute(
+  const result = await database.execute(
     `
     INSERT INTO templates (name)
     VALUES (?);
     `,
-    [cleanName],
+    [templateName],
   );
 
-  const result = await database.select<{ id: number }[]>(`
-    SELECT last_insert_rowid() AS id;
-  `);
+  const templateId = result.lastInsertId;
 
-  const templateId = result[0].id;
+  if (!templateId) {
+    throw new Error("Could not get created template id");
+  }
 
-  for (let index = 0; index < cleanStages.length; index++) {
+  for (let index = 0; index < templateStages.length; index++) {
     await database.execute(
       `
       INSERT INTO template_stages (template_id, name, stage_order)
       VALUES (?, ?, ?);
       `,
-      [templateId, cleanStages[index], index + 1],
+      [templateId, templateStages[index], index + 1],
+    );
+  }
+}
+
+export async function deleteTemplate(templateId: number): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    DELETE FROM template_stages
+    WHERE template_id = ?;
+    `,
+    [templateId],
+  );
+
+  await database.execute(
+    `
+    DELETE FROM templates
+    WHERE id = ?;
+    `,
+    [templateId],
+  );
+}
+
+export async function duplicateTemplate(templateId: number): Promise<void> {
+  const database = await getDatabase();
+
+  const templates = await database.select<Template[]>(
+    `
+    SELECT id, name
+    FROM templates
+    WHERE id = ?;
+    `,
+    [templateId],
+  );
+
+  if (templates.length === 0) {
+    throw new Error("Template not found");
+  }
+
+  const sourceTemplate = templates[0];
+  const stages = await getTemplateStages(templateId);
+
+  const result = await database.execute(
+    `
+    INSERT INTO templates (name)
+    VALUES (?);
+    `,
+    [`${sourceTemplate.name} Copy`],
+  );
+
+  const newTemplateId = result.lastInsertId;
+
+  if (!newTemplateId) {
+    throw new Error("Could not get duplicated template id");
+  }
+
+  for (const stage of stages) {
+    await database.execute(
+      `
+      INSERT INTO template_stages (template_id, name, stage_order)
+      VALUES (?, ?, ?);
+      `,
+      [newTemplateId, stage.name, stage.stage_order],
     );
   }
 }

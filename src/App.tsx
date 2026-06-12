@@ -7,6 +7,8 @@ import {
   getTemplateStages,
   getTemplates,
   initializeDatabase,
+  replaceTemplateStages,
+  updateTemplateName,
   type Template,
   type TemplateStage,
 } from "./lib/database";
@@ -210,6 +212,11 @@ function TemplatesPage() {
   const [newStages, setNewStages] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
+  const [editTemplateName, setEditTemplateName] = useState("");
+  const [editStages, setEditStages] = useState<string[]>([]);
+  const [editStageName, setEditStageName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
 
   async function loadTemplates() {
     const data = await getTemplates();
@@ -219,6 +226,64 @@ function TemplatesPage() {
       setSelectedTemplate(data[0]);
       const stageData = await getTemplateStages(data[0].id);
       setStages(stageData);
+      setEditTemplateName(data[0].name);
+      setEditStages(stageData.map((stage) => stage.name));
+    }
+  }
+
+  function handleAddEditStage() {
+    const cleanStage = editStageName.trim();
+
+    if (!cleanStage) {
+      return;
+    }
+
+    setEditStages((currentStages) => [...currentStages, cleanStage]);
+    setEditStageName("");
+  }
+
+  function handleRemoveEditStage(indexToRemove: number) {
+    setEditStages((currentStages) =>
+      currentStages.filter((_, index) => index !== indexToRemove),
+    );
+  }
+
+  async function handleSaveTemplateChanges() {
+    if (!selectedTemplate) {
+      return;
+    }
+
+    try {
+      setSavingTemplate(true);
+
+      await updateTemplateName(selectedTemplate.id, editTemplateName);
+      await replaceTemplateStages(selectedTemplate.id, editStages);
+
+      const data = await getTemplates();
+      setTemplates(data);
+
+      const updatedTemplate =
+        data.find((template) => template.id === selectedTemplate.id) ?? null;
+
+      setSelectedTemplate(updatedTemplate);
+
+      if (updatedTemplate) {
+        const stageData = await getTemplateStages(updatedTemplate.id);
+        setStages(stageData);
+        setEditTemplateName(updatedTemplate.name);
+        setEditStages(stageData.map((stage) => stage.name));
+      }
+
+      setTemplateSaved(true);
+
+      setTimeout(() => {
+        setTemplateSaved(false);
+      }, 1800);
+    } catch (error) {
+      console.error(error);
+      alert(`Save error: ${error}`);
+    } finally {
+      setSavingTemplate(false);
     }
   }
 
@@ -231,6 +296,8 @@ function TemplatesPage() {
     console.log("Stages:", stageData);
 
     setStages(stageData);
+    setEditTemplateName(template.name);
+    setEditStages(stageData.map((stage) => stage.name));
   }
 
   async function handleCreateTemplate() {
@@ -463,24 +530,80 @@ function TemplatesPage() {
                 </button>
               </div>
 
-              <div className="mt-6 space-y-3">
-                {stages.length === 0 ? (
-                  <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-5 text-sm text-[#9a8f82]">
-                    This template has no stages.
-                  </div>
-                ) : (
-                  stages.map((stage, index) => (
-                    <div
-                      key={stage.id}
-                      className="flex items-center gap-4 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4"
-                    >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-black shadow-sm">
-                        {index + 1}
-                      </span>
-                      <span className="font-bold">{stage.name}</span>
+              <div className="mt-6 space-y-4">
+                <input
+                  value={editTemplateName}
+                  onChange={(event) => setEditTemplateName(event.target.value)}
+                  className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-bold outline-none focus:border-[#1f2933]"
+                />
+
+                <div className="flex gap-2">
+                  <input
+                    value={editStageName}
+                    onChange={(event) => setEditStageName(event.target.value)}
+                    placeholder="New stage"
+                    className="min-w-0 flex-1 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none focus:border-[#1f2933]"
+                  />
+
+                  <button
+                    onClick={handleAddEditStage}
+                    className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-bold"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {editStages.length === 0 ? (
+                    <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-5 text-sm text-[#9a8f82]">
+                      This template has no stages.
                     </div>
-                  ))
-                )}
+                  ) : (
+                    editStages.map((stage, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4"
+                      >
+                        <span className="font-black">
+                          {index + 1}
+                        </span>
+
+                        <input
+                          value={stage}
+                          onChange={(event) => {
+                            const updatedStages = [...editStages];
+                            updatedStages[index] = event.target.value;
+                            setEditStages(updatedStages);
+                          }}
+                          className="flex-1 rounded-xl border border-[#d8cec0] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#1f2933]"
+                        />
+
+                        <button
+                          onClick={() => handleRemoveEditStage(index)}
+                          className="rounded-xl px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button
+                  onClick={handleSaveTemplateChanges}
+                  disabled={savingTemplate}
+                  className={
+                    templateSaved
+                      ? "rounded-2xl bg-green-600 px-5 py-3 text-sm font-bold text-white shadow-md transition-all duration-300"
+                      : "rounded-2xl bg-[#1f2933] px-5 py-3 text-sm font-bold text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
+                  }
+                >
+                  {savingTemplate
+                    ? "Saving..."
+                    : templateSaved
+                      ? "✓ Saved"
+                      : "Save changes"}
+                </button>
               </div>
             </>
           ) : (

@@ -208,3 +208,54 @@ export async function duplicateTemplate(templateId: number): Promise<void> {
     );
   }
 }
+
+export async function updateTemplateName(
+  templateId: number,
+  name: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanName = name.trim();
+
+  if (!cleanName) {
+    throw new Error("Template name is required");
+  }
+
+  await database.execute(
+    `
+    UPDATE templates
+    SET name = ?
+    WHERE id = ?;
+    `,
+    [cleanName, templateId],
+  );
+}
+
+export async function replaceTemplateStages(
+  templateId: number,
+  stages: string[],
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanStages = stages
+    .map((stage) => stage.trim())
+    .filter(Boolean);
+
+  await database.execute(
+    `
+    DELETE FROM template_stages
+    WHERE template_id = ?;
+    `,
+    [templateId],
+  );
+
+  for (let index = 0; index < cleanStages.length; index++) {
+    await database.execute(
+      `
+      INSERT INTO template_stages (template_id, name, stage_order)
+      VALUES (?, ?, ?);
+      `,
+      [templateId, cleanStages[index], index + 1],
+    );
+  }
+}

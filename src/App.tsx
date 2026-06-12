@@ -12,6 +12,7 @@ import {
   type Template,
   type TemplateStage,
 } from "./lib/database";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Page = "commissions" | "clients" | "tags" | "templates" | "finished" | "settings";
 
@@ -246,6 +247,40 @@ function TemplatesPage() {
     setEditStages((currentStages) =>
       currentStages.filter((_, index) => index !== indexToRemove),
     );
+  }
+
+  function handleMoveEditStageUp(index: number) {
+    if (index === 0) {
+      return;
+    }
+
+    setEditStages((currentStages) => {
+      const updatedStages = [...currentStages];
+
+      [updatedStages[index - 1], updatedStages[index]] = [
+        updatedStages[index],
+        updatedStages[index - 1],
+      ];
+
+      return updatedStages;
+    });
+  }
+
+  function handleMoveEditStageDown(index: number) {
+    if (index === editStages.length - 1) {
+      return;
+    }
+
+    setEditStages((currentStages) => {
+      const updatedStages = [...currentStages];
+
+      [updatedStages[index], updatedStages[index + 1]] = [
+        updatedStages[index + 1],
+        updatedStages[index],
+      ];
+
+      return updatedStages;
+    });
   }
 
   async function handleSaveTemplateChanges() {
@@ -553,41 +588,70 @@ function TemplatesPage() {
                   </button>
                 </div>
 
-                <div className="space-y-2">
-                  {editStages.length === 0 ? (
-                    <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-5 text-sm text-[#9a8f82]">
-                      This template has no stages.
-                    </div>
-                  ) : (
-                    editStages.map((stage, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4"
-                      >
-                        <span className="font-black">
-                          {index + 1}
-                        </span>
-
-                        <input
-                          value={stage}
-                          onChange={(event) => {
-                            const updatedStages = [...editStages];
-                            updatedStages[index] = event.target.value;
-                            setEditStages(updatedStages);
-                          }}
-                          className="flex-1 rounded-xl border border-[#d8cec0] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#1f2933]"
-                        />
-
-                        <button
-                          onClick={() => handleRemoveEditStage(index)}
-                          className="rounded-xl px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-50"
-                        >
-                          Delete
-                        </button>
+                <AnimatePresence mode="popLayout">
+                  <div className="space-y-2">
+                    {editStages.length === 0 ? (
+                      <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-5 text-sm text-[#9a8f82]">
+                        This template has no stages.
                       </div>
-                    ))
-                  )}
-                </div>
+                    ) : (
+                      editStages.map((stage, index) => (
+                        <motion.div
+                          key={`${stage}-${index}`}
+                          layout="position"
+                          transition={{
+                            layout: {
+                              duration: 0.35,
+                              ease: "easeInOut",
+                            },
+                          }}
+                            className="flex items-center gap-3 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4"
+                          >
+                          <span className="font-black">
+                            {index + 1}
+                          </span>
+
+                          <input
+                            value={stage}
+                            onChange={(event) => {
+                              const updatedStages = [...editStages];
+                              updatedStages[index] = event.target.value;
+                              setEditStages(updatedStages);
+                            }}
+                            className="flex-1 rounded-xl border border-[#d8cec0] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#1f2933]"
+                          />
+
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleMoveEditStageUp(index)}
+                              disabled={index === 0}
+                              className="rounded-xl px-2 py-1 text-xs font-bold text-[#6f665c] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-30"
+                            >
+                              ↑
+                            </button>
+
+                            <button
+                              onClick={() => handleMoveEditStageDown(index)}
+                              disabled={index === editStages.length - 1}
+                              className="rounded-xl px-2 py-1 text-xs font-bold text-[#6f665c] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-30"
+                            >
+                              ↓
+                            </button>
+
+                            <button
+                              onClick={() => handleRemoveEditStage(index)}
+                              className="rounded-xl px-2 py-1 text-xs font-bold text-red-500 transition hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                </AnimatePresence>
+
+
 
                 <button
                   onClick={handleSaveTemplateChanges}

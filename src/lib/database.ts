@@ -1,21 +1,34 @@
 import Database from "@tauri-apps/plugin-sql";
 
-let db: Database | null = null;
+type ZeeDatabase = Awaited<ReturnType<typeof Database.load>>;
 
-export async function getDatabase() {
+let db: ZeeDatabase | null = null;
+
+export type Template = {
+  id: number;
+  name: string;
+};
+
+export type TemplateStage = {
+  id: number;
+  template_id: number;
+  name: string;
+  stage_order: number;
+};
+
+export async function getDatabase(): Promise<ZeeDatabase> {
   if (db) {
     return db;
   }
 
   db = await Database.load("sqlite:zeeboard.db");
-
   return db;
 }
 
 export async function initializeDatabase() {
-  const db = await getDatabase();
+  const database = await getDatabase();
 
-  await db.execute(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY,
       language TEXT NOT NULL DEFAULT 'en',
@@ -23,7 +36,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  await db.execute(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS clients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -34,7 +47,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  await db.execute(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS tags (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -42,14 +55,14 @@ export async function initializeDatabase() {
     );
   `);
 
-  await db.execute(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS templates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL
     );
   `);
 
-  await db.execute(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS template_stages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       template_id INTEGER NOT NULL,
@@ -58,7 +71,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  await db.execute(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS commissions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -71,4 +84,70 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL
     );
   `);
+}
+
+export async function getTemplates(): Promise<Template[]> {
+  const database = await getDatabase();
+
+  return await database.select<Template[]>(`
+    SELECT id, name
+    FROM templates
+    ORDER BY id DESC;
+  `);
+}
+
+export async function getTemplateStages(
+  templateId: number,
+): Promise<TemplateStage[]> {
+  const database = await getDatabase();
+
+  return await database.select<TemplateStage[]>(
+    `
+    SELECT id, template_id, name, stage_order
+    FROM template_stages
+    WHERE template_id = ?
+    ORDER BY stage_order ASC;
+    `,
+    [templateId],
+  );
+}
+
+export async function createTemplate(
+  name: string,
+  stages: string[],
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanName = name.trim();
+  const cleanStages = stages
+    .map((stage) => stage.trim())
+    .filter(Boolean);
+
+  if (!cleanName) {
+    throw new Error("Template name is required");
+  }
+
+  await database.execute(
+    `
+    INSERT INTO templates (name)
+    VALUES (?);
+    `,
+    [cleanName],
+  );
+
+  const result = await database.select<{ id: number }[]>(`
+    SELECT last_insert_rowid() AS id;
+  `);
+
+  const templateId = result[0].id;
+
+  for (let index = 0; index < cleanStages.length; index++) {
+    await database.execute(
+      `
+      INSERT INTO template_stages (template_id, name, stage_order)
+      VALUES (?, ?, ?);
+      `,
+      [templateId, cleanStages[index], index + 1],
+    );
+  }
 }

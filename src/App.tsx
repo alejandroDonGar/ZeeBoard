@@ -1,6 +1,13 @@
 import "./App.css";
 import { useEffect, useState } from "react";
-import { initializeDatabase } from "./lib/database";
+import {
+  createTemplate,
+  getTemplateStages,
+  getTemplates,
+  initializeDatabase,
+  type Template,
+  type TemplateStage,
+} from "./lib/database";
 
 type Page = "commissions" | "clients" | "tags" | "templates" | "finished" | "settings";
 
@@ -193,42 +200,172 @@ function OpenTabs() {
 }
 
 function TemplatesPage() {
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [stages, setStages] = useState<TemplateStage[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [stageText, setStageText] = useState("");
+
+  async function loadTemplates() {
+    const data = await getTemplates();
+    setTemplates(data);
+
+    if (!selectedTemplate && data.length > 0) {
+      setSelectedTemplate(data[0]);
+      const stageData = await getTemplateStages(data[0].id);
+      setStages(stageData);
+    }
+  }
+
+  async function handleSelectTemplate(template: Template) {
+    setSelectedTemplate(template);
+    const stageData = await getTemplateStages(template.id);
+    setStages(stageData);
+  }
+
+  async function handleCreateTemplate() {
+    try {
+      const stages = stageText
+        .split("\n")
+        .map((stage) => stage.trim())
+        .filter(Boolean);
+
+      await createTemplate(templateName, stages);
+
+      setTemplateName("");
+      setStageText("");
+
+      const data = await getTemplates();
+      setTemplates(data);
+
+      if (data.length > 0) {
+        setSelectedTemplate(data[0]);
+        const stageData = await getTemplateStages(data[0].id);
+        setStages(stageData);
+      }
+    } catch (error) {
+      console.error(error);
+      alert(`Template error: ${error}`);
+    }
+  }
+
+  useEffect(() => {
+    loadTemplates().catch(console.error);
+  }, []);
+
   return (
     <>
       <PageHeader
         label="Workflow library"
         title="Templates"
         description="Create reusable commission workflows and arrange their stages."
-        action="+ New template"
       />
 
-      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[360px_minmax(0,1fr)] gap-5 p-5 pb-6">
-        <div className="h-full rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <h3 className="text-xl font-black">
-                No templates yet
-              </h3>
+      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[380px_minmax(0,1fr)] gap-5 p-5 pb-6">
+        <div className="flex h-full min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+          <div className="mb-5">
+            <h3 className="text-xl font-black">New template</h3>
+            <p className="mt-1 text-sm text-[#7c7163]">
+              Create a workflow with one stage per line.
+            </p>
+          </div>
 
-              <p className="mt-2 text-sm text-[#7c7163]">
-                Create your first commission template.
-              </p>
-            </div>
+          <input
+            value={templateName}
+            onChange={(event) => setTemplateName(event.target.value)}
+            placeholder="Template name"
+            className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none transition focus:border-[#1f2933]"
+          />
+
+          <textarea
+            value={stageText}
+            onChange={(event) => setStageText(event.target.value)}
+            placeholder={"Initial Sketch\nFinal Sketch\nCompleted"}
+            className="mt-3 min-h-32 resize-none rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none transition focus:border-[#1f2933]"
+          />
+
+          <button
+            onClick={handleCreateTemplate}
+            className="mt-3 rounded-2xl bg-[#1f2933] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            Create template
+          </button>
+
+          <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              Templates
+            </p>
+
+            {templates.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-4 text-center text-sm text-[#9a8f82]">
+                No templates yet
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {templates.map((template) => {
+                  const isSelected = selectedTemplate?.id === template.id;
+
+                  return (
+                    <button
+                      key={template.id}
+                      onClick={() => handleSelectTemplate(template)}
+                      className={
+                        isSelected
+                          ? "w-full rounded-3xl border border-[#1f2933] bg-[#1f2933] px-4 py-4 text-left font-bold text-white shadow-sm"
+                          : "w-full rounded-3xl border border-[#e6ded2] bg-[#fffaf2] px-4 py-4 text-left font-semibold text-[#1f2933] transition hover:border-[#1f2933]"
+                      }
+                    >
+                      {template.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="h-full rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <h3 className="text-xl font-black">
-                No template selected
+        <div className="h-full min-h-0 rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+          {selectedTemplate ? (
+            <>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+                Selected template
+              </p>
+
+              <h3 className="mt-2 text-2xl font-black">
+                {selectedTemplate.name}
               </h3>
 
-              <p className="mt-2 text-sm text-[#7c7163]">
-                Template stages will appear here.
-              </p>
+              <div className="mt-6 space-y-3">
+                {stages.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-5 text-sm text-[#9a8f82]">
+                    This template has no stages.
+                  </div>
+                ) : (
+                  stages.map((stage, index) => (
+                    <div
+                      key={stage.id}
+                      className="flex items-center gap-4 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-black shadow-sm">
+                        {index + 1}
+                      </span>
+                      <span className="font-bold">{stage.name}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <h3 className="text-xl font-black">No template selected</h3>
+
+                <p className="mt-2 text-sm text-[#7c7163]">
+                  Create or select a template to view its stages.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
     </>

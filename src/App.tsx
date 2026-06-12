@@ -139,9 +139,11 @@ function CommissionsPage() {
   const [hasDeadline, setHasDeadline] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [commissions, setCommissions] = useState<Commission[]>([]);
   const [creatingCommission, setCreatingCommission] = useState(false);
   const [commissionCreated, setCommissionCreated] = useState(false);
+  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [openCommissionTabs, setOpenCommissionTabs] = useState<Commission[]>([]);
+const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null);
 
   useEffect(() => {
     getTemplates()
@@ -193,6 +195,32 @@ function CommissionsPage() {
       setCreatingCommission(false);
     }
   }
+
+  function handleOpenCommission(commission: Commission) {
+    setOpenCommissionTabs((currentTabs: Commission[]) => {
+      const alreadyOpen = currentTabs.some(
+        (tab: Commission) => tab.id === commission.id,
+      );
+
+      if (alreadyOpen) {
+        return currentTabs;
+      }
+
+      return [...currentTabs, commission];
+    });
+
+    setActiveCommissionId(commission.id);
+  }
+
+  function handleCloseCommissionTab(commissionId: number) {
+    setOpenCommissionTabs((currentTabs: Commission[]) =>
+      currentTabs.filter((tab: Commission) => tab.id !== commissionId),
+    );
+
+    if (activeCommissionId === commissionId) {
+      setActiveCommissionId(null);
+    }
+  }
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
@@ -203,7 +231,12 @@ function CommissionsPage() {
         onAction={() => setShowNewCommissionModal(true)}
       />
 
-      <OpenTabs />
+      <OpenTabs
+        openCommissionTabs={openCommissionTabs}
+        activeCommissionId={activeCommissionId}
+        onSelectCommission={setActiveCommissionId}
+        onCloseCommission={handleCloseCommissionTab}
+      />
 
       <section className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-5 p-5 pb-6">
         <div className="h-full min-h-0 rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
@@ -214,13 +247,9 @@ function CommissionsPage() {
                 Start with a template, then move each commission through its own stages.
               </p>
             </div>
-
-            <button className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-2 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933]">
-              + Add column
-            </button>
           </div>
 
-          <div className="h-[calc(100%-76px)] min-h-0 overflow-y-auto pr-1">
+          <div className="h-[calc(100%-76px)] min-h-0 overflow-y-auto px-1 pt-2">
             {commissions.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-md text-center">
@@ -233,9 +262,10 @@ function CommissionsPage() {
             ) : (
               <div className="grid grid-cols-3 gap-4">
                 {commissions.map((commission) => (
-                  <div
+                  <button
                     key={commission.id}
-                    className="rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 shadow-sm"
+                    onClick={() => handleOpenCommission(commission)}
+                    className="rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f2933] hover:shadow-md"
                   >
                     <h4 className="font-black">{commission.title}</h4>
 
@@ -264,7 +294,7 @@ function CommissionsPage() {
                         {commission.notes}
                       </p>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -425,17 +455,62 @@ function CommissionsPage() {
   );
 }
 
-function OpenTabs() {
+function OpenTabs({
+  openCommissionTabs,
+  activeCommissionId,
+  onSelectCommission,
+  onCloseCommission,
+}: {
+  openCommissionTabs: Commission[];
+  activeCommissionId: number | null;
+  onSelectCommission: (commissionId: number) => void;
+  onCloseCommission: (commissionId: number) => void;
+}) {
   return (
     <section className="border-b border-[#ded7cc] bg-white px-8 py-3">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 overflow-x-auto">
         <span className="mr-1 text-xs font-bold uppercase tracking-[0.18em] text-[#9a8f82]">
           Open
         </span>
 
-        <div className="rounded-2xl border border-dashed border-[#d8cec0] px-4 py-2 text-sm text-[#9a8f82]">
-          No commissions open
-        </div>
+        {openCommissionTabs.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#d8cec0] px-4 py-2 text-sm text-[#9a8f82]">
+            No commissions open
+          </div>
+        ) : (
+          openCommissionTabs.map((commission) => {
+            const isActive = activeCommissionId === commission.id;
+
+            return (
+              <div
+                key={commission.id}
+                className={
+                  isActive
+                    ? "flex shrink-0 items-center gap-2 rounded-2xl border border-[#1f2933] bg-[#1f2933] px-4 py-2 text-sm font-bold text-white shadow-sm"
+                    : "flex shrink-0 items-center gap-2 rounded-2xl border border-[#e6ded2] bg-[#fffaf2] px-4 py-2 text-sm font-semibold text-[#1f2933] shadow-sm"
+                }
+              >
+                <button
+                  onClick={() => onSelectCommission(commission.id)}
+                  className="max-w-52 truncate"
+                >
+                  {commission.client_name || "No client"} · {commission.title}
+                </button>
+
+                <button
+                  onClick={() => onCloseCommission(commission.id)}
+                  className={
+                    isActive
+                      ? "rounded-full px-2 text-white/70 hover:bg-white/10 hover:text-white"
+                      : "rounded-full px-2 text-[#9a8f82] hover:bg-[#f1e8da] hover:text-[#1f2933]"
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })
+        )}
       </div>
     </section>
   );

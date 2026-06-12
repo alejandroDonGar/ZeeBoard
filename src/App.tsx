@@ -145,6 +145,8 @@ function CommissionsPage() {
   const [openCommissionTabs, setOpenCommissionTabs] = useState<Commission[]>([]);
   const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null);
   const [tabsRestored, setTabsRestored] = useState(false);
+  const [workflowStages, setWorkflowStages] = useState<TemplateStage[]>([]);
+  const activeCommission = commissions.find((commission) => commission.id === activeCommissionId) ?? null;
 
   useEffect(() => {
     getTemplates()
@@ -226,7 +228,7 @@ function CommissionsPage() {
         setTabsRestored(true);
       });
   }, []);
-  
+
   useEffect(() => {
     if (!tabsRestored) {
       return;
@@ -246,6 +248,27 @@ function CommissionsPage() {
       localStorage.removeItem("zeeboard-active-commission-id");
     }
   }, [openCommissionTabs, activeCommissionId, tabsRestored]);
+
+  useEffect(() => {
+    async function loadWorkflowStages() {
+      if (!activeCommission?.template_id) {
+        setWorkflowStages([]);
+        return;
+      }
+
+      try {
+        const stages = await getTemplateStages(
+          activeCommission.template_id,
+        );
+
+        setWorkflowStages(stages);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    loadWorkflowStages();
+  }, [activeCommission]);
 
   function handleOpenCommission(commission: Commission) {
     setOpenCommissionTabs((currentTabs: Commission[]) => {
@@ -272,7 +295,8 @@ function CommissionsPage() {
       setActiveCommissionId(null);
     }
   }
-  const activeCommission = commissions.find((commission) => commission.id === activeCommissionId) ?? null;
+  
+  
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
@@ -311,29 +335,21 @@ function CommissionsPage() {
 
           <div className="h-[calc(100%-76px)] min-h-0 overflow-y-auto px-1 pt-2">
             {activeCommission ? (
-              <div className="grid h-full grid-cols-[minmax(0,1fr)_420px] gap-5">
-                <div className="rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
-                    Workflow
-                  </p>
-
-                  <div className="mt-4 rounded-3xl border border-dashed border-[#d8cec0] bg-white p-4 text-sm text-[#9a8f82]">
-                    Workflow stages will appear here once we connect commissions to template
-                    stages.
-                  </div>
-                </div>
-
-                <aside className="rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
+              <div className="flex h-full min-h-0 flex-col gap-5">
+                <aside className="shrink-0 rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
                     Commission detail
                   </p>
 
-                  <h4 className="mt-2 text-2xl font-black">
-                    {activeCommission.title}
-                  </h4>
+                  <div className="mt-4 grid grid-cols-5 gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                        Title
+                      </p>
+                      <p className="mt-2 font-bold">{activeCommission.title}</p>
+                    </div>
 
-                  <div className="mt-6 space-y-4">
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                    <div>
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
                         Client
                       </p>
@@ -342,7 +358,7 @@ function CommissionsPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                    <div>
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
                         Platform
                       </p>
@@ -351,7 +367,7 @@ function CommissionsPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                    <div>
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
                         Price
                       </p>
@@ -362,7 +378,7 @@ function CommissionsPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
+                    <div>
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
                         Deadline
                       </p>
@@ -370,18 +386,40 @@ function CommissionsPage() {
                         {activeCommission.deadline || "No deadline"}
                       </p>
                     </div>
-
-                    <div className="rounded-3xl bg-white p-4 shadow-sm">
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
-                        Notes
-                      </p>
-
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#6f665c]">
-                        {activeCommission.notes || "No notes added."}
-                      </p>
-                    </div>
                   </div>
                 </aside>
+
+                <div className="min-h-0 flex-1 rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+                    Workflow
+                  </p>
+
+                  <div className="mt-4 flex gap-3 overflow-x-auto pb-3">
+                    {workflowStages.length === 0 ? (
+                      <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-white p-4 text-sm text-[#9a8f82]">
+                        No template assigned.
+                      </div>
+                    ) : (
+                      workflowStages.map((stage, index) => (
+                        <div
+                          key={stage.id}
+                          className="min-w-[240px] flex-shrink-0 rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1f2933] text-xs font-black text-white">
+                              {index + 1}
+                            </div>
+
+                            <div>
+                              <p className="font-bold">{stage.name}</p>
+                              <p className="text-xs text-[#9a8f82]">Stage {index + 1}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             ) : commissions.length === 0 ? (
               <div className="flex h-full items-center justify-center">
@@ -446,13 +484,30 @@ function CommissionsPage() {
               Deadlines will appear automatically once commissions are created.
             </p>
           </div>
-
           <div className="mt-6 rounded-3xl border border-[#e6ded2] bg-[#f9f4ec] p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
-              Default workflow
+              Calendar
             </p>
-            <div className="mt-3 rounded-2xl border border-dashed border-[#d8cec0] bg-white p-4 text-sm text-[#9a8f82]">
-              No templates available
+
+            <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs font-bold text-[#9a8f82]">
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
+              <span>Sun</span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-7 gap-2">
+              {Array.from({ length: 35 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex aspect-square items-center justify-center rounded-xl bg-white text-xs font-bold text-[#9a8f82]"
+                >
+                  {index + 1 <= 31 ? index + 1 : ""}
+                </div>
+              ))}
             </div>
           </div>
         </aside>

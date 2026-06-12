@@ -317,6 +317,13 @@ export async function createCommission(
     throw new Error("Commission title is required");
   }
 
+  let firstStageId: number | null = null;
+
+  if (templateId) {
+    const stages = await getTemplateStages(templateId);
+    firstStageId = stages.length > 0 ? stages[0].id : null;
+  }
+
   await database.execute(
     `
     INSERT INTO commissions (
@@ -324,24 +331,42 @@ export async function createCommission(
       client_name,
       platform,
       template_id,
+      current_stage_id,
       price,
       currency,
       deadline,
       notes,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
     [
       cleanTitle,
       clientName.trim() || null,
       platform,
       templateId,
+      firstStageId,
       price,
       currency,
       deadline,
       notes.trim() || null,
       new Date().toISOString(),
     ],
+  );
+}
+
+export async function updateCommissionStage(
+  commissionId: number,
+  stageId: number | null,
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    UPDATE commissions
+    SET current_stage_id = ?
+    WHERE id = ?;
+    `,
+    [stageId, commissionId],
   );
 }

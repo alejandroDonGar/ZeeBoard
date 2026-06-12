@@ -11,6 +11,7 @@ import {
   updateTemplateName,
   createCommission,
   getCommissions,
+  updateCommissionStage,
   type Commission,
   type Template,
   type TemplateStage,
@@ -295,7 +296,41 @@ function CommissionsPage() {
       setActiveCommissionId(null);
     }
   }
-  
+  async function handleMoveToNextStage() {
+    if (!activeCommission || workflowStages.length === 0) {
+      return;
+    }
+
+    const currentStageIndex = workflowStages.findIndex(
+      (stage) => stage.id === activeCommission.current_stage_id,
+    );
+
+    const nextStage = workflowStages[currentStageIndex + 1];
+
+    if (!nextStage) {
+      return;
+    }
+
+    await updateCommissionStage(activeCommission.id, nextStage.id);
+
+    const data = await getCommissions();
+    setCommissions(data);
+
+    setOpenCommissionTabs((currentTabs) =>
+      currentTabs.map((tab) =>
+        tab.id === activeCommission.id
+          ? { ...tab, current_stage_id: nextStage.id }
+          : tab,
+      ),
+    );
+  }
+  const currentStageIndex = workflowStages.findIndex(
+    (stage) => stage.id === activeCommission?.current_stage_id,
+  );
+
+  const isLastStage =
+    workflowStages.length > 0 &&
+    currentStageIndex === workflowStages.length - 1;
   
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -403,11 +438,25 @@ function CommissionsPage() {
                       workflowStages.map((stage, index) => (
                         <div
                           key={stage.id}
-                          className="min-w-[240px] flex-shrink-0 rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm"
+                          className={
+                            index < currentStageIndex
+                              ? "min-w-[240px] flex-shrink-0 rounded-3xl border border-green-300 bg-green-100 p-4 text-green-900 shadow-sm"
+                              : index === currentStageIndex
+                                ? "min-w-[240px] flex-shrink-0 rounded-3xl border border-amber-300 bg-amber-100 p-4 text-amber-900 shadow-sm"
+                                : "min-w-[240px] flex-shrink-0 rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm"
+                          }
                         >
                           <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1f2933] text-xs font-black text-white">
-                              {index + 1}
+                            <div
+                              className={
+                                index < currentStageIndex
+                                  ? "flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-xs font-black text-white"
+                                  : index === currentStageIndex
+                                    ? "flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white"
+                                    : "flex h-8 w-8 items-center justify-center rounded-full bg-[#1f2933] text-xs font-black text-white"
+                              }
+                            >
+                              {index < currentStageIndex ? "✓" : index + 1}
                             </div>
 
                             <div>
@@ -419,6 +468,17 @@ function CommissionsPage() {
                       ))
                     )}
                   </div>
+                  <button
+                    onClick={handleMoveToNextStage}
+                    disabled={isLastStage}
+                    className={
+                      isLastStage
+                        ? "mt-5 rounded-2xl bg-green-600 px-5 py-3 text-sm font-bold text-white shadow-md"
+                        : "mt-5 rounded-2xl bg-[#1f2933] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+                    }
+                  >
+                    {isLastStage ? "✓ Finished" : "Move to next stage"}
+                  </button>
                 </div>
               </div>
             ) : commissions.length === 0 ? (
@@ -473,17 +533,6 @@ function CommissionsPage() {
         </div>
 
         <aside className="h-full min-h-0 rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
-          <h3 className="text-xl font-black">Deadlines</h3>
-          <p className="mt-1 text-sm text-[#7c7163]">
-            Upcoming deliveries and client revisions.
-          </p>
-
-          <div className="mt-6 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4">
-            <p className="text-sm font-black">No deadlines yet</p>
-            <p className="mt-1 text-xs leading-relaxed text-[#7c7163]">
-              Deadlines will appear automatically once commissions are created.
-            </p>
-          </div>
           <div className="mt-6 rounded-3xl border border-[#e6ded2] bg-[#f9f4ec] p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
               Calendar

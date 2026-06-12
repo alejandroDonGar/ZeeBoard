@@ -9,6 +9,9 @@ import {
   initializeDatabase,
   replaceTemplateStages,
   updateTemplateName,
+  createCommission,
+  getCommissions,
+  type Commission,
   type Template,
   type TemplateStage,
 } from "./lib/database";
@@ -125,6 +128,71 @@ function App() {
 }
 
 function CommissionsPage() {
+  const [showNewCommissionModal, setShowNewCommissionModal] = useState(false);
+  const [commissionTitle, setCommissionTitle] = useState("");
+  const [commissionPrice, setCommissionPrice] = useState("");
+  const [commissionDeadline, setCommissionDeadline] = useState("");
+  const [commissionNotes, setCommissionNotes] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [platform, setPlatform] = useState("Discord");
+  const [currency, setCurrency] = useState("EUR");
+  const [hasDeadline, setHasDeadline] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [creatingCommission, setCreatingCommission] = useState(false);
+  const [commissionCreated, setCommissionCreated] = useState(false);
+
+  useEffect(() => {
+    getTemplates()
+      .then(setTemplates)
+      .catch(console.error);
+
+    getCommissions()
+      .then(setCommissions)
+      .catch(console.error);
+  }, []);
+  async function handleCreateCommission() {
+    try {
+      setCreatingCommission(true);
+
+      await createCommission(
+        commissionTitle,
+        clientName,
+        platform,
+        selectedTemplateId,
+        commissionPrice ? Number(commissionPrice) : null,
+        currency,
+        hasDeadline ? commissionDeadline : null,
+        commissionNotes,
+      );
+
+      const data = await getCommissions();
+      setCommissions(data);
+
+      setCommissionTitle("");
+      setClientName("");
+      setPlatform("Discord");
+      setSelectedTemplateId(null);
+      setCommissionPrice("");
+      setCurrency("EUR");
+      setHasDeadline(false);
+      setCommissionDeadline("");
+      setCommissionNotes("");
+
+      setCommissionCreated(true);
+
+      setTimeout(() => {
+        setCommissionCreated(false);
+        setShowNewCommissionModal(false);
+      }, 1500);
+    } catch (error) {
+      console.error(error);
+      alert(`Commission error: ${error}`);
+    } finally {
+      setCreatingCommission(false);
+    }
+  }
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
@@ -132,6 +200,7 @@ function CommissionsPage() {
         title="Commissions"
         description="Organize your drawings by stages, clients, dates and tags."
         action="+ New commission"
+        onAction={() => setShowNewCommissionModal(true)}
       />
 
       <OpenTabs />
@@ -151,13 +220,54 @@ function CommissionsPage() {
             </button>
           </div>
 
-          <div className="flex h-[calc(100%-76px)] min-h-0 items-center justify-center">
-            <div className="max-w-md text-center">
-              <h4 className="text-xl font-black">No commissions yet</h4>
-              <p className="mt-2 text-sm leading-relaxed text-[#7c7163]">
-                Create your first commission to start building your workflow.
-              </p>
-            </div>
+          <div className="h-[calc(100%-76px)] min-h-0 overflow-y-auto pr-1">
+            {commissions.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <div className="max-w-md text-center">
+                  <h4 className="text-xl font-black">No commissions yet</h4>
+                  <p className="mt-2 text-sm leading-relaxed text-[#7c7163]">
+                    Create your first commission to start building your workflow.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4">
+                {commissions.map((commission) => (
+                  <div
+                    key={commission.id}
+                    className="rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 shadow-sm"
+                  >
+                    <h4 className="font-black">{commission.title}</h4>
+
+                    <p className="mt-2 text-sm font-semibold text-[#6f665c]">
+                      {commission.client_name || "No client"}
+                    </p>
+
+                    <p className="mt-1 text-xs text-[#9a8f82]">
+                      {commission.platform || "No platform"}
+                    </p>
+
+                    <div className="mt-4 flex items-center justify-between">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1f2933] shadow-sm">
+                        {commission.price
+                          ? `${commission.price} ${commission.currency || "EUR"}`
+                          : "No price"}
+                      </span>
+
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#9a8f82] shadow-sm">
+                        {commission.deadline || "No deadline"}
+                      </span>
+                    </div>
+
+                    {commission.notes && (
+                      <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-[#7c7163]">
+                        {commission.notes}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -184,6 +294,133 @@ function CommissionsPage() {
           </div>
         </aside>
       </section>
+      {showNewCommissionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-[650px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              New commission
+            </p>
+
+            <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+              Create commission
+            </h3>
+
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <input
+                value={commissionTitle}
+                onChange={(event) => setCommissionTitle(event.target.value)}
+                placeholder="Commission title"
+                className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+
+              <input
+                value={clientName}
+                onChange={(event) => setClientName(event.target.value)}
+                placeholder="Client name"
+                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+
+              <select
+                value={platform}
+                onChange={(event) => setPlatform(event.target.value)}
+                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              >
+                <option>Discord</option>
+                <option>Twitter / X</option>
+                <option>Bluesky</option>
+                <option>Telegram</option>
+                <option>Email</option>
+                <option>Other</option>
+              </select>
+
+              <select
+                value={selectedTemplateId ?? ""}
+                onChange={(event) =>
+                  setSelectedTemplateId(
+                    event.target.value ? Number(event.target.value) : null,
+                  )
+                }
+                className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              >
+                <option value="">Select template</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                value={commissionPrice}
+                onChange={(event) => setCommissionPrice(event.target.value)}
+                placeholder="Price"
+                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+
+              <select
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value)}
+                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              >
+                <option>EUR</option>
+                <option>USD</option>
+                <option>GBP</option>
+              </select>
+
+              <label className="col-span-2 flex items-center gap-3 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={hasDeadline}
+                  onChange={(event) => setHasDeadline(event.target.checked)}
+                />
+                This commission has a deadline
+              </label>
+
+              {hasDeadline && (
+                <input
+                  type="date"
+                  value={commissionDeadline}
+                  onChange={(event) => setCommissionDeadline(event.target.value)}
+                  className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                />
+              )}
+
+              <textarea
+                value={commissionNotes}
+                onChange={(event) => setCommissionNotes(event.target.value)}
+                placeholder="Notes"
+                rows={4}
+                className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowNewCommissionModal(false)}
+                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleCreateCommission}
+                disabled={creatingCommission}
+                className={
+                  commissionCreated
+                    ? "rounded-2xl bg-green-600 px-4 py-2 font-bold text-white transition-all duration-300"
+                    : "rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white transition-all duration-300 hover:-translate-y-0.5"
+                }
+              >
+                {creatingCommission
+                  ? "Creating..."
+                  : commissionCreated
+                    ? "✓ Created"
+                    : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -807,11 +1044,13 @@ function PageHeader({
   title,
   description,
   action,
+  onAction,
 }: {
   label: string;
   title: string;
   description: string;
   action?: string;
+  onAction?: () => void;
 }) {
   return (
     <header className="border-b border-[#ded7cc] bg-[#fffaf2]/80 px-8 py-5 backdrop-blur">
@@ -825,7 +1064,10 @@ function PageHeader({
         </div>
 
         {action && (
-          <button className="rounded-2xl bg-[#1f2933] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg">
+          <button
+            onClick={onAction}
+            className="rounded-2xl bg-[#1f2933] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+          >
             {action}
           </button>
         )}

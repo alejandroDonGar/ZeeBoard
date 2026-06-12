@@ -82,6 +82,20 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL
     );
   `);
+  await database.execute(`
+    ALTER TABLE commissions
+    ADD COLUMN client_name TEXT;
+  `).catch(() => {});
+
+  await database.execute(`
+    ALTER TABLE commissions
+    ADD COLUMN platform TEXT;
+  `).catch(() => {});
+
+  await database.execute(`
+    ALTER TABLE commissions
+    ADD COLUMN currency TEXT DEFAULT 'EUR';
+  `).catch(() => {});
 }
 
 export async function getTemplates(): Promise<Template[]> {
@@ -258,4 +272,76 @@ export async function replaceTemplateStages(
       [templateId, cleanStages[index], index + 1],
     );
   }
+}
+
+export type Commission = {
+  id: number;
+  title: string;
+  client_id: number | null;
+  client_name: string | null;
+  platform: string | null;
+  template_id: number | null;
+  current_stage_id: number | null;
+  price: number | null;
+  currency: string | null;
+  deadline: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export async function getCommissions(): Promise<Commission[]> {
+  const database = await getDatabase();
+
+  return await database.select<Commission[]>(`
+    SELECT *
+    FROM commissions
+    ORDER BY id DESC;
+  `);
+}
+
+export async function createCommission(
+  title: string,
+  clientName: string,
+  platform: string,
+  templateId: number | null,
+  price: number | null,
+  currency: string,
+  deadline: string | null,
+  notes: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanTitle = title.trim();
+
+  if (!cleanTitle) {
+    throw new Error("Commission title is required");
+  }
+
+  await database.execute(
+    `
+    INSERT INTO commissions (
+      title,
+      client_name,
+      platform,
+      template_id,
+      price,
+      currency,
+      deadline,
+      notes,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    [
+      cleanTitle,
+      clientName.trim() || null,
+      platform,
+      templateId,
+      price,
+      currency,
+      deadline,
+      notes.trim() || null,
+      new Date().toISOString(),
+    ],
+  );
 }

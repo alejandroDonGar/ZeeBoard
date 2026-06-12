@@ -204,7 +204,8 @@ function TemplatesPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [stages, setStages] = useState<TemplateStage[]>([]);
   const [templateName, setTemplateName] = useState("");
-  const [stageText, setStageText] = useState("");
+  const [stageName, setStageName] = useState("");
+  const [newStages, setNewStages] = useState<string[]>([]);
 
   async function loadTemplates() {
     const data = await getTemplates();
@@ -225,15 +226,11 @@ function TemplatesPage() {
 
   async function handleCreateTemplate() {
     try {
-      const stages = stageText
-        .split("\n")
-        .map((stage) => stage.trim())
-        .filter(Boolean);
-
-      await createTemplate(templateName, stages);
+      await createTemplate(templateName, newStages);
 
       setTemplateName("");
-      setStageText("");
+      setStageName("");
+      setNewStages([]);
 
       const data = await getTemplates();
       setTemplates(data);
@@ -252,6 +249,23 @@ function TemplatesPage() {
   useEffect(() => {
     loadTemplates().catch(console.error);
   }, []);
+  
+  function handleAddStage() {
+    const cleanStage = stageName.trim();
+
+    if (!cleanStage) {
+      return;
+    }
+
+    setNewStages((currentStages) => [...currentStages, cleanStage]);
+    setStageName("");
+  }
+
+  function handleRemoveStage(indexToRemove: number) {
+    setNewStages((currentStages) =>
+      currentStages.filter((_, index) => index !== indexToRemove),
+    );
+  }
 
   return (
     <>
@@ -277,12 +291,55 @@ function TemplatesPage() {
             className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none transition focus:border-[#1f2933]"
           />
 
-          <textarea
-            value={stageText}
-            onChange={(event) => setStageText(event.target.value)}
-            placeholder={"Initial Sketch\nFinal Sketch\nCompleted"}
-            className="mt-3 min-h-32 resize-none rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none transition focus:border-[#1f2933]"
-          />
+          <div className="mt-3 flex gap-2">
+            <input
+              value={stageName}
+              onChange={(event) => setStageName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleAddStage();
+                }
+              }}
+              placeholder="Stage name"
+              className="min-w-0 flex-1 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none transition focus:border-[#1f2933]"
+            />
+
+            <button
+              onClick={handleAddStage}
+              className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933]"
+            >
+              Add
+            </button>
+          </div>
+
+          <div className="mt-3 min-h-28 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] p-3">
+            {newStages.length === 0 ? (
+              <p className="text-sm text-[#9a8f82]">
+                No stages added yet.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {newStages.map((stage, index) => (
+                  <div
+                    key={`${stage}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2 text-sm font-semibold shadow-sm"
+                  >
+                    <span>
+                      {index + 1}. {stage}
+                    </span>
+
+                    <button
+                      onClick={() => handleRemoveStage(index)}
+                      className="rounded-xl px-2 py-1 text-xs font-bold text-red-500 transition hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             onClick={handleCreateTemplate}

@@ -82,6 +82,7 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL
     );
   `);
+
   await database.execute(`
     ALTER TABLE commissions
     ADD COLUMN client_name TEXT;
@@ -96,6 +97,14 @@ export async function initializeDatabase() {
     ALTER TABLE commissions
     ADD COLUMN currency TEXT DEFAULT 'EUR';
   `).catch(() => {});
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS commission_tags (
+      commission_id INTEGER NOT NULL,
+      tag_id INTEGER NOT NULL,
+      PRIMARY KEY (commission_id, tag_id)
+    );
+  `);
 }
 
 export async function getTemplates(): Promise<Template[]> {
@@ -545,4 +554,47 @@ export async function deleteTag(tagId: number): Promise<void> {
     `,
     [tagId],
   );
+}
+
+export async function getCommissionTags(
+  commissionId: number,
+): Promise<Tag[]> {
+  const database = await getDatabase();
+
+  return await database.select<Tag[]>(
+    `
+    SELECT tags.id, tags.name, tags.color
+    FROM tags
+    INNER JOIN commission_tags
+      ON commission_tags.tag_id = tags.id
+    WHERE commission_tags.commission_id = ?
+    ORDER BY tags.name ASC;
+    `,
+    [commissionId],
+  );
+}
+
+export async function replaceCommissionTags(
+  commissionId: number,
+  tagIds: number[],
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    DELETE FROM commission_tags
+    WHERE commission_id = ?;
+    `,
+    [commissionId],
+  );
+
+  for (const tagId of tagIds) {
+    await database.execute(
+      `
+      INSERT INTO commission_tags (commission_id, tag_id)
+      VALUES (?, ?);
+      `,
+      [commissionId, tagId],
+    );
+  }
 }

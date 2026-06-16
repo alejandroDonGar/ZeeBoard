@@ -18,6 +18,8 @@ import {
   createTag,
   deleteTag,
   getTags,
+  getCommissionTags,
+  replaceCommissionTags,
   type Tag,
   type Commission,
   type Template,
@@ -144,6 +146,9 @@ function CommissionsPage() {
   const [deletingCommission, setDeletingCommission] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
 
   useEffect(() => {
     getTemplates()
@@ -151,7 +156,14 @@ function CommissionsPage() {
       .catch(console.error);
 
     getCommissions()
-      .then(setCommissions)
+      .then(async (data) => {
+        setCommissions(data);
+        await loadTagsForCommissions(data);
+      })
+      .catch(console.error);
+
+    getTags()
+      .then(setAllTags)
       .catch(console.error);
   }, []);
   async function handleCreateCommission() {
@@ -171,6 +183,7 @@ function CommissionsPage() {
 
       const data = await getCommissions();
       setCommissions(data);
+      await loadTagsForCommissions(data);
 
       setCommissionTitle("");
       setClientName("");
@@ -292,6 +305,16 @@ function CommissionsPage() {
       setActiveCommissionId(null);
     }
   }
+  async function loadTagsForCommissions(data: Commission[]) {
+    const entries = await Promise.all(
+      data.map(async (commission) => {
+        const tags = await getCommissionTags(commission.id);
+        return [commission.id, tags] as const;
+      }),
+    );
+
+    setCommissionTagsById(Object.fromEntries(entries));
+  }
   async function handleMoveToNextStage() {
     if (!activeCommission || workflowStages.length === 0) {
       return;
@@ -320,7 +343,7 @@ function CommissionsPage() {
       ),
     );
   }
-  function handleOpenEditCommission() {
+  async function handleOpenEditCommission() {
     if (!activeCommission) {
       return;
     }
@@ -336,6 +359,11 @@ function CommissionsPage() {
     setHasDeadline(Boolean(activeCommission.deadline));
     setCommissionNotes(activeCommission.notes || "");
 
+    const tags = await getCommissionTags(activeCommission.id);
+
+    setSelectedTagIds(
+      tags.map((tag) => tag.id),
+    );
     setShowEditCommissionModal(true);
   }
   async function handleSaveCommissionChanges() {
@@ -347,6 +375,7 @@ function CommissionsPage() {
       setSavingCommission(true);
 
       await updateCommission(
+        
         activeCommission.id,
         commissionTitle,
         clientName,
@@ -356,10 +385,16 @@ function CommissionsPage() {
         hasDeadline ? commissionDeadline : null,
         commissionNotes,
       );
+      await replaceCommissionTags(
+        activeCommission.id,
+        selectedTagIds,
+      );
 
       const data = await getCommissions();
 
       setCommissions(data);
+
+      await loadTagsForCommissions(data);
 
       setOpenCommissionTabs((currentTabs) =>
         currentTabs.map((tab) => {
@@ -395,6 +430,7 @@ function CommissionsPage() {
       const data = await getCommissions();
 
       setCommissions(data);
+      await loadTagsForCommissions(data);
 
       const duplicatedCommission =
         data.find((commission) => commission.id === newCommissionId) ?? null;
@@ -438,6 +474,7 @@ function CommissionsPage() {
       const data = await getCommissions();
 
       setCommissions(data);
+      await loadTagsForCommissions(data);
 
       setOpenCommissionTabs((currentTabs) =>
         currentTabs.filter(
@@ -527,6 +564,10 @@ function CommissionsPage() {
           (1000 * 60 * 60 * 24),
       )
     : null;
+
+  const activeCommissionTags = activeCommission
+    ? commissionTagsById[activeCommission.id] ?? []
+    : [];
     
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -601,6 +642,20 @@ function CommissionsPage() {
                       Delete
                     </button>
                   </div>
+
+                  {activeCommissionTags.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {activeCommissionTags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
+                          style={{ backgroundColor: tag.color }}
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="mt-4 grid grid-cols-7 gap-4">
                     <div>
@@ -736,41 +791,72 @@ function CommissionsPage() {
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-4">
-                {commissions.map((commission) => (
-                  <button
-                    key={commission.id}
-                    onClick={() => handleOpenCommission(commission)}
-                    className="rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f2933] hover:shadow-md"
-                  >
-                    <h4 className="font-black">{commission.title}</h4>
+                {commissions.map((commission) => {
+                  const tags = commissionTagsById[commission.id] ?? [];
 
-                    <p className="mt-2 text-sm font-semibold text-[#6f665c]">
-                      {commission.client_name || "No client"}
-                    </p>
+                  const visibleTags = tags.slice(0, 2);
 
-                    <p className="mt-1 text-xs text-[#9a8f82]">
-                      {commission.platform || "No platform"}
-                    </p>
+                  const hiddenTagsCount =
+                    tags.length - visibleTags.length;
 
-                    <div className="mt-4 flex items-center justify-between">
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1f2933] shadow-sm">
-                        {commission.price
-                          ? `${commission.price} ${commission.currency || "EUR"}`
-                          : "No price"}
-                      </span>
+                  return (
+                    <button
+                      key={commission.id}
+                      onClick={() => handleOpenCommission(commission)}
+                      className="rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f2933] hover:shadow-md"
+                    >
+                      <h4 className="font-black">{commission.title}</h4>
 
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#9a8f82] shadow-sm">
-                        {commission.deadline || "No deadline"}
-                      </span>
-                    </div>
+                      {visibleTags.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {visibleTags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="rounded-full px-3 py-1 text-xs font-black text-white"
+                              style={{
+                                backgroundColor: tag.color,
+                              }}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
 
-                    {commission.notes && (
-                      <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-[#7c7163]">
-                        {commission.notes}
+                          {hiddenTagsCount > 0 && (
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#9a8f82] shadow-sm">
+                              +{hiddenTagsCount}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <p className="mt-2 text-sm font-semibold text-[#6f665c]">
+                        {commission.client_name || "No client"}
                       </p>
-                    )}
-                  </button>
-                ))}
+
+                      <p className="mt-1 text-xs text-[#9a8f82]">
+                        {commission.platform || "No platform"}
+                      </p>
+
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1f2933] shadow-sm">
+                          {commission.price
+                            ? `${commission.price} ${commission.currency || "EUR"}`
+                            : "No price"}
+                        </span>
+
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#9a8f82] shadow-sm">
+                          {commission.deadline || "No deadline"}
+                        </span>
+                      </div>
+
+                      {commission.notes && (
+                        <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-[#7c7163]">
+                          {commission.notes}
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1006,6 +1092,48 @@ function CommissionsPage() {
                 rows={4}
                 className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
               />
+              <div className="col-span-2">
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  Tags
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  {allTags.map((tag) => {
+                    const selected =
+                      selectedTagIds.includes(tag.id);
+
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTagIds((current) =>
+                            selected
+                              ? current.filter(
+                                  (id) => id !== tag.id,
+                                )
+                              : [...current, tag.id],
+                          );
+                        }}
+                        className={
+                          selected
+                            ? "rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
+                            : "rounded-full border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#7c7163]"
+                        }
+                        style={
+                          selected
+                            ? {
+                                backgroundColor: tag.color,
+                              }
+                            : undefined
+                        }
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
@@ -1116,6 +1244,43 @@ function CommissionsPage() {
                 rows={4}
                 className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
               />
+              <div className="col-span-2">
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  Tags
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  {allTags.map((tag) => {
+                    const selected = selectedTagIds.includes(tag.id);
+
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTagIds((current) =>
+                            selected
+                              ? current.filter((id) => id !== tag.id)
+                              : [...current, tag.id],
+                          );
+                        }}
+                        className={
+                          selected
+                            ? "rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
+                            : "rounded-full border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#7c7163]"
+                        }
+                        style={
+                          selected
+                            ? { backgroundColor: tag.color }
+                            : undefined
+                        }
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">

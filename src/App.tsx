@@ -568,6 +568,21 @@ function CommissionsPage() {
   const activeCommissionTags = activeCommission
     ? commissionTagsById[activeCommission.id] ?? []
     : [];
+
+  function isPaymentTag(tag: Tag) {
+    return tag.category === "Payment";
+  }
+
+  function getPaymentTag(tags: Tag[]) {
+    return tags.find(isPaymentTag) ?? null;
+  }
+
+  function getNormalTags(tags: Tag[]) {
+    return tags.filter((tag) => !isPaymentTag(tag));
+  }
+
+  const activePaymentTag = getPaymentTag(activeCommissionTags);
+  const activeNormalTags = getNormalTags(activeCommissionTags);
     
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -582,6 +597,8 @@ function CommissionsPage() {
       <OpenTabs
         openCommissionTabs={openCommissionTabs}
         activeCommissionId={activeCommissionId}
+        commissionTagsById={commissionTagsById}
+        getPaymentTag={getPaymentTag}
         onSelectCommission={(commissionId) => setActiveCommissionId(commissionId)}
         onShowAllCommissions={() => setActiveCommissionId(null)}
         onCloseCommission={handleCloseCommissionTab}
@@ -643,19 +660,36 @@ function CommissionsPage() {
                     </button>
                   </div>
 
-                  {activeCommissionTags.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {activeCommissionTags.map((tag) => (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {activePaymentTag && (
+                      <div className="rounded-2xl border border-[#e6ded2] bg-white px-3 py-2 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9a8f82]">
+                          Payment
+                        </p>
+
                         <span
-                          key={tag.id}
-                          className="rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
-                          style={{ backgroundColor: tag.color }}
+                          className="mt-1 inline-flex rounded-full px-3 py-1 text-xs font-black text-white"
+                          style={{ backgroundColor: activePaymentTag.color }}
                         >
-                          {tag.name}
+                          {activePaymentTag.name}
                         </span>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    )}
+
+                    {activeNormalTags.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {activeNormalTags.map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
+                            style={{ backgroundColor: tag.color }}
+                          >
+                            {tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="mt-4 grid grid-cols-7 gap-4">
                     <div>
@@ -793,11 +827,8 @@ function CommissionsPage() {
               <div className="grid grid-cols-3 gap-4">
                 {commissions.map((commission) => {
                   const tags = commissionTagsById[commission.id] ?? [];
-
-                  const visibleTags = tags.slice(0, 2);
-
-                  const hiddenTagsCount =
-                    tags.length - visibleTags.length;
+                  const paymentTag = getPaymentTag(tags);
+                  const normalTags = getNormalTags(tags);
 
                   return (
                     <button
@@ -805,27 +836,34 @@ function CommissionsPage() {
                       onClick={() => handleOpenCommission(commission)}
                       className="rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f2933] hover:shadow-md"
                     >
+                      {paymentTag && (
+                        <div className="mt-3">
+                          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#9a8f82]">
+                            Payment
+                          </p>
+
+                          <span
+                            className="inline-flex rounded-full px-3 py-1 text-xs font-black text-white shadow-sm"
+                            style={{ backgroundColor: paymentTag.color }}
+                          >
+                            {paymentTag.name}
+                          </span>
+                        </div>
+                      )}
+
                       <h4 className="font-black">{commission.title}</h4>
 
-                      {visibleTags.length > 0 && (
+                      {normalTags.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {visibleTags.map((tag) => (
+                          {normalTags.map((tag) => (
                             <span
                               key={tag.id}
-                              className="rounded-full px-3 py-1 text-xs font-black text-white"
-                              style={{
-                                backgroundColor: tag.color,
-                              }}
+                              className="rounded-full px-3 py-1 text-xs font-black text-white shadow-sm"
+                              style={{ backgroundColor: tag.color }}
                             >
                               {tag.name}
                             </span>
                           ))}
-
-                          {hiddenTagsCount > 0 && (
-                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#9a8f82] shadow-sm">
-                              +{hiddenTagsCount}
-                            </span>
-                          )}
                         </div>
                       )}
 
@@ -1107,13 +1145,28 @@ function CommissionsPage() {
                         key={tag.id}
                         type="button"
                         onClick={() => {
-                          setSelectedTagIds((current) =>
-                            selected
-                              ? current.filter(
-                                  (id) => id !== tag.id,
-                                )
-                              : [...current, tag.id],
-                          );
+                          setSelectedTagIds((current) => {
+                            if (selected) {
+                              return current.filter((id) => id !== tag.id);
+                            }
+
+                            const exclusiveCategories = ["Payment", "Characters"];
+
+                            if (exclusiveCategories.includes(tag.category)) {
+                              const otherTagsInSameCategory = allTags
+                                .filter((otherTag) => otherTag.category === tag.category)
+                                .map((otherTag) => otherTag.id);
+
+                              return [
+                                ...current.filter(
+                                  (id) => !otherTagsInSameCategory.includes(id),
+                                ),
+                                tag.id,
+                              ];
+                            }
+
+                            return [...current, tag.id];
+                          });
                         }}
                         className={
                           selected
@@ -1258,11 +1311,28 @@ function CommissionsPage() {
                         key={tag.id}
                         type="button"
                         onClick={() => {
-                          setSelectedTagIds((current) =>
-                            selected
-                              ? current.filter((id) => id !== tag.id)
-                              : [...current, tag.id],
-                          );
+                          setSelectedTagIds((current) => {
+                            if (selected) {
+                              return current.filter((id) => id !== tag.id);
+                            }
+
+                            const exclusiveCategories = ["Payment", "Characters"];
+
+                            if (exclusiveCategories.includes(tag.category)) {
+                              const otherTagsInSameCategory = allTags
+                                .filter((otherTag) => otherTag.category === tag.category)
+                                .map((otherTag) => otherTag.id);
+
+                              return [
+                                ...current.filter(
+                                  (id) => !otherTagsInSameCategory.includes(id),
+                                ),
+                                tag.id,
+                              ];
+                            }
+
+                            return [...current, tag.id];
+                          });
                         }}
                         className={
                           selected
@@ -1362,12 +1432,16 @@ function CommissionsPage() {
 function OpenTabs({
   openCommissionTabs,
   activeCommissionId,
+  commissionTagsById,
+  getPaymentTag,
   onSelectCommission,
   onCloseCommission,
   onShowAllCommissions,
 }: {
   openCommissionTabs: Commission[];
   activeCommissionId: number | null;
+  commissionTagsById: Record<number, Tag[]>;
+  getPaymentTag: (tags: Tag[]) => Tag | null;
   onSelectCommission: (commissionId: number) => void;
   onCloseCommission: (commissionId: number) => void;
   onShowAllCommissions: () => void;
@@ -1395,6 +1469,7 @@ function OpenTabs({
         ) : (
           openCommissionTabs.map((commission) => {
             const isActive = activeCommissionId === commission.id;
+            const paymentTag = getPaymentTag(commissionTagsById[commission.id] ?? [],);
 
             return (
               <div
@@ -1411,6 +1486,15 @@ function OpenTabs({
                 >
                   {commission.client_name || "No client"} · {commission.title}
                 </button>
+
+                {paymentTag && (
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-black text-white"
+                    style={{ backgroundColor: paymentTag.color }}
+                  >
+                    {paymentTag.name}
+                  </span>
+                )}
 
                 <button
                   onClick={() => onCloseCommission(commission.id)}
@@ -1435,6 +1519,7 @@ function TagsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [tagName, setTagName] = useState("");
   const [tagColor, setTagColor] = useState("#f59e0b");
+  const [tagCategory, setTagCategory] = useState("General");
   const [creatingTag, setCreatingTag] = useState(false);
   const [tagCreated, setTagCreated] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
@@ -1448,7 +1533,7 @@ function TagsPage() {
     try {
       setCreatingTag(true);
 
-      await createTag(tagName, tagColor);
+      await createTag(tagName, tagColor, tagCategory);
 
       setTagName("");
       setTagColor("#f59e0b");
@@ -1480,6 +1565,22 @@ function TagsPage() {
   useEffect(() => {
     loadTags().catch(console.error);
   }, []);
+
+  const groupedTags = tags.reduce(
+    (groups, tag) => {
+      const category =
+        tag.category || "General";
+
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+
+      groups[category].push(tag);
+
+      return groups;
+    },
+    {} as Record<string, Tag[]>,
+  );
 
   return (
     <>
@@ -1529,6 +1630,19 @@ function TagsPage() {
                 Click to change
               </p>
             </div>
+            <select
+              value={tagCategory}
+              onChange={(event) =>
+                setTagCategory(event.target.value)
+              }
+              className="mt-3 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+            >
+              <option>Payment</option>
+              <option>Characters</option>
+              <option>Commission Type</option>
+              <option>Reference</option>
+              <option>General</option>
+            </select>
           </div>
 
           <div className="mt-4 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4">
@@ -1575,27 +1689,39 @@ function TagsPage() {
                 No tags yet
               </div>
             ) : (
-              <div className="flex flex-wrap gap-3">
-                {tags.map((tag) => (
-                  <div
-                    key={tag.id}
-                    className="flex items-center gap-2 rounded-full border border-[#e6ded2] bg-[#fffaf2] p-1 shadow-sm"
-                  >
-                    <span
-                      className="rounded-full px-4 py-2 text-sm font-black text-white"
-                      style={{ backgroundColor: tag.color }}
-                    >
-                      {tag.name}
-                    </span>
+              <div className="space-y-6">
+                {Object.entries(groupedTags).map(
+                  ([category, categoryTags]) => (
+                    <div key={category}>
+                      <h4 className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-[#9a8f82]">
+                        {category}
+                      </h4>
 
-                    <button
-                      onClick={() => setTagToDelete(tag)}
-                      className="rounded-full px-2 text-xs font-black text-red-500 transition hover:bg-red-50"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex flex-wrap gap-3">
+                        {categoryTags.map((tag) => (
+                          <div
+                            key={tag.id}
+                            className="flex items-center gap-2 rounded-full border border-[#e6ded2] bg-[#fffaf2] p-1 shadow-sm"
+                          >
+                            <span
+                              className="rounded-full px-4 py-2 text-sm font-black text-white"
+                              style={{ backgroundColor: tag.color }}
+                            >
+                              {tag.name}
+                            </span>
+
+                            <button
+                              onClick={() => setTagToDelete(tag)}
+                              className="rounded-full px-2 text-xs font-black text-red-500 transition hover:bg-red-50"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ),
+                )}
               </div>
             )}
           </div>

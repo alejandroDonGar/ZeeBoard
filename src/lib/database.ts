@@ -52,6 +52,10 @@ export async function initializeDatabase() {
       color TEXT NOT NULL
     );
   `);
+  await database.execute(`
+    ALTER TABLE tags
+    ADD COLUMN category TEXT DEFAULT 'General';
+  `).catch(() => {});
 
   await database.execute(`
     CREATE TABLE IF NOT EXISTS templates (
@@ -511,13 +515,14 @@ export type Tag = {
   id: number;
   name: string;
   color: string;
+  category: string;
 };
 
 export async function getTags(): Promise<Tag[]> {
   const database = await getDatabase();
 
   return await database.select<Tag[]>(`
-    SELECT id, name, color
+    SELECT id, name, color, category
     FROM tags
     ORDER BY id DESC;
   `);
@@ -526,6 +531,7 @@ export async function getTags(): Promise<Tag[]> {
 export async function createTag(
   name: string,
   color: string,
+  category: string,
 ): Promise<void> {
   const database = await getDatabase();
 
@@ -537,10 +543,10 @@ export async function createTag(
 
   await database.execute(
     `
-    INSERT INTO tags (name, color)
-    VALUES (?, ?);
+    INSERT INTO tags (name, color, category)
+    VALUES (?, ?, ?);
     `,
-    [cleanName, color],
+    [cleanName, color, category],
   );
 }
 
@@ -563,7 +569,7 @@ export async function getCommissionTags(
 
   return await database.select<Tag[]>(
     `
-    SELECT tags.id, tags.name, tags.color
+    SELECT tags.id, tags.name, tags.color, tags.category
     FROM tags
     INNER JOIN commission_tags
       ON commission_tags.tag_id = tags.id

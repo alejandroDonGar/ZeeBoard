@@ -370,3 +370,130 @@ export async function updateCommissionStage(
     [stageId, commissionId],
   );
 }
+
+export async function updateCommission(
+  commissionId: number,
+  title: string,
+  clientName: string,
+  platform: string,
+  price: number | null,
+  currency: string,
+  deadline: string | null,
+  notes: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanTitle = title.trim();
+
+  if (!cleanTitle) {
+    throw new Error("Commission title is required");
+  }
+
+  await database.execute(
+    `
+    UPDATE commissions
+    SET
+      title = ?,
+      client_name = ?,
+      platform = ?,
+      price = ?,
+      currency = ?,
+      deadline = ?,
+      notes = ?
+    WHERE id = ?;
+    `,
+    [
+      cleanTitle,
+      clientName.trim() || null,
+      platform,
+      price,
+      currency,
+      deadline,
+      notes.trim() || null,
+      commissionId,
+    ],
+  );
+}
+
+export async function duplicateCommission(
+  commissionId: number,
+): Promise<number> {
+  const database = await getDatabase();
+
+  const commissions = await database.select<Commission[]>(
+    `
+    SELECT *
+    FROM commissions
+    WHERE id = ?;
+    `,
+    [commissionId],
+  );
+
+  if (commissions.length === 0) {
+    throw new Error("Commission not found");
+  }
+
+  const commission = commissions[0];
+
+  const similarCopies = await database.select<{ count: number }[]>(
+    `
+    SELECT COUNT(*) as count
+    FROM commissions
+    WHERE title LIKE ?;
+    `,
+    [`${commission.title} Copy%`],
+  );
+
+  const copyNumber = similarCopies[0].count + 1;
+  const copyTitle = `${commission.title} Copy ${copyNumber}`;
+
+  await database.execute(
+    `
+    INSERT INTO commissions (
+      title,
+      client_name,
+      platform,
+      template_id,
+      current_stage_id,
+      price,
+      currency,
+      deadline,
+      notes,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    `,
+    [
+      copyTitle,
+      commission.client_name,
+      commission.platform,
+      commission.template_id,
+      commission.current_stage_id,
+      commission.price,
+      commission.currency,
+      commission.deadline,
+      commission.notes,
+      new Date().toISOString(),
+    ],
+  );
+
+  const result = await database.select<{ id: number }[]>(`
+    SELECT last_insert_rowid() AS id;
+  `);
+
+  return result[0].id;
+}
+
+export async function deleteCommission(
+  commissionId: number,
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    DELETE FROM commissions
+    WHERE id = ?;
+    `,
+    [commissionId],
+  );
+}

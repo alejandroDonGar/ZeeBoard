@@ -12,6 +12,9 @@ import {
   createCommission,
   getCommissions,
   updateCommissionStage,
+  updateCommission,
+  duplicateCommission,
+  deleteCommission,
   type Commission,
   type Template,
   type TemplateStage,
@@ -28,19 +31,6 @@ const navigationItems: { id: Page; label: string }[] = [
   { id: "finished", label: "Finished" },
   { id: "settings", label: "Settings" },
 ];
-
-const openCommissions: {
-  client: string;
-  stage: string;
-  payment: string;
-}[] = [];
-
-const starterColumns: string[] = [];
-
-const templates: {
-  name: string;
-  stages: string[];
-}[] = [];
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("commissions");
@@ -148,6 +138,15 @@ function CommissionsPage() {
   const [tabsRestored, setTabsRestored] = useState(false);
   const [workflowStages, setWorkflowStages] = useState<TemplateStage[]>([]);
   const activeCommission = commissions.find((commission) => commission.id === activeCommissionId) ?? null;
+  const [showEditCommissionModal, setShowEditCommissionModal] = useState(false);
+  const [savingCommission, setSavingCommission] = useState(false);
+  const [commissionSaved, setCommissionSaved] = useState(false);
+  const [duplicatingCommission, setDuplicatingCommission] = useState(false);
+  const [commissionDuplicated, setCommissionDuplicated] = useState(false);
+  const [showDeleteCommissionModal, setShowDeleteCommissionModal] = useState(false);
+  const [deletingCommission, setDeletingCommission] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error">("success");
 
   useEffect(() => {
     getTemplates()
@@ -324,6 +323,151 @@ function CommissionsPage() {
       ),
     );
   }
+  function handleOpenEditCommission() {
+    if (!activeCommission) {
+      return;
+    }
+
+    setCommissionTitle(activeCommission.title);
+    setClientName(activeCommission.client_name || "");
+    setPlatform(activeCommission.platform || "Discord");
+    setCommissionPrice(
+      activeCommission.price ? String(activeCommission.price) : "",
+    );
+    setCurrency(activeCommission.currency || "EUR");
+    setCommissionDeadline(activeCommission.deadline || "");
+    setHasDeadline(Boolean(activeCommission.deadline));
+    setCommissionNotes(activeCommission.notes || "");
+
+    setShowEditCommissionModal(true);
+  }
+  async function handleSaveCommissionChanges() {
+    if (!activeCommission) {
+      return;
+    }
+
+    try {
+      setSavingCommission(true);
+
+      await updateCommission(
+        activeCommission.id,
+        commissionTitle,
+        clientName,
+        platform,
+        commissionPrice ? Number(commissionPrice) : null,
+        currency,
+        hasDeadline ? commissionDeadline : null,
+        commissionNotes,
+      );
+
+      const data = await getCommissions();
+
+      setCommissions(data);
+
+      setOpenCommissionTabs((currentTabs) =>
+        currentTabs.map((tab) => {
+          const updatedCommission = data.find(
+            (commission) => commission.id === tab.id,
+          );
+
+          return updatedCommission ?? tab;
+        }),
+      );
+
+      setCommissionSaved(true);
+
+      setTimeout(() => {
+        setCommissionSaved(false);
+        setShowEditCommissionModal(false);
+      }, 1500);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSavingCommission(false);
+    }
+  }
+ async function handleDuplicateCommission() {
+    if (!activeCommission) {
+      return;
+    }
+
+    try {
+      setDuplicatingCommission(true);
+
+      const newCommissionId = await duplicateCommission(activeCommission.id);
+      const data = await getCommissions();
+
+      setCommissions(data);
+
+      const duplicatedCommission =
+        data.find((commission) => commission.id === newCommissionId) ?? null;
+
+      if (duplicatedCommission) {
+        setOpenCommissionTabs((currentTabs) => [
+          ...currentTabs,
+          duplicatedCommission,
+        ]);
+
+        setActiveCommissionId(duplicatedCommission.id);
+      }
+
+      setCommissionDuplicated(true);
+      setToastType("success");
+      setToastMessage("Commission duplicated successfully.");
+
+      setTimeout(() => {
+        setCommissionDuplicated(false);
+        setToastMessage("");
+      }, 1800);
+    } catch (error) {
+      console.error(error);
+      setToastType("error");
+      setToastMessage("Could not duplicate commission.");
+    } finally {
+      setDuplicatingCommission(false);
+    }
+  }
+
+  async function handleDeleteCommission() {
+    if (!activeCommission) {
+      return;
+    }
+
+    try {
+      setDeletingCommission(true);
+
+      await deleteCommission(activeCommission.id);
+
+      const data = await getCommissions();
+
+      setCommissions(data);
+
+      setOpenCommissionTabs((currentTabs) =>
+        currentTabs.filter(
+          (tab) => tab.id !== activeCommission.id,
+        ),
+      );
+
+      setActiveCommissionId(null);
+
+      setToastType("success");
+      setToastMessage("Commission deleted.");
+
+      setTimeout(() => {
+        setToastMessage("");
+      }, 1800);
+
+      setShowDeleteCommissionModal(false);
+    } catch (error) {
+      console.error(error);
+
+      setToastType("error");
+      setToastMessage("Could not delete commission.");
+    } finally {
+      setDeletingCommission(false);
+    }
+  }
+
   const currentStageIndex = workflowStages.findIndex(
     (stage) => stage.id === activeCommission?.current_stage_id,
   );
@@ -345,6 +489,36 @@ function CommissionsPage() {
       : workflowStages.length > 0
         ? `0 / ${workflowStages.length}`
         : "No workflow";
+    
+  const today = new Date();
+  const currentMonth = today.toLocaleString("en-US", {
+    month: "long",
+  });
+
+  const currentYear = today.getFullYear();
+
+  const firstDayOfMonth = new Date(
+    currentYear,
+    today.getMonth(),
+    1,
+  );
+
+  let startingWeekDay = firstDayOfMonth.getDay();
+
+  if (startingWeekDay === 0) {
+    startingWeekDay = 7;
+  }
+
+  const daysInMonth = new Date(
+    currentYear,
+    today.getMonth() + 1,
+    0,
+  ).getDate();
+
+  const calendarDays = [
+    ...Array(startingWeekDay - 1).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+  ];
 
   const selectedDeadlineCommission =
     activeCommission?.deadline ? activeCommission : null;
@@ -400,6 +574,36 @@ function CommissionsPage() {
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
                     Commission detail
                   </p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={handleOpenEditCommission}
+                      className="rounded-2xl border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933]"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={handleDuplicateCommission}
+                      disabled={duplicatingCommission}
+                      className={
+                        commissionDuplicated
+                          ? "rounded-2xl bg-green-600 px-4 py-2 text-sm font-bold text-white transition-all duration-300"
+                          : "rounded-2xl border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933] disabled:opacity-70"
+                      }
+                    >
+                      {duplicatingCommission
+                        ? "Duplicating..."
+                        : commissionDuplicated
+                          ? "✓ Duplicated"
+                          : "Duplicate"}
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteCommissionModal(true)}
+                      className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 transition hover:border-red-400"
+                    >
+                      Delete
+                    </button>
+                  </div>
 
                   <div className="mt-4 grid grid-cols-7 gap-4">
                     <div>
@@ -581,6 +785,10 @@ function CommissionsPage() {
               Calendar
             </p>
 
+            <p className="mt-2 text-lg font-black">
+              {currentMonth} {currentYear}
+            </p>
+
             {selectedDeadlineCommission && (
               <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
@@ -614,20 +822,92 @@ function CommissionsPage() {
             </div>
 
             <div className="mt-3 grid grid-cols-7 gap-2">
-              {Array.from({ length: 35 }).map((_, index) => (
-                <div
-                  key={index}
-                  className={
-                    selectedDeadlineCommission?.deadline &&
-                    new Date(selectedDeadlineCommission.deadline).getDate() === index + 1
-                      ? "flex aspect-square items-center justify-center rounded-xl bg-amber-100 text-xs font-black text-amber-900"
-                      : "flex aspect-square items-center justify-center rounded-xl bg-white text-xs font-bold text-[#9a8f82]"
-                  }
-                >
-                  {index + 1 <= 31 ? index + 1 : ""}
-                </div>
-              ))}
+              {calendarDays.map((day, index) => {
+                const deadlineDate = selectedDeadlineCommission?.deadline
+                  ? new Date(selectedDeadlineCommission.deadline)
+                  : null;
+
+                const cellDate =
+                  day !== null
+                    ? new Date(currentYear, today.getMonth(), day)
+                    : null;
+
+                const isToday =
+                  cellDate !== null &&
+                  cellDate.toDateString() === today.toDateString();
+
+                const isInDeadlineRange =
+                  cellDate !== null &&
+                  deadlineDate !== null &&
+                  cellDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate()) &&
+                  cellDate < deadlineDate;
+
+                const isDeadlineDay =
+                  cellDate !== null &&
+                  deadlineDate !== null &&
+                  cellDate.toDateString() === deadlineDate.toDateString();
+
+                return (
+                  <div
+                    key={index}
+                    className={
+                      isDeadlineDay
+                        ? "flex aspect-square items-center justify-center rounded-xl bg-red-500 text-xs font-black text-white"
+                        : isToday
+                          ? "flex aspect-square items-center justify-center rounded-xl bg-[#2c3947] text-xs font-black text-[#fffaf2] shadow-sm"
+                          : isInDeadlineRange
+                            ? "flex aspect-square items-center justify-center rounded-xl bg-amber-100 text-xs font-bold text-amber-900"
+                            : "flex aspect-square items-center justify-center rounded-xl bg-white text-xs font-bold text-[#9a8f82]"
+                    }
+                  >
+                    {day ?? ""}
+                  </div>
+                );
+              })}
             </div>
+
+            {selectedDeadlineCommission?.deadline && (
+              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  Deadline summary
+                </p>
+
+                <div className="mt-3 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-[#7c7163]">Today</span>
+                    <span className="font-bold text-[#1f2933]">
+                      {today.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-[#7c7163]">Deadline</span>
+                    <span className="font-bold text-red-600">
+                      {new Date(selectedDeadlineCommission.deadline).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                        },
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="rounded-full bg-amber-100 px-3 py-2 text-center text-xs font-black text-amber-900">
+                    {daysUntilSelectedDeadline !== null
+                      ? daysUntilSelectedDeadline > 0
+                        ? `${daysUntilSelectedDeadline} days left`
+                        : daysUntilSelectedDeadline === 0
+                          ? "Due today"
+                          : `${Math.abs(daysUntilSelectedDeadline)} days overdue`
+                      : "No deadline"}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </aside>
       </section>
@@ -756,6 +1036,161 @@ function CommissionsPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {showEditCommissionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-[650px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              Edit commission
+            </p>
+
+            <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+              Update commission
+            </h3>
+
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <input
+                value={commissionTitle}
+                onChange={(event) => setCommissionTitle(event.target.value)}
+                placeholder="Commission title"
+                className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+
+              <input
+                value={clientName}
+                onChange={(event) => setClientName(event.target.value)}
+                placeholder="Client name"
+                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+
+              <select
+                value={platform}
+                onChange={(event) => setPlatform(event.target.value)}
+                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              >
+                <option>Discord</option>
+                <option>Twitter / X</option>
+                <option>Bluesky</option>
+                <option>Telegram</option>
+                <option>Email</option>
+                <option>Other</option>
+              </select>
+
+              <input
+                value={commissionPrice}
+                onChange={(event) => setCommissionPrice(event.target.value)}
+                placeholder="Price"
+                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+
+              <select
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value)}
+                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              >
+                <option>EUR</option>
+                <option>USD</option>
+                <option>GBP</option>
+              </select>
+
+              <label className="col-span-2 flex items-center gap-3 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={hasDeadline}
+                  onChange={(event) => setHasDeadline(event.target.checked)}
+                />
+                This commission has a deadline
+              </label>
+
+              {hasDeadline && (
+                <input
+                  type="date"
+                  value={commissionDeadline}
+                  onChange={(event) => setCommissionDeadline(event.target.value)}
+                  className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                />
+              )}
+
+              <textarea
+                value={commissionNotes}
+                onChange={(event) => setCommissionNotes(event.target.value)}
+                placeholder="Notes"
+                rows={4}
+                className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowEditCommissionModal(false)}
+                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleSaveCommissionChanges}
+                disabled={savingCommission}
+                className={
+                  commissionSaved
+                    ? "rounded-2xl bg-green-600 px-4 py-2 font-bold text-white transition-all duration-300"
+                    : "rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white transition-all duration-300 hover:-translate-y-0.5"
+                }
+              >
+                {savingCommission
+                  ? "Saving..."
+                  : commissionSaved
+                    ? "✓ Saved"
+                    : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showDeleteCommissionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-[450px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              Delete commission
+            </p>
+
+            <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+              {activeCommission?.title}
+            </h3>
+
+            <p className="mt-4 text-sm text-[#7c7163]">
+              This action cannot be undone.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteCommissionModal(false)}
+                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleDeleteCommission}
+                disabled={deletingCommission}
+                className="rounded-2xl bg-red-500 px-4 py-2 font-bold text-white"
+              >
+                {deletingCommission ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {toastMessage && (
+        <div
+          className={
+            toastType === "success"
+              ? "fixed bottom-6 right-6 z-[60] rounded-2xl bg-green-600 px-5 py-3 text-sm font-bold text-white shadow-xl"
+              : "fixed bottom-6 right-6 z-[60] rounded-2xl bg-red-500 px-5 py-3 text-sm font-bold text-white shadow-xl"
+          }
+        >
+          {toastMessage}
         </div>
       )}
     </div>
@@ -1404,8 +1839,6 @@ function SettingsPage() {
 function PlaceholderPage({
   title,
   subtitle,
-  emptyTitle,
-  emptyText,
 }: {
   title: string;
   subtitle: string;

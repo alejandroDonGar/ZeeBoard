@@ -497,3 +497,52 @@ export async function deleteCommission(
     [commissionId],
   );
 }
+
+export type Tag = {
+  id: number;
+  name: string;
+  color: string;
+};
+
+export async function getTags(): Promise<Tag[]> {
+  const database = await getDatabase();
+
+  return await database.select<Tag[]>(`
+    SELECT id, name, color
+    FROM tags
+    ORDER BY id DESC;
+  `);
+}
+
+export async function createTag(
+  name: string,
+  color: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanName = name.trim();
+
+  if (!cleanName) {
+    throw new Error("Tag name is required");
+  }
+
+  await database.execute(
+    `
+    INSERT INTO tags (name, color)
+    VALUES (?, ?);
+    `,
+    [cleanName, color],
+  );
+}
+
+export async function deleteTag(tagId: number): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    DELETE FROM tags
+    WHERE id = ?;
+    `,
+    [tagId],
+  );
+}

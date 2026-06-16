@@ -331,7 +331,32 @@ function CommissionsPage() {
   const isLastStage =
     workflowStages.length > 0 &&
     currentStageIndex === workflowStages.length - 1;
-  
+
+  const currentStageName =
+    currentStageIndex >= 0
+      ? workflowStages[currentStageIndex]?.name
+      : workflowStages.length > 0
+        ? `Working on ${workflowStages[0].name}`
+        : "No stage";
+
+  const progressText =
+    currentStageIndex >= 0
+      ? `${currentStageIndex + 1} / ${workflowStages.length}`
+      : workflowStages.length > 0
+        ? `0 / ${workflowStages.length}`
+        : "No workflow";
+
+  const selectedDeadlineCommission =
+    activeCommission?.deadline ? activeCommission : null;
+
+  const daysUntilSelectedDeadline = selectedDeadlineCommission?.deadline
+    ? Math.ceil(
+        (new Date(selectedDeadlineCommission.deadline).getTime() -
+          new Date().getTime()) /
+          (1000 * 60 * 60 * 24),
+      )
+    : null;
+    
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
@@ -376,7 +401,7 @@ function CommissionsPage() {
                     Commission detail
                   </p>
 
-                  <div className="mt-4 grid grid-cols-5 gap-4">
+                  <div className="mt-4 grid grid-cols-7 gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
                         Title
@@ -419,6 +444,24 @@ function CommissionsPage() {
                       </p>
                       <p className="mt-2 font-bold">
                         {activeCommission.deadline || "No deadline"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                        Current stage
+                      </p>
+                      <p className="mt-2 font-bold">
+                        {currentStageName}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                        Progress
+                      </p>
+                      <p className="mt-2 font-bold">
+                        {progressText}
                       </p>
                     </div>
                   </div>
@@ -538,6 +581,28 @@ function CommissionsPage() {
               Calendar
             </p>
 
+            {selectedDeadlineCommission && (
+              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  Next deadline
+                </p>
+
+                <p className="mt-2 text-sm font-black">
+                  {selectedDeadlineCommission.title}
+                </p>
+
+                <p className="mt-1 text-xs text-[#7c7163]">
+                  {selectedDeadlineCommission.deadline}
+                </p>
+
+                <p className="mt-3 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
+                  {daysUntilSelectedDeadline !== null
+                    ? `${daysUntilSelectedDeadline} days left`
+                    : "No date"}
+                </p>
+              </div>
+            )}
+
             <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs font-bold text-[#9a8f82]">
               <span>Mon</span>
               <span>Tue</span>
@@ -552,7 +617,12 @@ function CommissionsPage() {
               {Array.from({ length: 35 }).map((_, index) => (
                 <div
                   key={index}
-                  className="flex aspect-square items-center justify-center rounded-xl bg-white text-xs font-bold text-[#9a8f82]"
+                  className={
+                    selectedDeadlineCommission?.deadline &&
+                    new Date(selectedDeadlineCommission.deadline).getDate() === index + 1
+                      ? "flex aspect-square items-center justify-center rounded-xl bg-amber-100 text-xs font-black text-amber-900"
+                      : "flex aspect-square items-center justify-center rounded-xl bg-white text-xs font-bold text-[#9a8f82]"
+                  }
                 >
                   {index + 1 <= 31 ? index + 1 : ""}
                 </div>

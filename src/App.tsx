@@ -1119,6 +1119,7 @@ function CommissionsPage() {
                   const normalTags = getNormalTags(tags);
                   const commissionImages = stageImagesByCommissionId[commission.id] ?? [];
                   const latestImage = commissionImages.length > 0 ? commissionImages[commissionImages.length - 1] : null;
+                  const altCount = commissionImages.length;
                   
                   return (
                     <button
@@ -1180,6 +1181,12 @@ function CommissionsPage() {
                       </p>
 
                       <div className="mt-4 flex flex-wrap items-center gap-2">
+                        {altCount > 0 && (
+                          <span className="rounded-full border border-[#d8cec0] bg-white px-3 py-1 text-xs font-black text-[#7c7163] shadow-sm">
+                            📷 {altCount} {altCount === 1 ? "Alt" : "Alts"}
+                          </span>
+                        )}
+
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1f2933] shadow-sm">
                           {commission.price
                             ? `${commission.price} ${commission.currency || "EUR"}`

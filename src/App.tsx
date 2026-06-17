@@ -25,6 +25,10 @@ import {
   deleteClient,
   updateClient,
   updateClientAvatar,
+  getCommissionStageImages,
+  createCommissionStageImage,
+  deleteCommissionStageImage,
+  type CommissionStageImage,
   type Client,
   type Tag,
   type Commission,
@@ -152,6 +156,8 @@ function CommissionsPage() {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
+  const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
+  const [activeStageImageIndexByStageId, setActiveStageImageIndexByStageId] = useState<Record<number, number>>({});
 
   useEffect(() => {
     getTemplates()
@@ -162,6 +168,7 @@ function CommissionsPage() {
       .then(async (data) => {
         setCommissions(data);
         await loadTagsForCommissions(data);
+        await loadStageImagesForCommissions(data);
       })
       .catch(console.error);
 
@@ -326,6 +333,17 @@ function CommissionsPage() {
 
     setCommissionTagsById(Object.fromEntries(entries));
   }
+
+  async function loadStageImagesForCommissions(data: Commission[]) {
+    const entries = await Promise.all(
+      data.map(async (commission) => {
+        const images = await getCommissionStageImages(commission.id);
+        return [commission.id, images] as const;
+      }),
+    );
+
+    setStageImagesByCommissionId(Object.fromEntries(entries));
+  }
   async function handleMoveToNextStage() {
     if (!activeCommission || workflowStages.length === 0) {
       return;
@@ -409,6 +427,7 @@ function CommissionsPage() {
       setCommissions(data);
 
       await loadTagsForCommissions(data);
+      await loadStageImagesForCommissions(data);
 
       setOpenCommissionTabs((currentTabs) =>
         currentTabs.map((tab) => {
@@ -514,6 +533,98 @@ function CommissionsPage() {
     } finally {
       setDeletingCommission(false);
     }
+  }
+
+  async function handleUploadStageImage(stageId: number, file: File) {
+    if (!activeCommission) {
+      console.error("No active commission");
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = async () => {
+      try {
+        const imageDataUrl = String(reader.result);
+
+        console.log("Uploading stage image", {
+          commissionId: activeCommission.id,
+          stageId,
+          size: imageDataUrl.length,
+        });
+
+        await createCommissionStageImage(
+          activeCommission.id,
+          stageId,
+          imageDataUrl,
+        );
+
+        const data = await getCommissions();
+        setCommissions(data);
+        await loadStageImagesForCommissions(data);
+
+        console.log("Stage image uploaded");
+      } catch (error) {
+        console.error("Could not upload stage image", error);
+      }
+    };
+
+    reader.onerror = () => {
+      console.error("Could not read image file");
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  async function handleDeleteStageImage(imageId: number) {
+    await deleteCommissionStageImage(imageId);
+
+    const data = await getCommissions();
+    setCommissions(data);
+    await loadStageImagesForCommissions(data);
+  }
+
+  function getStageImages(commissionId: number, stageId: number) {
+    return (stageImagesByCommissionId[commissionId] ?? []).filter(
+      (image) => image.stage_id === stageId,
+    );
+  }
+
+
+  function getActiveStageImageIndex(stageId: number, images: CommissionStageImage[]) {
+    const index = activeStageImageIndexByStageId[stageId] ?? 0;
+
+    if (images.length === 0) {
+      return 0;
+    }
+
+    return Math.min(index, images.length - 1);
+  }
+
+  function handlePreviousStageImage(stageId: number, images: CommissionStageImage[]) {
+    setActiveStageImageIndexByStageId((current) => {
+      const currentIndex = getActiveStageImageIndex(stageId, images);
+      const nextIndex =
+        currentIndex === 0 ? images.length - 1 : currentIndex - 1;
+
+      return {
+        ...current,
+        [stageId]: nextIndex,
+      };
+    });
+  }
+
+  function handleNextStageImage(stageId: number, images: CommissionStageImage[]) {
+    setActiveStageImageIndexByStageId((current) => {
+      const currentIndex = getActiveStageImageIndex(stageId, images);
+      const nextIndex =
+        currentIndex === images.length - 1 ? 0 : currentIndex + 1;
+
+      return {
+        ...current,
+        [stageId]: nextIndex,
+      };
+    });
   }
 
   const currentStageIndex = workflowStages.findIndex(
@@ -772,48 +883,210 @@ function CommissionsPage() {
                   </div>
                 </aside>
 
-                <div className="min-h-0 flex-1 rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
+                <div className="shrink-0 rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
                     Workflow
                   </p>
 
-                  <div className="mt-4 flex gap-3 overflow-x-auto pb-3">
+                  <div className="mt-4 flex min-h-[220px] items-start gap-3 overflow-x-auto pb-3">
                     {workflowStages.length === 0 ? (
                       <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-white p-4 text-sm text-[#9a8f82]">
                         No template assigned.
                       </div>
                     ) : (
-                      workflowStages.map((stage, index) => (
-                        <div
-                          key={stage.id}
-                          className={
-                            index < currentStageIndex
-                              ? "min-w-[240px] flex-shrink-0 rounded-3xl border border-green-300 bg-green-100 p-4 text-green-900 shadow-sm"
-                              : index === currentStageIndex
-                                ? "min-w-[240px] flex-shrink-0 rounded-3xl border border-amber-300 bg-amber-100 p-4 text-amber-900 shadow-sm"
-                                : "min-w-[240px] flex-shrink-0 rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm"
-                          }
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={
-                                index < currentStageIndex
-                                  ? "flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-xs font-black text-white"
-                                  : index === currentStageIndex
-                                    ? "flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white"
-                                    : "flex h-8 w-8 items-center justify-center rounded-full bg-[#1f2933] text-xs font-black text-white"
-                              }
-                            >
-                              {index < currentStageIndex ? "✓" : index + 1}
+                      workflowStages.map((stage, index) => {
+                        const stageImages = activeCommission
+                          ? getStageImages(activeCommission.id, stage.id)
+                          : [];
+
+                        const activeImageIndex = getActiveStageImageIndex(stage.id, stageImages);
+                        const mainStageImage = stageImages[activeImageIndex] ?? null;
+                        const previousStageImage =
+                          stageImages.length > 1
+                            ? stageImages[
+                                activeImageIndex === 0
+                                  ? stageImages.length - 1
+                                  : activeImageIndex - 1
+                              ]
+                            : null;
+
+                        const nextStageImage =
+                          stageImages.length > 1
+                            ? stageImages[
+                                activeImageIndex === stageImages.length - 1
+                                  ? 0
+                                  : activeImageIndex + 1
+                              ]
+                            : null;
+
+                        return (
+                          <div
+                            key={stage.id}
+                            className={
+                              index < currentStageIndex
+                                ? "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-green-300 bg-green-100 p-4 text-green-900 shadow-sm"
+                                : index === currentStageIndex
+                                  ? "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-amber-300 bg-amber-100 p-4 text-amber-900 shadow-sm"
+                                  : "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm"
+                            }
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={
+                                  index < currentStageIndex
+                                    ? "flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-xs font-black text-white"
+                                    : index === currentStageIndex
+                                      ? "flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white"
+                                      : "flex h-8 w-8 items-center justify-center rounded-full bg-[#1f2933] text-xs font-black text-white"
+                                }
+                              >
+                                {index < currentStageIndex ? "✓" : index + 1}
+                              </div>
+
+                              <div>
+                                <p className="font-bold">{stage.name}</p>
+                                <p className="text-xs text-[#9a8f82]">Stage {index + 1}</p>
+                              </div>
                             </div>
 
-                            <div>
-                              <p className="font-bold">{stage.name}</p>
-                              <p className="text-xs text-[#9a8f82]">Stage {index + 1}</p>
-                            </div>
+                            {mainStageImage && (
+                              <div className="relative mt-4 overflow-hidden rounded-3xl border border-white/60 bg-white p-3 shadow-sm">
+                                <div className="relative z-10">
+                                  <div className="mb-2 flex items-center justify-between">
+                                    <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-[#7c7163] shadow-sm">
+                                      {mainStageImage.label}
+                                    </span>
+
+                                    <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-[#9a8f82] shadow-sm">
+                                      {activeImageIndex + 1} / {stageImages.length}
+                                    </span>
+                                  </div>
+
+                                  <div className="relative flex min-h-[220px] items-center justify-center">
+                                    {stageImages.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePreviousStageImage(stage.id, stageImages)}
+                                        className="absolute left-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2933] text-lg font-black text-white shadow-lg transition hover:scale-105"
+                                      >
+                                        ‹
+                                      </button>
+                                    )}
+                                    {previousStageImage && (
+                                      <img
+                                        src={previousStageImage.image_data_url}
+                                        alt=""
+                                        className="
+                                          absolute
+                                          left-4
+                                          z-0
+                                          max-h-[260px]
+                                          scale-75
+                                          rounded-2xl
+                                          opacity-20
+                                          blur-sm
+                                          object-contain
+                                          pointer-events-none
+                                        "
+                                      />
+                                    )}
+
+                                    {nextStageImage && (
+                                      <img
+                                        src={nextStageImage.image_data_url}
+                                        alt=""
+                                        className="
+                                          absolute
+                                          right-4
+                                          z-0
+                                          max-h-[260px]
+                                          scale-75
+                                          rounded-2xl
+                                          opacity-20
+                                          blur-sm
+                                          object-contain
+                                          pointer-events-none
+                                        "
+                                      />
+                                    )}
+                                    <AnimatePresence mode="wait">
+                                      <motion.img
+                                        key={mainStageImage.id}
+                                        src={mainStageImage.image_data_url}
+                                        alt={mainStageImage.label}
+                                        initial={{
+                                          opacity: 0,
+                                          scale: 0.96,
+                                          filter: "blur(6px)",
+                                          x: 20,
+                                        }}
+                                        animate={{
+                                          opacity: 1,
+                                          scale: 1,
+                                          filter: "blur(0px)",
+                                          x: 0,
+                                        }}
+                                        exit={{
+                                          opacity: 0,
+                                          scale: 0.96,
+                                          filter: "blur(6px)",
+                                          x: -20,
+                                        }}
+                                        transition={{
+                                          duration: 0.15,
+                                          ease: "easeOut",
+                                        }}
+                                        className="mx-auto max-h-[360px] w-auto rounded-2xl object-contain shadow-sm"
+                                      />
+                                    </AnimatePresence>
+
+                                    {stageImages.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleNextStageImage(stage.id, stageImages)}
+                                        className="absolute right-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2933] text-lg font-black text-white shadow-lg transition hover:scale-105"
+                                      >
+                                        ›
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <div className="mt-3 flex items-center justify-between">
+                                    <p className="text-xs font-bold text-[#7c7163]">
+                                      {stageImages.length === 1 ? "1 alt" : `${stageImages.length} alts`}
+                                    </p>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteStageImage(mainStageImage.id)}
+                                      className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-500 transition hover:bg-red-100"
+                                    >
+                                      Remove current
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            <label className="mt-4 block cursor-pointer rounded-2xl border border-dashed border-[#d8cec0] bg-white px-3 py-3 text-center text-xs font-black text-[#7c7163] transition hover:border-[#1f2933]">
+                              {stageImages.length === 0 ? "Add image" : "Add alt"}
+
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+
+                                  if (file) {
+                                    handleUploadStageImage(stage.id, file);
+                                  }
+                                }}
+                              />
+                            </label>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                   <button
@@ -844,13 +1117,24 @@ function CommissionsPage() {
                   const tags = commissionTagsById[commission.id] ?? [];
                   const paymentTag = getPaymentTag(tags);
                   const normalTags = getNormalTags(tags);
-
+                  const commissionImages = stageImagesByCommissionId[commission.id] ?? [];
+                  const latestImage = commissionImages.length > 0 ? commissionImages[commissionImages.length - 1] : null;
+                  
                   return (
                     <button
                       key={commission.id}
                       onClick={() => handleOpenCommission(commission)}
                       className="min-w-0 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f2933] hover:shadow-md"
                     >
+                      {latestImage && (
+                        <div className="mb-3 overflow-hidden rounded-2xl bg-white shadow-sm">
+                          <img
+                            src={latestImage.image_data_url}
+                            alt={commission.title}
+                            className="w-full h-auto object-contain"
+                          />
+                        </div>
+                      )}
                       {paymentTag && (
                         <div className="mt-3">
                           <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#9a8f82]">

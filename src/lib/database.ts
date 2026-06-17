@@ -124,6 +124,27 @@ export async function initializeDatabase() {
     ALTER TABLE clients
     ADD COLUMN avatar_url TEXT;
   `).catch(() => {});
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS commission_stage_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commission_id INTEGER NOT NULL,
+      stage_id INTEGER NOT NULL,
+      label TEXT NOT NULL DEFAULT 'Alt 1',
+      image_data_url TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  await database.execute(`
+    ALTER TABLE commission_stage_images
+    ADD COLUMN id INTEGER;
+  `).catch(() => {});
+
+  await database.execute(`
+    ALTER TABLE commission_stage_images
+    ADD COLUMN label TEXT NOT NULL DEFAULT 'Alt 1';
+  `).catch(() => {});
 }
 
 export async function getTemplates(): Promise<Template[]> {
@@ -748,5 +769,85 @@ export async function updateClientAvatar(
     WHERE id = ?;
     `,
     [avatarUrl, clientId],
+  );
+}
+
+export type CommissionStageImage = {
+  id: number;
+  commission_id: number;
+  stage_id: number;
+  label: string;
+  image_data_url: string;
+  created_at: string;
+};
+
+export async function getCommissionStageImages(
+  commissionId: number,
+): Promise<CommissionStageImage[]> {
+  const database = await getDatabase();
+
+  return await database.select<CommissionStageImage[]>(
+    `
+    SELECT id, commission_id, stage_id, label, image_data_url, created_at
+    FROM commission_stage_images
+    WHERE commission_id = ?
+    ORDER BY stage_id ASC, id ASC;
+    `,
+    [commissionId],
+  );
+}
+
+export async function createCommissionStageImage(
+  commissionId: number,
+  stageId: number,
+  imageDataUrl: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const existingImages = await database.select<{ count: number }[]>(
+    `
+    SELECT COUNT(*) as count
+    FROM commission_stage_images
+    WHERE commission_id = ?
+      AND stage_id = ?;
+    `,
+    [commissionId, stageId],
+  );
+
+  const altNumber = existingImages[0].count + 1;
+  const label = `Alt ${altNumber}`;
+
+  await database.execute(
+    `
+    INSERT INTO commission_stage_images (
+      commission_id,
+      stage_id,
+      label,
+      image_data_url,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?);
+    `,
+    [
+      commissionId,
+      stageId,
+      label,
+      imageDataUrl,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+export async function deleteCommissionStageImage(
+  imageId: number,
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    DELETE FROM commission_stage_images
+    WHERE id = ?;
+    `,
+    [imageId],
   );
 }

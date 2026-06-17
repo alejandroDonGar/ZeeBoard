@@ -109,6 +109,21 @@ export async function initializeDatabase() {
       PRIMARY KEY (commission_id, tag_id)
     );
   `);
+
+  await database.execute(`
+    ALTER TABLE clients
+    ADD COLUMN platform TEXT;
+  `).catch(() => {});
+
+  await database.execute(`
+    ALTER TABLE clients
+    ADD COLUMN handle TEXT;
+  `).catch(() => {});
+
+  await database.execute(`
+    ALTER TABLE clients
+    ADD COLUMN avatar_url TEXT;
+  `).catch(() => {});
 }
 
 export async function getTemplates(): Promise<Template[]> {
@@ -314,6 +329,7 @@ export async function getCommissions(): Promise<Commission[]> {
 
 export async function createCommission(
   title: string,
+  clientId: number | null,
   clientName: string,
   platform: string,
   templateId: number | null,
@@ -341,6 +357,7 @@ export async function createCommission(
     `
     INSERT INTO commissions (
       title,
+      client_id,
       client_name,
       platform,
       template_id,
@@ -351,10 +368,11 @@ export async function createCommission(
       notes,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
     [
       cleanTitle,
+      clientId,
       clientName.trim() || null,
       platform,
       templateId,
@@ -387,6 +405,7 @@ export async function updateCommissionStage(
 export async function updateCommission(
   commissionId: number,
   title: string,
+  clientId: number | null,
   clientName: string,
   platform: string,
   price: number | null,
@@ -407,6 +426,7 @@ export async function updateCommission(
     UPDATE commissions
     SET
       title = ?,
+      client_id = ?,
       client_name = ?,
       platform = ?,
       price = ?,
@@ -417,6 +437,7 @@ export async function updateCommission(
     `,
     [
       cleanTitle,
+      clientId,
       clientName.trim() || null,
       platform,
       price,
@@ -603,4 +624,129 @@ export async function replaceCommissionTags(
       [commissionId, tagId],
     );
   }
+}
+
+export type Client = {
+  id: number;
+  name: string;
+  platform: string | null;
+  handle: string | null;
+  avatar_url: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export async function getClients(): Promise<Client[]> {
+  const database = await getDatabase();
+
+  return await database.select<Client[]>(`
+    SELECT
+      id,
+      name,
+      platform,
+      handle,
+      avatar_url,
+      notes,
+      created_at
+    FROM clients
+    ORDER BY name ASC;
+  `);
+}
+
+export async function createClient(
+  name: string,
+  platform: string,
+  handle: string,
+  notes: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanName = name.trim();
+
+  if (!cleanName) {
+    throw new Error("Client name is required");
+  }
+
+  await database.execute(
+    `
+    INSERT INTO clients (
+      name,
+      platform,
+      handle,
+      notes,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?);
+    `,
+    [
+      cleanName,
+      platform || null,
+      handle.trim() || null,
+      notes.trim() || null,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+export async function deleteClient(clientId: number): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    DELETE FROM clients
+    WHERE id = ?;
+    `,
+    [clientId],
+  );
+}
+
+export async function updateClient(
+  clientId: number,
+  name: string,
+  platform: string,
+  handle: string,
+  notes: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanName = name.trim();
+
+  if (!cleanName) {
+    throw new Error("Client name is required");
+  }
+
+  await database.execute(
+    `
+    UPDATE clients
+    SET
+      name = ?,
+      platform = ?,
+      handle = ?,
+      notes = ?
+    WHERE id = ?;
+    `,
+    [
+      cleanName,
+      platform || null,
+      handle.trim() || null,
+      notes.trim() || null,
+      clientId,
+    ],
+  );
+}
+
+export async function updateClientAvatar(
+  clientId: number,
+  avatarUrl: string | null,
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    UPDATE clients
+    SET avatar_url = ?
+    WHERE id = ?;
+    `,
+    [avatarUrl, clientId],
+  );
 }

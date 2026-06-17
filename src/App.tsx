@@ -20,6 +20,12 @@ import {
   getTags,
   getCommissionTags,
   replaceCommissionTags,
+  getClients,
+  createClient,
+  deleteClient,
+  updateClient,
+  updateClientAvatar,
+  type Client,
   type Tag,
   type Commission,
   type Template,
@@ -100,12 +106,7 @@ function App() {
         <main className="flex-1 overflow-hidden">
           {currentPage === "commissions" && <CommissionsPage />}
           {currentPage === "clients" && (
-            <PlaceholderPage
-              title="Clients"
-              subtitle="Manage the people who request your commissions."
-              emptyTitle="No clients yet"
-              emptyText="Client profiles will store contact info, notes and commission history."
-            />
+            <ClientsPage onOpenCommissionsPage={() => setCurrentPage("commissions")} />
           )}
           {currentPage === "tags" && <TagsPage />}
           {currentPage === "templates" && <TemplatesPage />}
@@ -124,6 +125,8 @@ function CommissionsPage() {
   const [commissionDeadline, setCommissionDeadline] = useState("");
   const [commissionNotes, setCommissionNotes] = useState("");
   const [clientName, setClientName] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
   const [platform, setPlatform] = useState("Discord");
   const [currency, setCurrency] = useState("EUR");
   const [hasDeadline, setHasDeadline] = useState(false);
@@ -162,6 +165,10 @@ function CommissionsPage() {
       })
       .catch(console.error);
 
+    getClients()
+      .then(setClients)
+      .catch(console.error);
+
     getTags()
       .then(setAllTags)
       .catch(console.error);
@@ -170,10 +177,13 @@ function CommissionsPage() {
     try {
       setCreatingCommission(true);
 
+      const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
+
       await createCommission(
         commissionTitle,
-        clientName,
-        platform,
+        selectedClientId,
+        selectedClient?.name || clientName,
+        selectedClient?.platform || platform,
         selectedTemplateId,
         commissionPrice ? Number(commissionPrice) : null,
         currency,
@@ -186,6 +196,7 @@ function CommissionsPage() {
       await loadTagsForCommissions(data);
 
       setCommissionTitle("");
+      setSelectedClientId(null);
       setClientName("");
       setPlatform("Discord");
       setSelectedTemplateId(null);
@@ -350,6 +361,7 @@ function CommissionsPage() {
 
     setCommissionTitle(activeCommission.title);
     setClientName(activeCommission.client_name || "");
+    setSelectedClientId(activeCommission.client_id);
     setPlatform(activeCommission.platform || "Discord");
     setCommissionPrice(
       activeCommission.price ? String(activeCommission.price) : "",
@@ -374,12 +386,14 @@ function CommissionsPage() {
     try {
       setSavingCommission(true);
 
+      const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
+
       await updateCommission(
-        
         activeCommission.id,
         commissionTitle,
-        clientName,
-        platform,
+        selectedClientId,
+        selectedClient?.name || clientName,
+        selectedClient?.platform || platform,
         commissionPrice ? Number(commissionPrice) : null,
         currency,
         hasDeadline ? commissionDeadline : null,
@@ -598,6 +612,7 @@ function CommissionsPage() {
         openCommissionTabs={openCommissionTabs}
         activeCommissionId={activeCommissionId}
         commissionTagsById={commissionTagsById}
+        clients={clients}
         getPaymentTag={getPaymentTag}
         onSelectCommission={(commissionId) => setActiveCommissionId(commissionId)}
         onShowAllCommissions={() => setActiveCommissionId(null)}
@@ -824,7 +839,7 @@ function CommissionsPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
                 {commissions.map((commission) => {
                   const tags = commissionTagsById[commission.id] ?? [];
                   const paymentTag = getPaymentTag(tags);
@@ -834,7 +849,7 @@ function CommissionsPage() {
                     <button
                       key={commission.id}
                       onClick={() => handleOpenCommission(commission)}
-                      className="rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f2933] hover:shadow-md"
+                      className="min-w-0 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f2933] hover:shadow-md"
                     >
                       {paymentTag && (
                         <div className="mt-3">
@@ -851,17 +866,22 @@ function CommissionsPage() {
                         </div>
                       )}
 
-                      <h4 className="font-black">{commission.title}</h4>
+                      <h4 className="break-words font-black leading-tight">
+                        {commission.title}
+                      </h4>
 
                       {normalTags.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {normalTags.map((tag) => (
                             <span
                               key={tag.id}
-                              className="rounded-full px-3 py-1 text-xs font-black text-white shadow-sm"
+                              title={tag.name}
+                              className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl text-[0px] font-black text-white shadow-sm xl:w-auto xl:max-w-full xl:rounded-full xl:px-3 xl:text-xs"
                               style={{ backgroundColor: tag.color }}
                             >
-                              {tag.name}
+                              <span className="hidden truncate xl:block">
+                                {tag.name}
+                              </span>
                             </span>
                           ))}
                         </div>
@@ -875,14 +895,14 @@ function CommissionsPage() {
                         {commission.platform || "No platform"}
                       </p>
 
-                      <div className="mt-4 flex items-center justify-between">
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1f2933] shadow-sm">
                           {commission.price
                             ? `${commission.price} ${commission.currency || "EUR"}`
                             : "No price"}
                         </span>
 
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#9a8f82] shadow-sm">
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1f2933] shadow-sm">
                           {commission.deadline || "No deadline"}
                         </span>
                       </div>
@@ -900,8 +920,8 @@ function CommissionsPage() {
           </div>
         </div>
 
-        <aside className="h-full min-h-0 rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
-          <div className="mt-6 rounded-3xl border border-[#e6ded2] bg-[#f9f4ec] p-4">
+        <aside className="h-full min-h-0 overflow-hidden rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+          <div className="max-h-full overflow-y-auto rounded-3xl border border-[#e6ded2] bg-[#f9f4ec] p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
               Calendar
             </p>
@@ -1051,12 +1071,32 @@ function CommissionsPage() {
                 className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
               />
 
-              <input
-                value={clientName}
-                onChange={(event) => setClientName(event.target.value)}
-                placeholder="Client name"
+              <select
+                value={selectedClientId ?? ""}
+                onChange={(event) => {
+                  const clientId = event.target.value
+                    ? Number(event.target.value)
+                    : null;
+
+                  setSelectedClientId(clientId);
+
+                  const selectedClient =
+                    clients.find((client) => client.id === clientId) ?? null;
+
+                  setClientName(selectedClient?.name || "");
+                  setPlatform(selectedClient?.platform || "Discord");
+                }}
                 className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
-              />
+              >
+                <option value="">Select client</option>
+
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                    {client.handle ? ` · ${client.handle}` : ""}
+                  </option>
+                ))}
+              </select>
 
               <select
                 value={platform}
@@ -1235,12 +1275,32 @@ function CommissionsPage() {
                 className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
               />
 
-              <input
-                value={clientName}
-                onChange={(event) => setClientName(event.target.value)}
-                placeholder="Client name"
+              <select
+                value={selectedClientId ?? ""}
+                onChange={(event) => {
+                  const clientId = event.target.value
+                    ? Number(event.target.value)
+                    : null;
+
+                  setSelectedClientId(clientId);
+
+                  const selectedClient =
+                    clients.find((client) => client.id === clientId) ?? null;
+
+                  setClientName(selectedClient?.name || "");
+                  setPlatform(selectedClient?.platform || "Discord");
+                }}
                 className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
-              />
+              >
+                <option value="">Select client</option>
+
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                    {client.handle ? ` · ${client.handle}` : ""}
+                  </option>
+                ))}
+              </select>
 
               <select
                 value={platform}
@@ -1437,6 +1497,7 @@ function OpenTabs({
   onSelectCommission,
   onCloseCommission,
   onShowAllCommissions,
+  clients,
 }: {
   openCommissionTabs: Commission[];
   activeCommissionId: number | null;
@@ -1445,6 +1506,7 @@ function OpenTabs({
   onSelectCommission: (commissionId: number) => void;
   onCloseCommission: (commissionId: number) => void;
   onShowAllCommissions: () => void;
+  clients: Client[];
 }) {
   return (
     <section className="border-b border-[#ded7cc] bg-white px-8 py-3">
@@ -1468,6 +1530,7 @@ function OpenTabs({
           </div>
         ) : (
           openCommissionTabs.map((commission) => {
+            const client = clients.find((client) => client.id === commission.client_id) ?? null;
             const isActive = activeCommissionId === commission.id;
             const paymentTag = getPaymentTag(commissionTagsById[commission.id] ?? [],);
 
@@ -1480,6 +1543,13 @@ function OpenTabs({
                     : "flex shrink-0 items-center gap-2 rounded-2xl border border-[#e6ded2] bg-[#fffaf2] px-4 py-2 text-sm font-semibold text-[#1f2933] shadow-sm"
                 }
               >
+                {client?.avatar_url && (
+                  <img
+                    src={client.avatar_url}
+                    alt={client.name}
+                    className="h-6 w-6 rounded-full object-cover"
+                  />
+                )}
                 <button
                   onClick={() => onSelectCommission(commission.id)}
                   className="max-w-52 truncate"
@@ -1512,6 +1582,732 @@ function OpenTabs({
         )}
       </div>
     </section>
+  );
+}
+
+function ClientsPage({
+  onOpenCommissionsPage,
+}: {
+  onOpenCommissionsPage: () => void;
+}) {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
+  const [clientName, setClientName] = useState("");
+  const [clientPlatform, setClientPlatform] = useState("Twitter / X");
+  const [clientHandle, setClientHandle] = useState("");
+  const [clientNotes, setClientNotes] = useState("");
+  const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [savingClient, setSavingClient] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  
+
+  async function loadClients() {
+    const data = await getClients();
+    setClients(data);
+  }
+
+  async function handleCreateClient() {
+    try {
+      await createClient(
+        clientName,
+        clientPlatform,
+        clientHandle,
+        clientNotes,
+      );
+
+      const avatarUrl = await fetchBlueskyAvatar(clientPlatform, clientHandle);
+
+      if (avatarUrl) {
+        const data = await getClients();
+        const createdClient = data.find(
+          (client) =>
+            client.name === clientName.trim() &&
+            client.handle === clientHandle.trim(),
+        );
+
+        if (createdClient) {
+          await updateClientAvatar(createdClient.id, avatarUrl);
+        }
+      }
+
+      setClientName("");
+      setClientPlatform("Twitter / X");
+      setClientHandle("");
+      setClientNotes("");
+
+      await loadClients();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function handleDeleteClient(clientId: number) {
+    try {
+      await deleteClient(clientId);
+      await loadClients();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function loadClientCommissionTags(data: Commission[]) {
+    const entries = await Promise.all(
+      data.map(async (commission) => {
+        const tags = await getCommissionTags(commission.id);
+        return [commission.id, tags] as const;
+      }),
+    );
+
+    setCommissionTagsById(Object.fromEntries(entries));
+  }
+
+  useEffect(() => {
+    loadClients().catch(console.error);
+
+    getCommissions()
+      .then(async (data) => {
+        setCommissions(data);
+        await loadClientCommissionTags(data);
+      })
+      .catch(console.error);
+  }, []);
+
+  function handleOpenEditClient(client: Client) {
+    setClientToEdit(client);
+    setClientName(client.name);
+    setClientPlatform(client.platform || "Twitter / X");
+    setClientHandle(client.handle || "");
+    setClientNotes(client.notes || "");
+  }
+
+  async function handleSaveClientChanges() {
+    if (!clientToEdit) {
+      return;
+    }
+
+    try {
+      setSavingClient(true);
+
+      await updateClient(
+        clientToEdit.id,
+        clientName,
+        clientPlatform,
+        clientHandle,
+        clientNotes,
+      );
+
+      setClientToEdit(null);
+      setClientName("");
+      setClientPlatform("Twitter / X");
+      setClientHandle("");
+      setClientNotes("");
+
+      await loadClients();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSavingClient(false);
+    }
+  }
+  function getClientInitials(name: string) {
+    const words = name.trim().split(/\s+/).filter(Boolean);
+
+    if (words.length === 0) {
+      return "?";
+    }
+
+    if (words.length === 1) {
+      return words[0].slice(0, 2).toUpperCase();
+    }
+
+    return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  }
+
+  function getClientAvatarBackground(name: string) {
+    const colours = [
+      "bg-[#1f2933]",
+      "bg-[#7c3aed]",
+      "bg-[#0891b2]",
+      "bg-[#16a34a]",
+      "bg-[#f59e0b]",
+      "bg-[#dc2626]",
+    ];
+
+    const total = name
+      .split("")
+      .reduce((sum, letter) => sum + letter.charCodeAt(0), 0);
+
+    return colours[total % colours.length];
+  }
+
+  function cleanBlueskyHandle(handle: string) {
+    return handle.trim().replace(/^@/, "");
+  }
+
+  async function fetchBlueskyAvatar(platform: string | null, handle: string | null) {
+    if (platform !== "Bluesky" || !handle) {
+      return null;
+    }
+
+    const cleanHandle = cleanBlueskyHandle(handle);
+
+    const response = await fetch(
+      `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(
+        cleanHandle,
+      )}`,
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const profile = await response.json();
+
+    return profile.avatar || null;
+  }
+
+  async function handleFetchClientAvatar(client: Client) {
+    try {
+      const avatarUrl = await fetchBlueskyAvatar(client.platform, client.handle);
+
+      await updateClientAvatar(client.id, avatarUrl);
+
+      await loadClients();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  const selectedClientCommissions = selectedClient
+  ? commissions.filter(
+      (commission) => commission.client_id === selectedClient.id,
+    )
+  : [];
+  const totalEarned = selectedClientCommissions.reduce(
+    (total, commission) => total + (commission.price || 0),
+    0,
+  );
+
+  const commissionsWithPrice = selectedClientCommissions.filter(
+    (commission) => commission.price !== null,
+  );
+
+  const averagePrice =
+    commissionsWithPrice.length > 0
+      ? Math.round(totalEarned / commissionsWithPrice.length)
+      : 0;
+
+  const lastCommission =
+    selectedClientCommissions.length > 0
+      ? [...selectedClientCommissions].sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() -
+            new Date(a.created_at).getTime(),
+        )[0]
+      : null;
+    
+    const paidCommissionsCount = selectedClientCommissions.filter((commission) =>
+      (commissionTagsById[commission.id] ?? []).some(
+        (tag) =>
+          tag.category === "Payment" &&
+          tag.name.trim().toLowerCase() === "paid",
+      ),
+    ).length;
+
+    const unpaidCommissionsCount = selectedClientCommissions.filter((commission) =>
+      (commissionTagsById[commission.id] ?? []).some(
+        (tag) =>
+          tag.category === "Payment" &&
+          tag.name.trim().toLowerCase() === "not paid",
+      ),
+    ).length;
+  
+  function handleOpenCommissionFromClient(commission: Commission) {
+    localStorage.setItem(
+      "zeeboard-open-commission-tabs",
+      JSON.stringify([commission.id]),
+    );
+
+    localStorage.setItem(
+      "zeeboard-active-commission-id",
+      String(commission.id),
+    );
+
+    setSelectedClient(null);
+    onOpenCommissionsPage();
+  }
+  return (
+    <>
+      <PageHeader
+        label="Client database"
+        title="Clients"
+        description="Manage your commission clients."
+      />
+
+      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[360px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
+        <div className="flex min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+          <h3 className="text-xl font-black">
+            New client
+          </h3>
+
+          <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
+            <input
+              value={clientName}
+              onChange={(event) =>
+                setClientName(event.target.value)
+              }
+              placeholder="Client name"
+              className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+            />
+
+            <select
+              value={clientPlatform}
+              onChange={(event) =>
+                setClientPlatform(event.target.value)
+              }
+              className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+            >
+              <option>Twitter / X</option>
+              <option>Bluesky</option>
+              <option>Telegram</option>
+              <option>Discord</option>
+              <option>Other</option>
+            </select>
+
+            <input
+              value={clientHandle}
+              onChange={(event) =>
+                setClientHandle(event.target.value)
+              }
+              placeholder="@username"
+              className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+            />
+
+            <textarea
+              value={clientNotes}
+              onChange={(event) =>
+                setClientNotes(event.target.value)
+              }
+              placeholder="Notes"
+              rows={4}
+              className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+            />
+
+            <button
+              onClick={handleCreateClient}
+              className="w-full rounded-2xl bg-[#1f2933] px-4 py-3 font-bold text-white"
+            >
+              Create client
+            </button>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-black">
+              Clients
+            </h3>
+
+            <span className="rounded-full bg-[#fffaf2] px-3 py-1 text-xs font-bold text-[#9a8f82]">
+              {clients.length} clients
+            </span>
+          </div>
+
+          <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
+            {clients.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-8 text-center text-sm text-[#9a8f82]">
+                No clients yet
+              </div>
+            ) : (
+              clients.map((client) => {
+                const clientCommissions = commissions.filter(
+                  (commission) => commission.client_id === client.id,
+                );
+
+                const clientTotal = clientCommissions.reduce(
+                  (total, commission) => total + (commission.price || 0),
+                  0,
+                );
+
+                const clientPaidCount = clientCommissions.filter((commission) =>
+                  (commissionTagsById[commission.id] ?? []).some(
+                    (tag) =>
+                      tag.category === "Payment" &&
+                      tag.name.trim().toLowerCase() === "paid",
+                  ),
+                ).length;
+
+                const clientUnpaidCount = clientCommissions.filter((commission) =>
+                  (commissionTagsById[commission.id] ?? []).some(
+                    (tag) =>
+                      tag.category === "Payment" &&
+                      tag.name.trim().toLowerCase() === "not paid",
+                  ),
+                ).length;
+
+                return (
+                  <div
+                  key={client.id}
+                  onClick={() => setSelectedClient(client)}
+                  className="cursor-pointer rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 transition hover:border-[#1f2933] hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      {client.avatar_url ? (
+                        <img
+                          src={client.avatar_url}
+                          alt={client.name}
+                          className="h-12 w-12 rounded-2xl object-cover shadow-sm"
+                        />
+                      ) : (
+                        <div
+                          className={`flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-black text-white shadow-sm ${getClientAvatarBackground(
+                            client.name,
+                          )}`}
+                        >
+                          {getClientInitials(client.name)}
+                        </div>
+                      )}
+
+                      <div>
+                        <h4 className="font-black">{client.name}</h4>
+
+                        {client.platform && (
+                          <p className="mt-1 text-sm font-semibold text-[#1f2933]">
+                            {client.platform}
+                          </p>
+                        )}
+
+                        {client.handle && (
+                          <p className="text-sm text-[#7c7163]">
+                            {client.handle}
+                          </p>
+                        )}
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#7c7163] shadow-sm">
+                            {clientCommissions.length} commissions
+                          </span>
+
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#1f2933] shadow-sm">
+                            {clientTotal} EUR
+                          </span>
+
+                          <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-700 shadow-sm">
+                            {clientPaidCount} paid
+                          </span>
+
+                          <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600 shadow-sm">
+                            {clientUnpaidCount} unpaid
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {client.platform === "Bluesky" && client.handle && (
+                        <button
+                          onClick={() => handleFetchClientAvatar(client)}
+                          className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#1f2933] shadow-sm transition hover:bg-[#f1e8da]"
+                        >
+                          Fetch avatar
+                        </button>
+                      )}
+
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenEditClient(client);
+                        }}
+                        className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#1f2933] shadow-sm transition hover:bg-[#f1e8da]"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setClientToDelete(client);
+                        }}
+                        className="rounded-full bg-white px-3 py-1 text-xs font-black text-red-500 shadow-sm transition hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </section>
+      {selectedClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-[560px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+            <div className="flex items-start gap-4">
+              {selectedClient.avatar_url ? (
+                <img
+                  src={selectedClient.avatar_url}
+                  alt={selectedClient.name}
+                  className="h-16 w-16 rounded-3xl object-cover shadow-sm"
+                />
+              ) : (
+                <div
+                  className={`flex h-16 w-16 items-center justify-center rounded-3xl text-lg font-black text-white shadow-sm ${getClientAvatarBackground(
+                    selectedClient.name,
+                  )}`}
+                >
+                  {getClientInitials(selectedClient.name)}
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+                  Client profile
+                </p>
+
+                <h3 className="mt-1 text-2xl font-black text-[#1f2933]">
+                  {selectedClient.name}
+                </h3>
+
+                <p className="mt-1 text-sm font-semibold text-[#7c7163]">
+                  {selectedClient.platform || "No platform"}
+                  {selectedClient.handle
+                    ? ` · ${selectedClient.handle}`
+                    : ""}
+                </p>
+                <div className="mt-6 grid grid-cols-4 gap-3 overflow-hidden">
+                  <div className="rounded-3xl bg-[#fffaf2] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      Total earned
+                    </p>
+
+                    <p className="mt-2 text-xl font-black text-[#1f2933]">
+                      {totalEarned} EUR
+                    </p>
+                  </div>
+
+                  <div className="rounded-3xl bg-[#fffaf2] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      Average
+                    </p>
+
+                    <p className="mt-2 text-xl font-black text-[#1f2933]">
+                      {averagePrice} EUR
+                    </p>
+                  </div>
+
+                  <div className="rounded-3xl bg-[#fffaf2] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      Last commission
+                    </p>
+
+                    <p
+                      title={lastCommission?.title || "None"}
+                      className="mt-2 line-clamp-2 break-words text-sm font-black leading-tight text-[#1f2933]"
+                    >
+                      {lastCommission?.title || "None"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-3xl bg-[#fffaf2] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      Payment
+                    </p>
+
+                    <p className="mt-2 text-sm font-black text-green-700">
+                      {paidCommissionsCount} paid
+                    </p>
+
+                    <p className="mt-1 text-sm font-black text-red-600">
+                      {unpaidCommissionsCount} unpaid
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 rounded-3xl bg-[#fffaf2] p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  Commissions
+                </p>
+
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#9a8f82] shadow-sm">
+                  {selectedClientCommissions.length}
+                </span>
+              </div>
+
+              {selectedClientCommissions.length === 0 ? (
+                <p className="mt-3 text-sm text-[#7c7163]">
+                  No commissions yet.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {selectedClientCommissions.map((commission) => (
+                    <div
+                      key={commission.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm"
+                    >
+                      <div>
+                        <p className="text-sm font-black text-[#1f2933]">
+                          {commission.title}
+                        </p>
+
+                        <p className="mt-1 text-xs text-[#7c7163]">
+                          {commission.price
+                            ? `${commission.price} ${commission.currency || "EUR"}`
+                            : "No price"}
+                          {" · "}
+                          {commission.deadline || "No deadline"}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenCommissionFromClient(commission)}
+                        className="rounded-full bg-[#1f2933] px-3 py-1 text-xs font-black text-white shadow-sm"
+                      >
+                        Open
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedClient.notes && (
+              <div className="mt-6 rounded-3xl bg-[#fffaf2] p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  Notes
+                </p>
+
+                <p className="mt-2 text-sm text-[#7c7163]">
+                  {selectedClient.notes}
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setSelectedClient(null)}
+                className="rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {clientToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-[520px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              Edit client
+            </p>
+
+            <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+              Update client
+            </h3>
+
+            <div className="mt-6 space-y-3">
+              <input
+                value={clientName}
+                onChange={(event) => setClientName(event.target.value)}
+                placeholder="Client name"
+                className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+
+              <select
+                value={clientPlatform}
+                onChange={(event) => setClientPlatform(event.target.value)}
+                className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              >
+                <option>Twitter / X</option>
+                <option>Bluesky</option>
+                <option>Telegram</option>
+                <option>Discord</option>
+                <option>Other</option>
+              </select>
+
+              <input
+                value={clientHandle}
+                onChange={(event) => setClientHandle(event.target.value)}
+                placeholder="@username"
+                className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+
+              <textarea
+                value={clientNotes}
+                onChange={(event) => setClientNotes(event.target.value)}
+                placeholder="Notes"
+                rows={4}
+                className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setClientToEdit(null);
+                  setClientName("");
+                  setClientPlatform("Twitter / X");
+                  setClientHandle("");
+                  setClientNotes("");
+                }}
+                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleSaveClientChanges}
+                disabled={savingClient}
+                className="rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white"
+              >
+                {savingClient ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {clientToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="w-[450px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              Delete client
+            </p>
+
+            <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+              {clientToDelete.name}
+            </h3>
+
+            <p className="mt-4 text-sm text-[#7c7163]">
+              This action cannot be undone.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setClientToDelete(null)}
+                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={async () => {
+                  await handleDeleteClient(clientToDelete.id);
+                  setClientToDelete(null);
+                }}
+                className="rounded-2xl bg-red-500 px-4 py-2 font-bold text-white"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1590,8 +2386,8 @@ function TagsPage() {
         description="Create reusable tags to classify commissions."
       />
 
-      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[360px_minmax(0,1fr)] gap-5 p-5 pb-6">
-        <div className="flex h-full min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[340px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
+        <div className="flex min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
           <div className="mb-5">
             <h3 className="text-xl font-black">New tag</h3>
             <p className="mt-1 text-sm text-[#7c7163]">
@@ -1674,7 +2470,7 @@ function TagsPage() {
           </button>
         </div>
 
-        <div className="h-full min-h-0 rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-xl font-black">Saved tags</h3>
 
@@ -1683,21 +2479,21 @@ function TagsPage() {
             </span>
           </div>
 
-          <div className="mt-5 min-h-0 overflow-y-auto pr-1">
+          <div className="mt-5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-2">
             {tags.length === 0 ? (
               <div className="flex h-[300px] items-center justify-center rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] text-sm text-[#9a8f82]">
                 No tags yet
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-2">
                 {Object.entries(groupedTags).map(
                   ([category, categoryTags]) => (
-                    <div key={category}>
+                    <div key={category} className="pb-7">
                       <h4 className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-[#9a8f82]">
                         {category}
                       </h4>
 
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-x-4 gap-y-3">
                         {categoryTags.map((tag) => (
                           <div
                             key={tag.id}
@@ -1992,7 +2788,7 @@ function TemplatesPage() {
         description="Create reusable commission workflows and arrange their stages."
       />
 
-      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[380px_minmax(0,1fr)] gap-5 p-5 pb-6">
+      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[380px_minmax(0,1fr)] gap-5 p-5 pb-6 overflow-hidden">
         <div className="flex h-full min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
           <div className="mb-5">
             <h3 className="text-xl font-black">New template</h3>
@@ -2098,7 +2894,7 @@ function TemplatesPage() {
           </div>
         </div>
 
-        <div className="h-full min-h-0 rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="flex h-full min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
           {selectedTemplate ? (
             <>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
@@ -2127,7 +2923,7 @@ function TemplatesPage() {
                 </button>
               </div>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-6 flex min-h-0 flex-1 flex-col space-y-4">
                 <input
                   value={editTemplateName}
                   onChange={(event) => setEditTemplateName(event.target.value)}
@@ -2151,7 +2947,7 @@ function TemplatesPage() {
                 </div>
 
                 <AnimatePresence mode="popLayout">
-                  <div className="space-y-2">
+                   <div className="min-h-0 flex-1 overflow-y-auto space-y-2 pr-2">
                     {editStages.length === 0 ? (
                       <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-5 text-sm text-[#9a8f82]">
                         This template has no stages.

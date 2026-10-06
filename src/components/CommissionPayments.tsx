@@ -136,6 +136,7 @@ function CommissionPayments({
                   defaultValue={payment.received !== null ? String(payment.received).replace(".", ",") : ""}
                   placeholder="Not yet"
                   inputMode="decimal"
+                  data-private
                   onBlur={(event) => {
                     if (event.target.value !== (payment.received !== null ? String(payment.received).replace(".", ",") : "")) {
                       run(() => updatePaymentReceived(payment.id, parsePrice(event.target.value)));
@@ -172,6 +173,7 @@ function CommissionPayments({
                 onChange={(event) => setAmount(event.target.value)}
                 placeholder={summary.remaining > 0 ? String(summary.remaining).replace(".", ",") : "0"}
                 inputMode="decimal"
+                  data-private
                 className={field}
               />
               <input
@@ -180,6 +182,7 @@ function CommissionPayments({
                 placeholder={suggestedReceived !== null ? String(suggestedReceived).replace(".", ",") : "Later"}
                 title={platform ? `${platform.name}: ${platform.percent}% + ${platform.fixed}` : undefined}
                 inputMode="decimal"
+                  data-private
                 className={field}
               />
               <button

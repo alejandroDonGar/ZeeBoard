@@ -1,3 +1,4 @@
+import { isPrivate } from "./privacy";
 import {
   getCommissionStageImages,
   type Commission,
@@ -168,6 +169,10 @@ export function parsePrice(text: string): number | null {
 
 /** "200 EUR", "186,84 EUR": decimales solo cuando los hay, con el formato del sistema. */
 export function formatMoney(amount: number, currency?: string | null): string {
+  if (isPrivate()) {
+    return "•••";
+  }
+
   const rounded = round2(amount);
   const decimals = Number.isInteger(rounded) ? 0 : 2;
 

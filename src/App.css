@@ -91,3 +91,9 @@ body {
 *::-webkit-scrollbar {
   display: none;
 }
+
+/* Modo privado: los campos de texto marcados con data-private se difuminan (no se pueden enmascarar) */
+:root[data-private="on"] [data-private] {
+  filter: blur(7px);
+  user-select: none;
+}

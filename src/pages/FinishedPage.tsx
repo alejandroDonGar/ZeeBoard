@@ -12,6 +12,7 @@ import {
   type CommissionStageImage,
   type TemplateStage,
 } from "../lib/database";
+import { hide } from "../lib/privacy";
 import PageHeader from "../components/PageHeader";
 import { Segmented } from "../components/BoardFilters";
 
@@ -241,7 +242,7 @@ function FinishedPage({
                     <section key={group.key}>
                       <div className="mb-1 flex items-baseline justify-between px-2">
                         <h3 className="text-[11px] font-black uppercase tracking-[0.16em] text-faint">
-                          {group.label}
+                          {groupMode === "client" ? hide(group.label) : group.label}
                         </h3>
                         <span className="text-xs text-faint">
                           {group.commissions.length} · {formatMoney(groupEarnings)}
@@ -285,7 +286,7 @@ function FinishedPage({
 
                                 <span className="truncate text-sm font-bold">{commission.title}</span>
                                 <span className="truncate text-sm text-muted">
-                                  {commission.client_name || "No client"}
+                                  {hide(commission.client_name || "No client")}
                                 </span>
                                 <span className="text-sm text-faint">
                                   {dateFormatter.format(new Date(commission.created_at))}

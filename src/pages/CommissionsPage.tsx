@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
+import { hide, isPrivate } from "../lib/privacy";
 import BoardFilters, { Segmented, type PaymentFilter } from "../components/BoardFilters";
 import CommissionPayments from "../components/CommissionPayments";
 import {
@@ -287,7 +288,7 @@ function CommissionsPage() {
     .flat()
     .map((character) => ({
       id: character.id,
-      label: `${character.name} (${clients.find((client) => client.id === character.client_id)?.name ?? "?"})`,
+      label: `${character.name} (${hide(clients.find((client) => client.id === character.client_id)?.name ?? "?")})`,
     }));
   const formLabel = "mb-1.5 block text-[11px] font-black uppercase tracking-[0.16em] text-faint";
   const formField =
@@ -830,7 +831,7 @@ function CommissionsPage() {
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-bold">{commission.title}</span>
                             <span className="block truncate text-[11px] text-faint">
-                              {[commission.client_name, stageName].filter(Boolean).join(" · ") || "No client"}
+                              {[commission.client_name && hide(commission.client_name), stageName].filter(Boolean).join(" · ") || "No client"}
                             </span>
                           </span>
 
@@ -864,7 +865,7 @@ function CommissionsPage() {
                     <h3 className="truncate text-2xl font-black">{activeCommission.title}</h3>
                     <p className="mt-1 text-sm text-muted">
                       {[
-                        activeCommission.client_name || "No client",
+                        hide(activeCommission.client_name || "No client"),
                         activeCommission.platform,
                         templates.find((template) => template.id === activeCommission.template_id)?.name,
                       ]
@@ -1360,7 +1361,7 @@ function CommissionsPage() {
                       )}
 
                       <p className="mt-2 text-sm font-semibold text-muted">
-                        {commission.client_name || "No client"}
+                        {hide(commission.client_name || "No client")}
                       </p>
 
                       <p className="mt-1 text-xs text-faint">
@@ -1575,7 +1576,8 @@ function CommissionsPage() {
                 <p className={formLabel}>Client</p>
                 <div className="flex gap-2">
                   <input
-                    list="client-options"
+                    list={isPrivate() ? undefined : "client-options"}
+                    data-private
                     value={clientName}
                     onChange={(event) => {
                       const name = event.target.value;
@@ -1635,7 +1637,7 @@ function CommissionsPage() {
                         {character.name}
                         {character.client_id !== selectedClientId && (
                           <span className="ml-1 text-[11px] opacity-70">
-                            · {clients.find((client) => client.id === character.client_id)?.name}
+                            · {hide(clients.find((client) => client.id === character.client_id)?.name ?? "")}
                           </span>
                         )}
                       </button>
@@ -1644,7 +1646,7 @@ function CommissionsPage() {
 
                   {/* Personajes de cualquier cliente: colaboraciones, personajes de amigos… */}
                   <input
-                    list="character-options"
+                    list={isPrivate() ? undefined : "character-options"}
                     value={characterSearch}
                     onChange={(event) => {
                       const option = allCharacterOptions.find((item) => item.label === event.target.value);
@@ -1795,6 +1797,7 @@ function CommissionsPage() {
                       onChange={(event) => setCommissionPrice(event.target.value)}
                       placeholder="0"
                       inputMode="decimal"
+                      data-private
                       title="Calculated from the type and characters; you can change it"
                       className="w-24 rounded-md border border-line-strong bg-surface px-2 py-1 text-right font-black outline-none focus:border-ink"
                     />

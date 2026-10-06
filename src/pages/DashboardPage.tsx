@@ -19,6 +19,7 @@ import {
   type TemplateStage,
 } from "../lib/database";
 import { thumbUrl } from "../lib/images";
+import { hide } from "../lib/privacy";
 import PageHeader from "../components/PageHeader";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -198,7 +199,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
                           {stageIndex >= 0
                             ? `${stages[stageIndex].name} · ${stageIndex + 1}/${stages.length}`
                             : "Not started"}
-                          {commission.client_name ? ` · ${commission.client_name}` : ""}
+                          {commission.client_name ? ` · ${hide(commission.client_name)}` : ""}
                         </p>
                       </div>
 

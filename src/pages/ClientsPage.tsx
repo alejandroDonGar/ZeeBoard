@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { hide, isPrivate } from "../lib/privacy";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
 import {
@@ -525,6 +526,11 @@ function ClientsPage({
   function renderAvatar(client: Client, size: "sm" | "lg") {
     const sizeClass = size === "sm" ? "h-9 w-9 text-xs" : "h-14 w-14 text-base";
 
+    // Ni la foto ni las iniciales identifican al cliente en modo privado
+    if (isPrivate()) {
+      return <div className={`${sizeClass} shrink-0 rounded-full bg-highlight`} />;
+    }
+
     return client.avatar_url ? (
       <img
         src={client.avatar_url}
@@ -588,9 +594,9 @@ function ClientsPage({
                     {renderAvatar(client, "sm")}
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{client.name}</p>
+                      <p className="truncate text-sm font-bold">{hide(client.name)}</p>
                       <p className="truncate text-xs text-faint">
-                        {client.handle || client.platform || "No contact"}
+                        {hide(client.handle || client.platform || "No contact")}
                       </p>
                     </div>
 
@@ -631,10 +637,10 @@ function ClientsPage({
                 {renderAvatar(selectedClient, "lg")}
 
                 <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-2xl font-black">{selectedClient.name}</h3>
+                  <h3 className="truncate text-2xl font-black">{hide(selectedClient.name)}</h3>
                   <p className="text-sm text-muted">
                     {selectedClient.platform || "No platform"}
-                    {selectedClient.handle ? ` · ${selectedClient.handle}` : ""}
+                    {selectedClient.handle ? ` · ${hide(selectedClient.handle)}` : ""}
                   </p>
                 </div>
 
@@ -1073,6 +1079,7 @@ function ClientsPage({
                 value={clientName}
                 onChange={(event) => setClientName(event.target.value)}
                 placeholder="Client name"
+                data-private
                 className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
               />
 
@@ -1093,6 +1100,7 @@ function ClientsPage({
                   value={clientHandle}
                   onChange={(event) => setClientHandle(event.target.value)}
                   placeholder="@username"
+                data-private
                   className="rounded-md border border-line-strong bg-paper px-3 py-2.5"
                 />
               </div>
@@ -1101,6 +1109,7 @@ function ClientsPage({
                 value={clientNotes}
                 onChange={(event) => setClientNotes(event.target.value)}
                 placeholder="Notes"
+                data-private
                 rows={4}
                 className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
               />

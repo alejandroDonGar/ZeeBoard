@@ -11,6 +11,7 @@ import SettingsPage from "./pages/SettingsPage";
 import DashboardPage from "./pages/DashboardPage";
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { runAutoBackup } from "./lib/backup";
+import { setPrivate, usePrivacy } from "./lib/privacy";
 
 type Page = "dashboard" | "commissions" | "clients" | "tags" | "templates" | "finished" | "settings";
 
@@ -59,6 +60,20 @@ function AutoBackup() {
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
+  // Al cambiar, toda la app se vuelve a pintar con los datos ocultos o visibles
+  const privateMode = usePrivacy();
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setPrivate(!privateMode);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [privateMode]);
   const [ready, setReady] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
 
@@ -148,7 +163,21 @@ function App() {
             })}
           </nav>
 
-          <div className="mt-auto rounded-3xl border border-line bg-surface p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setPrivate(!privateMode)}
+            title="Hide client names and prices while streaming (Ctrl+Shift+P)"
+            className={`mt-auto flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm font-bold transition ${
+              privateMode
+                ? "border-amber-400 bg-amber-100 text-amber-900"
+                : "border-line bg-surface text-muted hover:border-ink hover:text-ink"
+            }`}
+          >
+            {privateMode ? "● Private mode on" : "Private mode"}
+            <span className="text-[11px] font-semibold opacity-70">Ctrl+Shift+P</span>
+          </button>
+
+          <div className="mt-3 rounded-3xl border border-line bg-surface p-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
               Current theme
             </p>

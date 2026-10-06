@@ -1,6 +1,7 @@
 // Comprobación rápida de pagos y precios: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { calculateCommissionPrice, paymentSummary, receivedAfterFees } from "../src/lib/commissionHelpers";
+import { calculateCommissionPrice, formatMoney, paymentSummary, receivedAfterFees } from "../src/lib/commissionHelpers";
+import { HIDDEN, hide, setPrivate } from "../src/lib/privacy";
 
 // PayPal: el cliente paga 200, te llegan 186,84
 let s = paymentSummary(200, [{ amount: 200, received: 186.84 }]);
@@ -34,3 +35,13 @@ assert.strictEqual(receivedAfterFees(200, { percent: 3.4, fixed: 0.35 }), 192.85
 assert.strictEqual(receivedAfterFees(200, { percent: 0, fixed: 0 }), 200);
 assert.strictEqual(receivedAfterFees(0.2, { percent: 3.4, fixed: 0.35 }), 0);
 console.log("fees ok");
+
+// Modo privado: importes y nombres ocultos, y todo vuelve al desactivarlo
+assert.notStrictEqual(formatMoney(200, "EUR"), "•••");
+setPrivate(true);
+assert.strictEqual(formatMoney(200, "EUR"), "•••");
+assert.strictEqual(hide("Kai"), HIDDEN);
+setPrivate(false);
+assert.strictEqual(hide("Kai"), "Kai");
+assert.notStrictEqual(formatMoney(200, "EUR"), "•••");
+console.log("private ok");

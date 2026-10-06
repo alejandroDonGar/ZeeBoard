@@ -17,6 +17,7 @@
     "fs:allow-copy-file",
     "fs:allow-exists",
     "fs:allow-read-dir",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "notification:default"
   ]
 }

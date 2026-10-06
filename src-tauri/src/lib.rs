@@ -8,6 +8,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::default().build()) // SQLite local
         .plugin(tauri_plugin_fs::init()) // copias de seguridad
+        .plugin(tauri_plugin_notification::init()) // recordatorios de entrega
         .plugin(tauri_plugin_dialog::init()) // selectores de archivos y carpetas
         .invoke_handler(tauri::generate_handler![
             images::import_image_from_path,

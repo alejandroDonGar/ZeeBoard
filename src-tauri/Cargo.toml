@@ -31,6 +31,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 fast_image_resize = "5"
 webp = "0.3"
 sha2 = "0.10"
+tauri-plugin-notification = "2.2"
 
 # En modo desarrollo, las dependencias se compilan optimizadas: procesar un lienzo
 # enorme sin optimizar tardaría decenas de segundos

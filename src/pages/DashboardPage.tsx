@@ -20,6 +20,7 @@ import {
 } from "../lib/database";
 import { thumbUrl } from "../lib/images";
 import { hide } from "../lib/privacy";
+import { ATTENTION_STYLE, loadAttention, type Attention } from "../lib/reminders";
 import PageHeader from "../components/PageHeader";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -30,6 +31,11 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
   const [templateStagesByTemplateId, setTemplateStagesByTemplateId] = useState<Record<number, TemplateStage[]>>({});
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
   const [payments, setPayments] = useState<CommissionPayment[]>([]);
+  const [attention, setAttention] = useState<Attention<Commission>[]>([]);
+
+  useEffect(() => {
+    loadAttention().then(setAttention).catch(console.error);
+  }, []);
 
   useEffect(() => {
     getCommissions()
@@ -149,6 +155,28 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
       <PageHeader label="Overview" title="Dashboard" description="What's on your desk today." />
 
       <div className="space-y-5 p-5 pb-6">
+        {attention.length > 0 && (
+          <section className={panel}>
+            <h3 className={heading}>Needs attention · {attention.length}</h3>
+
+            <div className="divide-y divide-line">
+              {attention.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleOpenCommission(item.commission)}
+                  className="flex w-full items-center gap-3 py-2 text-left text-sm transition hover:bg-paper"
+                >
+                  <span className={`w-16 shrink-0 rounded-sm px-2 py-0.5 text-center text-xs font-bold ${ATTENTION_STYLE[item.kind].className}`}>
+                    {ATTENTION_STYLE[item.kind].label}
+                  </span>
+                  <span className="truncate">{item.text}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         <dl className="grid grid-cols-4 gap-4">
           {stats.map((stat) => (
             <div key={stat.label} className={panel}>

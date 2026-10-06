@@ -71,6 +71,14 @@ export type AppSettings = {
   auto_backup_keep: number;
   /** Cuándo se hizo la última copia automática (ISO) */
   last_auto_backup: string | null;
+  /** Lo máximo que prometes a un cliente: sin fecha de entrega, es el límite desde que aceptas la comisión */
+  promise_max_days: number;
+  reminders_enabled: boolean;
+  /** Avisos de entrega: este número de días antes y el mismo día */
+  reminder_days_before: number;
+  stalled_enabled: boolean;
+  /** Aviso de comisión parada: días sin cambios */
+  stalled_days: number;
 };
 
 // Se cargan una vez al arrancar para poder leerlos sin await desde cualquier pantalla
@@ -81,6 +89,11 @@ let settings: AppSettings = {
   auto_backup_folder: null,
   auto_backup_keep: 7,
   last_auto_backup: null,
+  promise_max_days: 60,
+  reminders_enabled: true,
+  reminder_days_before: 3,
+  stalled_enabled: true,
+  stalled_days: 21,
 };
 
 export function appSettings(): AppSettings {
@@ -89,13 +102,25 @@ export function appSettings(): AppSettings {
 
 async function loadSettings(): Promise<void> {
   const database = await getDatabase();
-  const rows = await database.select<(Omit<AppSettings, "auto_backup_enabled"> & { auto_backup_enabled: number })[]>(
-    `SELECT default_currency, extra_character_rate, auto_backup_enabled, auto_backup_folder, auto_backup_keep, last_auto_backup
+  type Row = Omit<AppSettings, "auto_backup_enabled" | "reminders_enabled" | "stalled_enabled"> & {
+    auto_backup_enabled: number;
+    reminders_enabled: number;
+    stalled_enabled: number;
+  };
+
+  const rows = await database.select<Row[]>(
+    `SELECT default_currency, extra_character_rate, auto_backup_enabled, auto_backup_folder, auto_backup_keep,
+       last_auto_backup, promise_max_days, reminders_enabled, reminder_days_before, stalled_enabled, stalled_days
      FROM settings WHERE id = 1;`,
   );
 
   if (rows[0]) {
-    settings = { ...rows[0], auto_backup_enabled: Boolean(rows[0].auto_backup_enabled) };
+    settings = {
+      ...rows[0],
+      auto_backup_enabled: Boolean(rows[0].auto_backup_enabled),
+      reminders_enabled: Boolean(rows[0].reminders_enabled),
+      stalled_enabled: Boolean(rows[0].stalled_enabled),
+    };
   }
 }
 
@@ -105,7 +130,8 @@ export async function updateSettings(changes: Partial<AppSettings>): Promise<voi
 
   await database.execute(
     `UPDATE settings SET default_currency = ?, extra_character_rate = ?, auto_backup_enabled = ?,
-       auto_backup_folder = ?, auto_backup_keep = ?, last_auto_backup = ? WHERE id = 1;`,
+       auto_backup_folder = ?, auto_backup_keep = ?, last_auto_backup = ?, promise_max_days = ?,
+       reminders_enabled = ?, reminder_days_before = ?, stalled_enabled = ?, stalled_days = ? WHERE id = 1;`,
     [
       next.default_currency,
       next.extra_character_rate,
@@ -113,6 +139,11 @@ export async function updateSettings(changes: Partial<AppSettings>): Promise<voi
       next.auto_backup_folder,
       next.auto_backup_keep,
       next.last_auto_backup,
+      next.promise_max_days,
+      next.reminders_enabled ? 1 : 0,
+      next.reminder_days_before,
+      next.stalled_enabled ? 1 : 0,
+      next.stalled_days,
     ],
   );
   settings = next;
@@ -134,6 +165,13 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE settings ADD COLUMN auto_backup_folder TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE settings ADD COLUMN auto_backup_keep INTEGER NOT NULL DEFAULT 7;`).catch(() => {});
   await database.execute(`ALTER TABLE settings ADD COLUMN last_auto_backup TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN promise_max_days INTEGER NOT NULL DEFAULT 60;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN reminders_enabled INTEGER NOT NULL DEFAULT 1;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN reminder_days_before INTEGER NOT NULL DEFAULT 3;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN stalled_enabled INTEGER NOT NULL DEFAULT 1;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN stalled_days INTEGER NOT NULL DEFAULT 21;`).catch(() => {});
+  // Cuándo cambió una comisión de etapa por última vez: cuenta como movimiento para el aviso de comisión parada
+  await database.execute(`ALTER TABLE commissions ADD COLUMN stage_changed_at TEXT;`).catch(() => {});
   await database.execute(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
   await loadSettings();
 
@@ -641,10 +679,10 @@ export async function updateCommissionStage(
   await database.execute(
     `
     UPDATE commissions
-    SET current_stage_id = ?
+    SET current_stage_id = ?, stage_changed_at = ?
     WHERE id = ?;
     `,
-    [stageId, commissionId],
+    [stageId, new Date().toISOString(), commissionId],
   );
 }
 

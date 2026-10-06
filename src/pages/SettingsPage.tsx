@@ -34,6 +34,7 @@ function SettingsPage() {
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const [autoRunning, setAutoRunning] = useState(false);
 
+  // Guarda cualquier ajuste y refresca `auto`, que es una copia de todos
   async function saveAuto(changes: Parameters<typeof updateSettings>[0]) {
     await updateSettings(changes);
     setAuto({ ...appSettings() });
@@ -156,6 +157,10 @@ function SettingsPage() {
 
   const totalBytes = storage ? storage.imagesBytes + storage.thumbsBytes + storage.databaseBytes : 0;
   const share = (bytes: number) => `${totalBytes > 0 ? (bytes / totalBytes) * 100 : 0}%`;
+
+  const positive = (text: string) => Math.max(1, Math.round(Number(text)) || 1);
+  const numberField =
+    "w-16 rounded-md border border-line-strong bg-paper px-2 py-1.5 text-right font-bold outline-none focus:border-ink";
 
   const section = "mb-2 mt-8 text-[11px] font-black uppercase tracking-[0.16em] text-faint first:mt-0";
   const panel = "divide-y divide-line rounded-3xl border border-line bg-surface shadow-sm";
@@ -296,6 +301,89 @@ function SettingsPage() {
               >
                 + Add platform
               </button>
+            </div>
+          </div>
+
+          <h3 className={section}>Delivery</h3>
+          <div className={panel}>
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">Promised delivery time</p>
+                <p className="text-sm text-muted">
+                  The longest you tell clients it can take. A commission without a deadline counts from the day you
+                  accept it.
+                </p>
+              </div>
+              <label className="flex items-center gap-1.5 text-sm font-semibold">
+                <input
+                  type="number"
+                  min={1}
+                  value={auto.promise_max_days}
+                  onChange={(event) => saveAuto({ promise_max_days: positive(event.target.value) }).catch(console.error)}
+                  className={numberField}
+                />
+                days
+              </label>
+            </div>
+
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">Delivery reminders</p>
+                <p className="text-sm text-muted">
+                  A Windows notification {auto.reminder_days_before} days before and on the day, while ZeeBoard is open.
+                </p>
+              </div>
+              {auto.reminders_enabled && (
+                <label className="flex items-center gap-1.5 text-sm font-semibold">
+                  <input
+                    type="number"
+                    min={1}
+                    value={auto.reminder_days_before}
+                    onChange={(event) =>
+                      saveAuto({ reminder_days_before: positive(event.target.value) }).catch(console.error)
+                    }
+                    className={numberField}
+                  />
+                  days before
+                </label>
+              )}
+              <Segmented
+                options={[
+                  { value: "off", label: "Off" },
+                  { value: "on", label: "On" },
+                ]}
+                value={auto.reminders_enabled ? "on" : "off"}
+                onChange={(value) => saveAuto({ reminders_enabled: value === "on" }).catch(console.error)}
+              />
+            </div>
+
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">Stalled commissions</p>
+                <p className="text-sm text-muted">
+                  Warns you when a commission has had no new image, correction, payment or stage change for a while.
+                </p>
+              </div>
+              {auto.stalled_enabled && (
+                <label className="flex items-center gap-1.5 text-sm font-semibold">
+                  <input
+                    type="number"
+                    min={1}
+                    value={auto.stalled_days}
+                    onChange={(event) => saveAuto({ stalled_days: positive(event.target.value) }).catch(console.error)}
+                    className={numberField}
+                  />
+                  days
+                </label>
+              )}
+              <Segmented
+                options={[
+                  { value: "off", label: "Off" },
+                  { value: "on", label: "On" },
+                ]}
+                value={auto.stalled_enabled ? "on" : "off"}
+                onChange={(value) => saveAuto({ stalled_enabled: value === "on" }).catch(console.error)}
+              />
             </div>
           </div>
 

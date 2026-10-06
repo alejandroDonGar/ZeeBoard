@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
 import { hide, isPrivate } from "../lib/privacy";
+import { ageInDays, daysToDeadline } from "../lib/reminders";
 import BoardFilters, { Segmented, type PaymentFilter } from "../components/BoardFilters";
 import CommissionPayments from "../components/CommissionPayments";
 import {
@@ -835,9 +836,24 @@ function CommissionsPage() {
                             </span>
                           </span>
 
-                          {deadlineStatus && (
+                          {deadlineStatus ? (
                             <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold ${deadlineStatus.className}`}>
                               {deadlineStatus.label.replace(" days left", "d").replace(" days overdue", "d late")}
+                            </span>
+                          ) : (
+                            // Sin fecha: los días desde que la aceptaste, con color al acercarse a lo que prometes
+                            <span
+                              title="Days since you accepted it"
+                              className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold ${
+                                daysToDeadline(commission, appSettings().promise_max_days, new Date()).daysLeft < 0
+                                  ? "bg-red-50 text-red-600"
+                                  : daysToDeadline(commission, appSettings().promise_max_days, new Date()).daysLeft <=
+                                      appSettings().reminder_days_before
+                                    ? "bg-amber-100 text-amber-900"
+                                    : "bg-highlight text-muted"
+                              }`}
+                            >
+                              {ageInDays(commission, new Date())}d
                             </span>
                           )}
                         </button>

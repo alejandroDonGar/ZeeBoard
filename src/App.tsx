@@ -12,6 +12,7 @@ import DashboardPage from "./pages/DashboardPage";
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { runAutoBackup } from "./lib/backup";
 import { setPrivate, usePrivacy } from "./lib/privacy";
+import { loadAttention, notifyNew } from "./lib/reminders";
 
 type Page = "dashboard" | "commissions" | "clients" | "tags" | "templates" | "finished" | "settings";
 
@@ -35,6 +36,20 @@ const startup = initImageUrls()
   .then(initializeDatabase)
   .then(migratePaymentTags)
   .then(() => migrateLegacyImages((done, total) => reportProgress({ done, total })));
+
+/** Avisos de entrega y de comisiones paradas: al abrir y cada 30 minutos mientras la app siga abierta. */
+function Reminders() {
+  useEffect(() => {
+    const check = () => loadAttention().then(notifyNew).catch(console.error);
+
+    check();
+    const timer = setInterval(check, 30 * 60 * 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return null;
+}
 
 let autoBackupStarted = false;
 
@@ -125,6 +140,7 @@ function App() {
   return (
     <ToastProvider>
       <AutoBackup />
+      <Reminders />
       <div className="h-screen overflow-hidden bg-canvas text-ink">
       <div className="flex h-full">
         <aside className="flex w-72 flex-col border-r border-line bg-paper px-5 py-6">

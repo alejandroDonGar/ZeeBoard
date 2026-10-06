@@ -89,6 +89,6 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 
 **Comodidad**
 - [ ] Paleta de comandos (Ctrl+K)
-- [ ] Copias de seguridad automáticas
+- [x] Copias de seguridad automáticas
 - [ ] Exportar los datos a CSV
 - [ ] App en español e inglés

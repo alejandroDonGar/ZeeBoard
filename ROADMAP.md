@@ -72,7 +72,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real
 - [ ] Varias monedas
-- [ ] Resumen de ingresos por trimestre (CSV)
+- [x] Resumen de ingresos por trimestre (CSV)
 - [ ] Estadísticas
 
 **Flujo de trabajo**
@@ -90,5 +90,5 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 **Comodidad**
 - [ ] Paleta de comandos (Ctrl+K)
 - [x] Copias de seguridad automáticas
-- [ ] Exportar los datos a CSV
+- [x] Exportar los datos a CSV
 - [ ] App en español e inglés

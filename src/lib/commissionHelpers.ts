@@ -181,3 +181,8 @@ export function formatMoney(amount: number, currency?: string | null): string {
     maximumFractionDigits: decimals,
   })} ${currency || "EUR"}`;
 }
+
+/** Fecha local como "2026-10-06" (toISOString usaría UTC y puede salir un día corrido). */
+export function isoDay(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}

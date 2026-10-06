@@ -12,6 +12,7 @@ import {
   type PaymentPlatform,
 } from "../lib/database";
 import { formatMoney, receivedAfterFees } from "../lib/commissionHelpers";
+import { exportCsv, type ExportKind } from "../lib/export";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { cleanUpOrphanedImages, getStorageStats, type StorageStats } from "../lib/images";
@@ -30,7 +31,26 @@ function SettingsPage() {
   const [currency, setCurrency] = useState(appSettings().default_currency);
   const [ratePercent, setRatePercent] = useState(String(Math.round(appSettings().extra_character_rate * 100)));
   const [platforms, setPlatforms] = useState<Omit<PaymentPlatform, "id">[]>([]);
+  const [exportingKind, setExportingKind] = useState<ExportKind | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [auto, setAuto] = useState(appSettings());
+
+  async function handleExport(kind: ExportKind) {
+    try {
+      setExportingKind(kind);
+      setExportMessage(null);
+      const path = await exportCsv(kind);
+
+      if (path) {
+        setExportMessage(`Saved to: ${path}`);
+      }
+    } catch (error) {
+      console.error(error);
+      setExportMessage(`Could not export: ${error}`);
+    } finally {
+      setExportingKind(null);
+    }
+  }
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const [autoRunning, setAutoRunning] = useState(false);
 
@@ -481,6 +501,37 @@ function SettingsPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          <h3 className={section}>Export data</h3>
+          <div className={panel}>
+            {(
+              [
+                ["commissions", "Commissions", "One row per commission: client, type, stage, price and what has been paid."],
+                ["payments", "Payments", "One row per payment: date, what the client paid, what you received and the platform fee."],
+                [
+                  "quarterly",
+                  "Quarterly summary",
+                  "Payments grouped by quarter and currency, by the day you received them. Currencies are never added together.",
+                ],
+              ] as const
+            ).map(([kind, title, description]) => (
+              <div key={kind} className={row}>
+                <div className="flex-1">
+                  <p className="font-semibold">{title}</p>
+                  <p className="text-sm text-muted">{description}</p>
+                </div>
+                <button type="button" onClick={() => handleExport(kind)} disabled={exportingKind !== null} className={ghostButton}>
+                  {exportingKind === kind ? "Exporting…" : "Export CSV"}
+                </button>
+              </div>
+            ))}
+
+            <p className="px-5 py-3 text-xs text-muted">
+              Opens in Excel and Google Sheets (semicolon-separated, decimal comma). Exports always contain the real
+              names and prices, even in private mode.
+              {exportMessage && <span className="mt-1 block">{exportMessage}</span>}
+            </p>
           </div>
 
           <h3 className={section}>Storage</h3>

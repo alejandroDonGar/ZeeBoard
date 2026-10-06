@@ -1,5 +1,5 @@
 import { sendNotification } from "@tauri-apps/plugin-notification";
-import { isCommissionCompleted } from "./commissionHelpers";
+import { isCommissionCompleted, isoDay } from "./commissionHelpers";
 import {
   appSettings,
   getCommissions,
@@ -30,8 +30,6 @@ type Options = Pick<
 >;
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-const isoDay = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 /**
  * Cuántos días faltan para el límite de una comisión (negativo = pasado).

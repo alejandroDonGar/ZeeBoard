@@ -1,4 +1,5 @@
 mod backup;
+mod export;
 mod images;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -17,6 +18,7 @@ pub fn run() {
             images::cleanup_orphan_images,
             images::storage_stats,
             backup::restore_backup,
+            export::write_text_file,
             backup::prepare_backup,
             backup::finish_backup,
         ])

@@ -8,6 +8,15 @@
     "opener:default",
     "sql:allow-load",
     "sql:allow-execute",
-    "sql:allow-select"
+    "sql:allow-select",
+    "fs:default",
+    "fs:allow-app-write",
+    "fs:allow-app-read",
+    "fs:scope-app-recursive",
+    "fs:allow-mkdir",
+    "fs:allow-copy-file",
+    "fs:allow-exists",
+    "fs:allow-read-dir",
+    "dialog:allow-open"
   ]
 }

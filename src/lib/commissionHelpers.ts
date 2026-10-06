@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { isPrivate } from "./privacy";
 import {
   getCommissions,
@@ -75,27 +76,27 @@ export function getDeadlineStatus(deadline: string | null) {
 
   if (daysLeft < 0) {
     return {
-      label: `${Math.abs(daysLeft)} days overdue`,
+      label: t(daysLeft === -1 ? "{n} day overdue" : "{n} days overdue", { n: Math.abs(daysLeft) }),
       className: "bg-red-500 text-white",
     };
   }
 
   if (daysLeft === 0) {
     return {
-      label: "Due today",
+      label: t("Due today"),
       className: "bg-red-500 text-white",
     };
   }
 
   if (daysLeft <= 7) {
     return {
-      label: `${daysLeft} days left`,
+      label: t(daysLeft === 1 ? "{n} day left" : "{n} days left", { n: daysLeft }),
       className: "bg-amber-100 text-amber-900",
     };
   }
 
   return {
-    label: `${daysLeft} days left`,
+    label: t("{n} days left", { n: daysLeft }),
     className: "bg-white text-[#7c7163]",
   };
 }
@@ -136,9 +137,9 @@ export function paymentSummary(
 }
 
 export const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; className: string }> = {
-  unpaid: { label: "Unpaid", className: "bg-red-50 text-red-600" },
-  partial: { label: "Partial", className: "bg-amber-100 text-amber-900" },
-  paid: { label: "Paid", className: "bg-green-50 text-green-700" },
+  unpaid: { label: t("Unpaid"), className: "bg-red-50 text-red-600" },
+  partial: { label: t("Partial"), className: "bg-amber-100 text-amber-900" },
+  paid: { label: t("Paid"), className: "bg-green-50 text-green-700" },
 };
 
 // ponytail: tu usuario fijo en el código (es el mismo en todas tus redes); pasarlo a Ajustes si alguna vez cambia

@@ -24,6 +24,8 @@ export function setLanguage(language: Language): void {
 
 const language = getLanguage();
 
+export const locale = language === "es" ? "es-ES" : "en-US";
+
 /** The English text is the key; `{name}` placeholders are filled from `vars`. */
 export function t(text: string, vars?: Record<string, string | number>): string {
   const translated = (language === "es" && es[text]) || text;

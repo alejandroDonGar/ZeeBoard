@@ -1,4 +1,5 @@
 import { sendNotification } from "@tauri-apps/plugin-notification";
+import { t } from "./i18n";
 import { isoDay, loadOpenCommissions } from "./commissionHelpers";
 import {
   appSettings,
@@ -56,7 +57,7 @@ export const ATTENTION_STYLE: Record<AttentionKind, { label: string; className: 
   stalled: { label: "Stalled", className: "bg-highlight text-muted" },
 };
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+const days = (count: number) => t(count === 1 ? "{n} day" : "{n} days", { n: count });
 
 /**
  * Qué comisiones piden atención hoy: entrega que se acerca o pasada, comisiones paradas y las que ya
@@ -78,12 +79,12 @@ export function computeAttention<T extends Reminderable>(
         kind: "payment",
         days: 0,
         key: `${commission.id}:payment`,
-        text: `${commission.title} is past the sketch and still unpaid`,
+        text: t("{title} is past the sketch and still unpaid", { title: commission.title }),
       });
     }
 
     const { daysLeft, implicit, deadline } = daysToDeadline(commission, options.promise_max_days, now);
-    const limit = implicit ? "your promised time" : "its deadline";
+    const limit = implicit ? t("your promised time") : t("its deadline");
     const deadlineKey = `${commission.id}:${isoDay(deadline)}`;
 
     if (options.reminders_enabled && daysLeft < 0) {
@@ -92,7 +93,7 @@ export function computeAttention<T extends Reminderable>(
         kind: "overdue",
         days: -daysLeft,
         key: `${deadlineKey}:overdue`,
-        text: `${commission.title} is ${plural(-daysLeft, "day")} past ${limit}`,
+        text: t("{title} is {days} past {limit}", { title: commission.title, days: days(-daysLeft), limit }),
       });
     } else if (options.reminders_enabled && daysLeft === 0) {
       items.push({
@@ -100,7 +101,7 @@ export function computeAttention<T extends Reminderable>(
         kind: "due-today",
         days: 0,
         key: `${deadlineKey}:today`,
-        text: `${commission.title} reaches ${limit} today`,
+        text: t("{title} reaches {limit} today", { title: commission.title, limit }),
       });
     } else if (options.reminders_enabled && daysLeft <= options.reminder_days_before) {
       items.push({
@@ -108,7 +109,7 @@ export function computeAttention<T extends Reminderable>(
         kind: "due-soon",
         days: daysLeft,
         key: `${deadlineKey}:soon`,
-        text: `${commission.title} reaches ${limit} in ${plural(daysLeft, "day")}`,
+        text: t("{title} reaches {limit} in {days}", { title: commission.title, limit, days: days(daysLeft) }),
       });
     } else if (options.stalled_enabled) {
       const last = new Date(lastActivity[commission.id] ?? commission.created_at);
@@ -120,7 +121,7 @@ export function computeAttention<T extends Reminderable>(
           kind: "stalled",
           days: idle,
           key: `${commission.id}:${isoDay(last)}:stalled`,
-          text: `${commission.title} hasn't changed in ${plural(idle, "day")}`,
+          text: t("{title} hasn't changed in {days}", { title: commission.title, days: days(idle) }),
         });
       }
     }
@@ -188,7 +189,7 @@ export function notifyNew(items: Attention<Commission>[]): number {
 
   // Muchos a la vez (primer arranque, o tras varios días sin abrir): uno solo con el resumen
   if (fresh.length > 3) {
-    sendNotification({ title: "ZeeBoard", body: `${fresh.length} commissions need your attention` });
+    sendNotification({ title: "ZeeBoard", body: t("{n} commissions need your attention", { n: fresh.length }) });
   } else {
     fresh.forEach((item) => sendNotification({ title: "ZeeBoard", body: item.text }));
   }

@@ -18,6 +18,7 @@ import {
   type Tag,
   type TemplateStage,
 } from "../lib/database";
+import { locale, t } from "../lib/i18n";
 import { thumbUrl } from "../lib/images";
 import { hide } from "../lib/privacy";
 import { ATTENTION_STYLE, loadAttention, type Attention } from "../lib/reminders";
@@ -97,7 +98,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
     payments.filter((payment) => payment.paid_at.startsWith(thisMonth)),
   );
 
-  const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
+  const monthFormatter = new Intl.DateTimeFormat(locale, { month: "short" });
   const now = new Date();
   const bookedByMonth = Array.from({ length: 6 }, (_, index) => {
     const month = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
@@ -123,26 +124,26 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
   const topTags = [...tagCounts.values()].sort((a, b) => b.count - a.count).slice(0, 6);
 
   const stats = [
-    { label: "In progress", value: inProgress.length, detail: "commissions", className: "text-ink" },
+    { label: t("In progress"), value: inProgress.length, detail: t("commissions"), className: "text-ink" },
     {
-      label: "Due within 7 days",
+      label: t("Due within 7 days"),
       value: dueThisWeek,
-      detail: "including overdue",
+      detail: t("including overdue"),
       className: dueThisWeek > 0 ? "text-amber-600" : "text-ink",
     },
     {
-      label: "Waiting for payment",
+      label: t("Waiting for payment"),
       value: formatMoney(unpaid.reduce((sum, entry) => sum + entry.remaining, 0)),
-      detail: `${unpaid.length} ${unpaid.length === 1 ? "commission" : "commissions"}`,
+      detail: t(unpaid.length === 1 ? "{n} commission" : "{n} commissions", { n: unpaid.length }),
       className: unpaid.length > 0 ? "text-red-500" : "text-ink",
     },
     {
-      label: "Received this month",
+      label: t("Received this month"),
       value: formatMoney(receivedThisMonth.received),
       detail:
         receivedThisMonth.pendingReceived > 0
-          ? `${receivedThisMonth.pendingReceived} payments not entered yet`
-          : `${formatMoney(receivedThisMonth.fees)} in platform fees`,
+          ? t("{n} payments not entered yet", { n: receivedThisMonth.pendingReceived })
+          : t("{amount} in platform fees", { amount: formatMoney(receivedThisMonth.fees) }),
       className: "text-green-600",
     },
   ];
@@ -157,7 +158,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
       <div className="space-y-5 p-5 pb-6">
         {attention.length > 0 && (
           <section className={panel}>
-            <h3 className={heading}>Needs attention · {attention.length}</h3>
+            <h3 className={heading}>{t("Needs attention · {n}", { n: attention.length })}</h3>
 
             <div className="divide-y divide-line">
               {attention.map((item) => (
@@ -168,7 +169,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
                   className="flex w-full items-center gap-3 py-2 text-left text-sm transition hover:bg-paper"
                 >
                   <span className={`w-16 shrink-0 rounded-sm px-2 py-0.5 text-center text-xs font-bold ${ATTENTION_STYLE[item.kind].className}`}>
-                    {ATTENTION_STYLE[item.kind].label}
+                    {t(ATTENTION_STYLE[item.kind].label)}
                   </span>
                   <span className="truncate">{item.text}</span>
                 </button>
@@ -189,10 +190,10 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
 
         <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5">
           <section className={panel}>
-            <h3 className={heading}>In progress · {inProgress.length}</h3>
+            <h3 className={heading}>{t("In progress · {n}", { n: inProgress.length })}</h3>
 
             {inProgress.length === 0 ? (
-              <p className="text-sm text-muted">Nothing on the board. Time for a break.</p>
+              <p className="text-sm text-muted">{t("Nothing on the board. Time for a break.")}</p>
             ) : (
               <div className="divide-y divide-line">
                 {inProgress.map((commission) => {
@@ -226,7 +227,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
                         <p className="truncate text-xs text-muted">
                           {stageIndex >= 0
                             ? `${stages[stageIndex].name} · ${stageIndex + 1}/${stages.length}`
-                            : "Not started"}
+                            : t("Not started")}
                           {commission.client_name ? ` · ${hide(commission.client_name)}` : ""}
                         </p>
                       </div>
@@ -240,7 +241,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
                           {deadlineStatus.label}
                         </span>
                       ) : (
-                        <span className="text-xs text-faint">No deadline</span>
+                        <span className="text-xs text-faint">{t("No deadline")}</span>
                       )}
                     </button>
                   );
@@ -251,10 +252,10 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
 
           <div className="space-y-5">
             <section className={panel}>
-              <h3 className={heading}>Not paid yet · {unpaid.length}</h3>
+              <h3 className={heading}>{t("Not paid yet · {n}", { n: unpaid.length })}</h3>
 
               {unpaid.length === 0 ? (
-                <p className="text-sm text-muted">All caught up.</p>
+                <p className="text-sm text-muted">{t("All caught up.")}</p>
               ) : (
                 <div className="divide-y divide-line">
                   {unpaid.map(({ commission, remaining }) => (
@@ -275,10 +276,10 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
             </section>
 
             <section className={panel}>
-              <h3 className={heading}>Most used tags</h3>
+              <h3 className={heading}>{t("Most used tags")}</h3>
 
               {topTags.length === 0 ? (
-                <p className="text-sm text-muted">No tags in use yet.</p>
+                <p className="text-sm text-muted">{t("No tags in use yet.")}</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {topTags.map(({ tag, count }) => (
@@ -296,7 +297,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
         </div>
 
         <section className={panel}>
-          <h3 className={heading}>Booked per month · by commission start date</h3>
+          <h3 className={heading}>{t("Booked per month · by commission start date")}</h3>
 
           <div className="flex h-36 items-end gap-3 border-b border-line">
             {bookedByMonth.map((entry) => (

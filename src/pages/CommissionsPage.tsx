@@ -18,6 +18,7 @@ import {
   calculateCommissionPrice,
   invoiceDescription,
 } from "../lib/commissionHelpers";
+import { autoTagIds } from "../lib/formImport";
 import {
   getTemplateStages,
   getTemplates,
@@ -279,6 +280,18 @@ function CommissionsPage() {
         String(calculateCommissionPrice(basePrice, characterCount, appSettings().extra_character_rate)).replace(".", ","),
       );
     }
+  }
+
+  /** Al crear: pone solas las etiquetas de tipo y de personajes (las demás se respetan) */
+  function applyAutoTags(templateId: number | null, characterCount: number) {
+    if (formMode !== "new") {
+      return;
+    }
+
+    const auto = autoTagIds(templates.find((template) => template.id === templateId)?.name ?? null, characterCount, allTags);
+    const own = (id: number) => ["Commission Type", "Characters"].includes(allTags.find((tag) => tag.id === id)?.category ?? "");
+
+    setSelectedTagIds((current) => [...current.filter((id) => !own(id)), ...auto]);
   }
 
   const formTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
@@ -1680,6 +1693,7 @@ function CommissionsPage() {
                             : [...selectedCharacterIds, character.id];
                           setSelectedCharacterIds(nextIds);
                           applyAutoPrice(selectedTemplateId, nextIds.length);
+                          applyAutoTags(selectedTemplateId, nextIds.length);
                         }}
                         className={
                           selected
@@ -1710,6 +1724,7 @@ function CommissionsPage() {
                           : [...selectedCharacterIds, option.id];
                         setSelectedCharacterIds(nextIds);
                         applyAutoPrice(selectedTemplateId, nextIds.length);
+                          applyAutoTags(selectedTemplateId, nextIds.length);
                         setCharacterSearch("");
                       } else {
                         setCharacterSearch(event.target.value);
@@ -1747,6 +1762,7 @@ function CommissionsPage() {
                         onClick={() => {
                           setSelectedTemplateId(template.id);
                           applyAutoPrice(template.id, selectedCharacterIds.length);
+                          applyAutoTags(template.id, selectedCharacterIds.length);
                         }}
                         className={`rounded-md border px-3 py-2 text-left transition disabled:cursor-default ${
                           selected

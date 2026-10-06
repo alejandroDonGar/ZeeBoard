@@ -26,3 +26,14 @@ tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2.7.1"
 
+# Procesado de imágenes: decodificar, redimensionar (SIMD) y comprimir a WebP
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp", "tiff"] }
+fast_image_resize = "5"
+webp = "0.3"
+sha2 = "0.10"
+
+# En modo desarrollo, las dependencias se compilan optimizadas: procesar un lienzo
+# enorme sin optimizar tardaría decenas de segundos
+[profile.dev.package."*"]
+opt-level = 3
+

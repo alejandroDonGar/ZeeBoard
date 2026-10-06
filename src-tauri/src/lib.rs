@@ -19,6 +19,7 @@ pub fn run() {
             images::storage_stats,
             backup::restore_backup,
             export::write_text_file,
+            export::read_text_file,
             backup::prepare_backup,
             backup::finish_backup,
         ])

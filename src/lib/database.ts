@@ -84,6 +84,9 @@ export type AppSettings = {
   slots_open: boolean;
   /** Cuántas comisiones abiertas aceptas a la vez */
   slots_total: number;
+  /** CSV con las respuestas del formulario (lo deja al día el script de Google en tu Drive) */
+  responses_file: string | null;
+  last_form_sync: string | null;
 };
 
 // Se cargan una vez al arrancar para poder leerlos sin await desde cualquier pantalla
@@ -101,6 +104,8 @@ let settings: AppSettings = {
   stalled_days: 21,
   slots_open: false,
   slots_total: 5,
+  responses_file: null,
+  last_form_sync: null,
 };
 
 export function appSettings(): AppSettings {
@@ -119,7 +124,7 @@ async function loadSettings(): Promise<void> {
   const rows = await database.select<Row[]>(
     `SELECT default_currency, extra_character_rate, auto_backup_enabled, auto_backup_folder, auto_backup_keep,
        last_auto_backup, promise_max_days, reminders_enabled, reminder_days_before, stalled_enabled, stalled_days,
-       slots_open, slots_total
+       slots_open, slots_total, responses_file, last_form_sync
      FROM settings WHERE id = 1;`,
   );
 
@@ -142,7 +147,7 @@ export async function updateSettings(changes: Partial<AppSettings>): Promise<voi
     `UPDATE settings SET default_currency = ?, extra_character_rate = ?, auto_backup_enabled = ?,
        auto_backup_folder = ?, auto_backup_keep = ?, last_auto_backup = ?, promise_max_days = ?,
        reminders_enabled = ?, reminder_days_before = ?, stalled_enabled = ?, stalled_days = ?,
-       slots_open = ?, slots_total = ? WHERE id = 1;`,
+       slots_open = ?, slots_total = ?, responses_file = ?, last_form_sync = ? WHERE id = 1;`,
     [
       next.default_currency,
       next.extra_character_rate,
@@ -157,6 +162,8 @@ export async function updateSettings(changes: Partial<AppSettings>): Promise<voi
       next.stalled_days,
       next.slots_open ? 1 : 0,
       next.slots_total,
+      next.responses_file,
+      next.last_form_sync,
     ],
   );
   settings = next;
@@ -185,6 +192,8 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE settings ADD COLUMN stalled_days INTEGER NOT NULL DEFAULT 21;`).catch(() => {});
   await database.execute(`ALTER TABLE settings ADD COLUMN slots_open INTEGER NOT NULL DEFAULT 0;`).catch(() => {});
   await database.execute(`ALTER TABLE settings ADD COLUMN slots_total INTEGER NOT NULL DEFAULT 5;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN responses_file TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN last_form_sync TEXT;`).catch(() => {});
 
   // Solicitudes de comisión que aún no son comisión: nuevas, en lista de espera, aceptadas o rechazadas
   await database.execute(`
@@ -1799,8 +1808,8 @@ export async function importRequests(items: ImportedRequest[]): Promise<{ added:
       await database.execute(
         `INSERT INTO commission_requests
            (name, platform, contact, template_id, characters, details, status, created_at, external_id, email)
-         VALUES (?, ?, ?, ?, 1, ?, 'new', ?, ?, ?);`,
-        [item.name, item.platform, item.contact, item.template_id, item.details, item.created_at, item.externalId, item.email],
+         VALUES (?, ?, ?, ?, ?, ?, 'new', ?, ?, ?);`,
+        [item.name, item.platform, item.contact, item.template_id, item.characters, item.details, item.created_at, item.externalId, item.email],
       );
       known.add(item.externalId);
       added += 1;

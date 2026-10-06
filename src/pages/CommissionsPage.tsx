@@ -3,6 +3,7 @@ import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
 import { hide, isPrivate } from "../lib/privacy";
 import { ageInDays, daysToDeadline } from "../lib/reminders";
+import Linkified from "../components/Linkified";
 import BoardFilters, { Segmented, type PaymentFilter } from "../components/BoardFilters";
 import CommissionPayments from "../components/CommissionPayments";
 import {
@@ -1238,7 +1239,7 @@ function CommissionsPage() {
                     <div>
                       <p className="mb-1 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Notes</p>
                       <p className="line-clamp-4 whitespace-pre-wrap text-sm text-muted">
-                        {activeCommission.notes || "No notes."}
+                        {activeCommission.notes ? <Linkified text={activeCommission.notes} /> : "No notes."}
                       </p>
                     </div>
 

@@ -18,9 +18,12 @@ import {
 } from "../lib/database";
 import { calculateCommissionPrice, formatMoney, loadOpenCommissions } from "../lib/commissionHelpers";
 import { normalizeHandle, parseResponses } from "../lib/formImport";
+import { REQUESTS_CHANGED, syncFormResponses } from "../lib/formSync";
 import { hide } from "../lib/privacy";
+import { open } from "@tauri-apps/plugin-dialog";
 import { Segmented } from "../components/BoardFilters";
 import ConfirmModal from "../components/ConfirmModal";
+import Linkified from "../components/Linkified";
 import PageHeader from "../components/PageHeader";
 import { useToast } from "../context/ToastContext";
 
@@ -47,6 +50,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
     setRequests(requestList);
     setTemplates(templateList);
     setTaken(open.length);
+    window.dispatchEvent(new Event(REQUESTS_CHANGED));
   }
 
   useEffect(() => {
@@ -56,6 +60,38 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
   async function saveSlots(changes: Parameters<typeof updateSettings>[0]) {
     await updateSettings(changes);
     setSettings({ ...appSettings() });
+  }
+
+  async function chooseResponsesFile() {
+    const file = await open({ title: "Choose the responses CSV", filters: [{ name: "CSV", extensions: ["csv"] }] });
+
+    if (typeof file === "string") {
+      await saveSlots({ responses_file: file });
+      await checkNow();
+    }
+  }
+
+  async function checkNow() {
+    try {
+      setBusy(true);
+      const result = await syncFormResponses();
+      setSettings({ ...appSettings() });
+      await load();
+
+      if (result) {
+        showToast(
+          result.added > 0
+            ? `${result.added} new ${result.added === 1 ? "request" : "requests"} from the form.`
+            : "Nothing new in the form.",
+          "success",
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      showToast(`Could not read the responses file: ${error instanceof Error ? error.message : error}`, "error");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function run(action: () => Promise<void>, errorPrefix: string) {
@@ -228,7 +264,11 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
             {request.email && <span className="text-muted"> · {hide(request.email)}</span>}
           </p>
 
-          {request.details && <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-muted">{request.details}</p>}
+          {request.details && (
+            <p className="mt-1 whitespace-pre-wrap text-sm text-muted">
+              <Linkified text={request.details} />
+            </p>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -321,6 +361,30 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                 value={settings.slots_open ? "open" : "closed"}
                 onChange={(value) => saveSlots({ slots_open: value === "open" }).catch(console.error)}
               />
+            </div>
+
+            <div className="flex items-center gap-4 px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">Form responses</p>
+                <p className="truncate text-sm text-muted" title={settings.responses_file ?? undefined}>
+                  {settings.responses_file ?? "Not connected: pick the CSV your Google script keeps up to date."}
+                </p>
+                {settings.responses_file && (
+                  <p className="text-xs text-faint">
+                    {settings.last_form_sync
+                      ? `Checked ${new Date(settings.last_form_sync).toLocaleString()} · again every 30 minutes`
+                      : "Not checked yet"}
+                  </p>
+                )}
+              </div>
+              <button type="button" onClick={chooseResponsesFile} disabled={busy} className={ghost}>
+                {settings.responses_file ? "Change…" : "Choose file…"}
+              </button>
+              {settings.responses_file && (
+                <button type="button" onClick={checkNow} disabled={busy} className={ghost}>
+                  Check now
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-4 px-5 py-4">

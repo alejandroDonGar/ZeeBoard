@@ -14,6 +14,8 @@ import { ToastProvider, useToast } from "./context/ToastContext";
 import { runAutoBackup } from "./lib/backup";
 import { setPrivate, usePrivacy } from "./lib/privacy";
 import { loadAttention, notifyNew } from "./lib/reminders";
+import { REQUESTS_CHANGED, syncFormResponses } from "./lib/formSync";
+import { getRequests } from "./lib/database";
 
 type Page = "dashboard" | "commissions" | "requests" | "clients" | "tags" | "templates" | "finished" | "settings";
 
@@ -53,6 +55,21 @@ function Reminders() {
   return null;
 }
 
+/** Respuestas nuevas del formulario: al abrir y cada 30 minutos, si hay un archivo de respuestas elegido. */
+function FormSync() {
+  useEffect(() => {
+    // Si el archivo no está (Drive sin montar, sin conexión…) no molesta: se vuelve a intentar luego
+    const check = () => syncFormResponses().catch(console.error);
+
+    check();
+    const timer = setInterval(check, 30 * 60 * 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return null;
+}
+
 let autoBackupStarted = false;
 
 /** Una vez por arranque, ya con la app a la vista: si toca, hace la copia automática en segundo plano. */
@@ -79,6 +96,18 @@ function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   // Al cambiar, toda la app se vuelve a pintar con los datos ocultos o visibles
   const privateMode = usePrivacy();
+  const [newRequests, setNewRequests] = useState(0);
+
+  useEffect(() => {
+    const count = () =>
+      getRequests()
+        .then((requests) => setNewRequests(requests.filter((request) => request.status === "new").length))
+        .catch(console.error);
+
+    count();
+    window.addEventListener(REQUESTS_CHANGED, count);
+    return () => window.removeEventListener(REQUESTS_CHANGED, count);
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -143,6 +172,7 @@ function App() {
     <ToastProvider>
       <AutoBackup />
       <Reminders />
+      <FormSync />
       <div className="h-screen overflow-hidden bg-canvas text-ink">
       <div className="flex h-full">
         <aside className="flex w-72 flex-col border-r border-line bg-paper px-5 py-6">
@@ -176,6 +206,11 @@ function App() {
                   }
                 >
                   {item.label}
+                  {item.id === "requests" && newRequests > 0 && (
+                    <span className="ml-2 rounded-sm bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">
+                      {newRequests}
+                    </span>
+                  )}
                 </button>
               );
             })}

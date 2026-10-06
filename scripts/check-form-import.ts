@@ -1,6 +1,7 @@
 // Comprobación rápida de la importación del formulario: npx tsx scripts/check-form-import.ts
 // Todos los usuarios y correos de aquí son inventados.
 import assert from "node:assert";
+import { splitLinks } from "../src/lib/links";
 import { matchTemplate, normalizeHandle, parseContact, parseCsv, parseResponses, parseTimestamp } from "../src/lib/formImport";
 
 // CSV de Google: comillas, comillas escapadas y saltos de línea dentro de una celda
@@ -84,6 +85,38 @@ assert.deepStrictEqual(
   real.requests.map((request) => [request.contact, request.email, request.details]),
   [["@demo", "demo.person@example.com", null], ["@demo2", null, "Email in the form: no tengo"]],
 );
+
+// Con la pregunta de los personajes: "3 Characters" -> 3; sin la pregunta, 1
+const charactersTitle = "How many characters is your commission going to have?";
+const withCharacters = parseResponses(
+  `${header},"${charactersTitle}"
+"2026/10/06 10:00:00 a. m. CET","Full Colour","bsky -> @demo","3 Characters"
+"2026/10/06 10:05:00 a. m. CET","Full Colour","tg demo2","1 Character"
+`,
+  templates,
+);
+assert.deepStrictEqual(withCharacters.requests.map((request) => request.characters), [3, 1]);
+assert.strictEqual(withoutEmail.requests[0].characters, 1);
+
+// Las referencias (enlaces y descripciones) pasan a los detalles; su título real contiene "Reference"
+const referencesTitle = "Reference links and a name or short description for the character/s";
+const withReferences = parseResponses(
+  `${header},"${referencesTitle}"\n"2026/10/06 10:00:00 a. m. CET","Full Colour","bsky -> @demo","https://drive.example.com/folder/abc\nthe blue fox has no name"\n"2026/10/06 10:05:00 a. m. CET","Full Colour","tg demo2",""\n`,
+  templates,
+);
+assert.deepStrictEqual(withReferences.requests.map((request) => request.details), [
+  "References: https://drive.example.com/folder/abc\nthe blue fox has no name",
+  null,
+]);
+
+// Enlaces en las referencias: con o sin https://, sin llevarse el punto final y sin falsos positivos
+const links = (text: string) => splitLinks(text).filter((part) => part.href).map((part) => part.href);
+assert.deepStrictEqual(links("see https://drive.google.com/x/y. thanks"), ["https://drive.google.com/x/y"]);
+assert.deepStrictEqual(links("toyhou.se/123 and Dropbox.com/s/abc?dl=0, ok"), ["https://toyhou.se/123", "https://Dropbox.com/s/abc?dl=0"]);
+assert.deepStrictEqual(links("www.example.com/a and (https://imgur.com/z)"), ["https://www.example.com/a", "https://imgur.com/z"]);
+assert.deepStrictEqual(links("x.com/someone"), ["https://x.com/someone"]);
+assert.deepStrictEqual(links("notdropbox.com/x, e.g. foto.png, name@x.com/y, box.com/z"), []);
+assert.strictEqual(splitLinks("a toyhou.se/1 b").map((part) => part.text).join(""), "a toyhou.se/1 b"); // el texto no se pierde
 
 // Un archivo que no es el formulario
 assert.ok(parseResponses('"a","b"\n"1","2"', templates).error);

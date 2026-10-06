@@ -145,6 +145,7 @@ export type ImportedRequest = {
   platform: string;
   contact: string;
   template_id: number | null;
+  characters: number;
   email: string | null;
   details: string | null;
 };
@@ -164,6 +165,8 @@ export function parseResponses<T extends { id: number; name: string }>(
   const typeColumn = find(/type of commission|tipo de comisi/i);
   const contactColumn = find(/handle|communication|contact|usuario/i);
   const emailColumn = find(/e-?mail|correo/i);
+  const referencesColumn = find(/reference|referencia/i);
+  const charactersColumn = find(/how many characters|number of characters|cu[aá]ntos personajes/i);
   const timeColumn = Math.max(find(/marca temporal|timestamp/i), 0);
 
   if (typeColumn < 0 || contactColumn < 0) {
@@ -182,8 +185,10 @@ export function parseResponses<T extends { id: number; name: string }>(
       const emailText = emailColumn >= 0 ? (row[emailColumn] ?? "").trim() : "";
       // Solo se guarda como correo si lo parece (y en minúsculas, para poder emparejarlo luego); si no, queda en los detalles
       const email = /^\S+@\S+\.\S+$/.test(emailText) ? emailText.toLowerCase() : null;
+      const referencesText = referencesColumn >= 0 ? (row[referencesColumn] ?? "").trim() : "";
       const notes = [
         template || !typeText ? null : `Type in the form: ${typeText}`,
+        referencesText ? `References: ${referencesText}` : null,
         emailText && !email ? `Email in the form: ${emailText}` : null,
       ].filter(Boolean);
 
@@ -194,6 +199,8 @@ export function parseResponses<T extends { id: number; name: string }>(
         platform: contact.platform,
         contact: contact.handle,
         template_id: template?.id ?? null,
+        // "3 Characters" → 3; sin esa pregunta (o sin número), 1
+        characters: Math.max(1, Number((charactersColumn >= 0 ? row[charactersColumn] ?? "" : "").match(/\d+/)?.[0]) || 1),
         email,
         // Lo que no encaja (un tipo desconocido, un correo raro) se conserva tal cual para revisarlo a mano
         details: notes.length > 0 ? notes.join("\n") : null,

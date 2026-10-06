@@ -45,10 +45,12 @@ function ClientsPage({
   const [clientPlatform, setClientPlatform] = useState("Twitter / X");
   const [clientHandle, setClientHandle] = useState("");
   const [clientNotes, setClientNotes] = useState("");
-  const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
+  // null = cerrado, "new" = crear, Client = editar
+  const [clientForm, setClientForm] = useState<Client | "new" | null>(null);
+  const [clientSearch, setClientSearch] = useState("");
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [savingClient, setSavingClient] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [importingCharacterId, setImportingCharacterId] = useState<number | null>(null);
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
@@ -64,10 +66,28 @@ function ClientsPage({
   async function loadClients() {
     const data = await getClients();
     setClients(data);
+    return data;
+  }
+
+  const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
+
+  function closeClientForm() {
+    setClientForm(null);
+    setClientName("");
+    setClientPlatform("Twitter / X");
+    setClientHandle("");
+    setClientNotes("");
+  }
+
+  function handleOpenNewClient() {
+    closeClientForm();
+    setClientForm("new");
   }
 
   async function handleCreateClient() {
     try {
+      setSavingClient(true);
+
       await createClient(
         clientName,
         clientPlatform,
@@ -90,15 +110,16 @@ function ClientsPage({
         }
       }
 
-      setClientName("");
-      setClientPlatform("Twitter / X");
-      setClientHandle("");
-      setClientNotes("");
+      closeClientForm();
 
-      await loadClients();
+      // El cliente nuevo es el de id más alto: se abre su ficha
+      const data = await loadClients();
+      setSelectedClientId(Math.max(...data.map((client) => client.id)));
     } catch (error) {
-    console.error(error);
-    showToast("Could not create client.", "error");
+      console.error(error);
+      showToast("Could not create client.", "error");
+    } finally {
+      setSavingClient(false);
     }
   }
 
@@ -106,6 +127,7 @@ function ClientsPage({
     try {
         await deleteClient(clientId);
         await loadClients();
+        setSelectedClientId(null);
         showToast("Client deleted.", "success");
     } catch (error) {
         console.error(error);
@@ -160,6 +182,10 @@ function ClientsPage({
       const data = await getClients();
 
       setClients(data);
+      // Se abre la ficha del primer cliente por orden alfabético
+      setSelectedClientId(
+        [...data].sort((a, b) => a.name.localeCompare(b.name))[0]?.id ?? null,
+      );
 
       const characterEntries = await Promise.all(
         data.map(async (client) => {
@@ -203,7 +229,7 @@ function ClientsPage({
   }, []);
 
   function handleOpenEditClient(client: Client) {
-    setClientToEdit(client);
+    setClientForm(client);
     setClientName(client.name);
     setClientPlatform(client.platform || "Twitter / X");
     setClientHandle(client.handle || "");
@@ -211,7 +237,7 @@ function ClientsPage({
   }
 
   async function handleSaveClientChanges() {
-    if (!clientToEdit) {
+    if (!clientForm || clientForm === "new") {
       return;
     }
 
@@ -219,19 +245,14 @@ function ClientsPage({
       setSavingClient(true);
 
       await updateClient(
-        clientToEdit.id,
+        clientForm.id,
         clientName,
         clientPlatform,
         clientHandle,
         clientNotes,
       );
 
-      setClientToEdit(null);
-      setClientName("");
-      setClientPlatform("Twitter / X");
-      setClientHandle("");
-      setClientNotes("");
-
+      closeClientForm();
       await loadClients();
     } catch (error) {
     console.error(error);
@@ -458,7 +479,6 @@ function ClientsPage({
       String(commission.id),
     );
 
-    setSelectedClient(null);
     onOpenCommissionsPage();
   }
 
@@ -470,665 +490,472 @@ function ClientsPage({
     return isCommissionCompletedHelper(commission, templateStagesByTemplateId);
   }
 
+  const visibleClients = [...clients]
+    .filter((client) =>
+      `${client.name} ${client.handle ?? ""}`.toLowerCase().includes(clientSearch.trim().toLowerCase()),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  function renderAvatar(client: Client, size: "sm" | "lg") {
+    const sizeClass = size === "sm" ? "h-9 w-9 text-xs" : "h-14 w-14 text-base";
+
+    return client.avatar_url ? (
+      <img
+        src={client.avatar_url}
+        alt={client.name}
+        className={`${sizeClass} shrink-0 rounded-full object-cover`}
+      />
+    ) : (
+      <div
+        className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full font-black text-white ${getClientAvatarBackground(
+          client.name,
+        )}`}
+      >
+        {getClientInitials(client.name)}
+      </div>
+    );
+  }
+
   return (
     <>
       <PageHeader
         label="Client database"
         title="Clients"
-        description="Manage your commission clients."
+        description="Your clients, their characters and their commissions."
+        action="+ New client"
+        onAction={handleOpenNewClient}
       />
 
-      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[360px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
-        <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <h3 className="text-xl font-black">
-            New client
-          </h3>
+      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[280px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
+        <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-3 shadow-sm">
+          <input
+            value={clientSearch}
+            onChange={(event) => setClientSearch(event.target.value)}
+            placeholder="Search clients…"
+            className="mb-2 rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
+          />
 
-          <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
-            <input
-              value={clientName}
-              onChange={(event) =>
-                setClientName(event.target.value)
-              }
-              placeholder="Client name"
-              className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
-            />
-
-            <select
-              value={clientPlatform}
-              onChange={(event) =>
-                setClientPlatform(event.target.value)
-              }
-              className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
-            >
-              <option>Twitter / X</option>
-              <option>Bluesky</option>
-              <option>Telegram</option>
-              <option>Discord</option>
-              <option>Other</option>
-            </select>
-
-            <input
-              value={clientHandle}
-              onChange={(event) =>
-                setClientHandle(event.target.value)
-              }
-              placeholder="@username"
-              className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
-            />
-
-            <textarea
-              value={clientNotes}
-              onChange={(event) =>
-                setClientNotes(event.target.value)
-              }
-              placeholder="Notes"
-              rows={4}
-              className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
-            />
-
-            <button
-              onClick={handleCreateClient}
-              className="w-full rounded-2xl bg-primary px-4 py-3 font-bold text-on-primary"
-            >
-              Create client
-            </button>
-          </div>
-        </div>
-
-        <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-black">
-              Clients
-            </h3>
-
-            <span className="rounded-sm bg-paper px-3 py-1 text-xs font-bold text-faint">
-              {clients.length} clients
-            </span>
-          </div>
-
-          <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
-            {clients.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-line-strong bg-paper p-8 text-center text-sm text-faint">
-                No clients yet
-              </div>
+          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+            {visibleClients.length === 0 ? (
+              <p className="p-4 text-center text-sm text-faint">
+                {clients.length === 0 ? "No clients yet" : "No matches"}
+              </p>
             ) : (
-              clients.map((client) => {
-                const clientCommissions = commissions.filter(
+              visibleClients.map((client) => {
+                const commissionCount = commissions.filter(
                   (commission) => commission.client_id === client.id,
-                );
-
-                const clientTotal = clientCommissions.reduce(
-                  (total, commission) => total + (commission.price || 0),
-                  0,
-                );
-
-                const clientPaidCount = clientCommissions.filter((commission) =>
-                  (commissionTagsById[commission.id] ?? []).some(
-                    (tag) =>
-                      tag.category === "Payment" &&
-                      tag.name.trim().toLowerCase() === "paid",
-                  ),
-                ).length;
-
-                const clientUnpaidCount = clientCommissions.filter((commission) =>
-                  (commissionTagsById[commission.id] ?? []).some(
-                    (tag) =>
-                      tag.category === "Payment" &&
-                      tag.name.trim().toLowerCase() === "not paid",
-                  ),
                 ).length;
 
                 return (
-                  <div
+                  <button
                     key={client.id}
-                    onClick={() => setSelectedClient(client)}
-                    className="cursor-pointer rounded-3xl border border-line bg-paper p-4 transition hover:border-ink hover:shadow-md"
+                    type="button"
+                    onClick={() => setSelectedClientId(client.id)}
+                    className={`flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition ${
+                      client.id === selectedClientId ? "bg-highlight" : "hover:bg-paper"
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        {client.avatar_url ? (
-                          <img
-                            src={client.avatar_url}
-                            alt={client.name}
-                            className="h-12 w-12 rounded-2xl object-cover shadow-sm"
-                          />
-                        ) : (
-                          <div
-                            className={`flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-black text-white shadow-sm ${getClientAvatarBackground(
-                              client.name,
-                            )}`}
-                          >
-                            {getClientInitials(client.name)}
-                          </div>
-                        )}
+                    {renderAvatar(client, "sm")}
 
-                        <div>
-                          <h4 className="font-black">{client.name}</h4>
-
-                          {client.platform && (
-                            <p className="mt-1 text-sm font-semibold text-ink">
-                              {client.platform}
-                            </p>
-                          )}
-
-                          {client.handle && (
-                            <p className="text-sm text-muted">
-                              {client.handle}
-                            </p>
-                          )}
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-muted shadow-sm">
-                              {clientCommissions.length} commissions
-                            </span>
-
-                            <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-ink shadow-sm">
-                              {clientTotal} EUR
-                            </span>
-
-                            <span className="rounded-sm bg-green-50 px-3 py-1 text-xs font-black text-green-700 shadow-sm">
-                              {clientPaidCount} paid
-                            </span>
-
-                            <span className="rounded-sm bg-red-50 px-3 py-1 text-xs font-black text-red-600 shadow-sm">
-                              {clientUnpaidCount} unpaid
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {client.platform === "Bluesky" && client.handle && (
-                          <button
-                            onClick={() => handleFetchClientAvatar(client)}
-                            className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-ink shadow-sm transition hover:bg-highlight"
-                          >
-                            Fetch avatar
-                          </button>
-                        )}
-
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOpenEditClient(client);
-                          }}
-                          className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-ink shadow-sm transition hover:bg-highlight"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setClientToDelete(client);
-                          }}
-                          className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-red-500 shadow-sm transition hover:bg-red-50"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">{client.name}</p>
+                      <p className="truncate text-xs text-faint">
+                        {client.handle || client.platform || "No contact"}
+                      </p>
                     </div>
-                  </div>
+
+                    {commissionCount > 0 && (
+                      <span className="text-xs font-semibold text-faint">{commissionCount}</span>
+                    )}
+                  </button>
                 );
               })
             )}
           </div>
         </div>
-      </section>
-      {selectedClient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-[560px] overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-2xl">
-            <div className="flex items-start gap-4">
-              {selectedClient.avatar_url ? (
-                <img
-                  src={selectedClient.avatar_url}
-                  alt={selectedClient.name}
-                  className="h-16 w-16 rounded-3xl object-cover shadow-sm"
-                />
-              ) : (
-                <div
-                  className={`flex h-16 w-16 items-center justify-center rounded-3xl text-lg font-black text-white shadow-sm ${getClientAvatarBackground(
-                    selectedClient.name,
-                  )}`}
+
+        <div className="min-h-0 overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-sm">
+          {!selectedClient ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <p className="text-lg font-black">
+                {clients.length === 0 ? "Add your first client" : "Pick a client"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {clients.length === 0
+                  ? "Keep their contact, characters and references in one place."
+                  : "Their profile, characters and commissions show up here."}
+              </p>
+              {clients.length === 0 && (
+                <button
+                  type="button"
+                  onClick={handleOpenNewClient}
+                  className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary"
                 >
-                  {getClientInitials(selectedClient.name)}
-                </div>
+                  New client
+                </button>
               )}
-
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-                  Client profile
-                </p>
-
-                <h3 className="mt-1 text-2xl font-black text-ink">
-                  {selectedClient.name}
-                </h3>
-
-                <p className="mt-1 text-sm font-semibold text-muted">
-                  {selectedClient.platform || "No platform"}
-                  {selectedClient.handle
-                    ? ` · ${selectedClient.handle}`
-                    : ""}
-                </p>
-                <div className="mt-6 grid grid-cols-4 gap-3">
-                  <div className="rounded-3xl bg-paper p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                      Total
-                    </p>
-
-                    <p className="mt-2 text-xl font-black text-ink">
-                      {selectedClientCommissions.length}
-                    </p>
-                  </div>
-
-                  <div className="rounded-3xl bg-paper p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                      Active
-                    </p>
-
-                    <p className="mt-2 text-xl font-black text-amber-600">
-                      {activeCommissions.length}
-                    </p>
-                  </div>
-
-                  <div className="rounded-3xl bg-paper p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                      Completed
-                    </p>
-
-                    <p className="mt-2 text-xl font-black text-green-600">
-                      {completedCommissions.length}
-                    </p>
-                  </div>
-
-                  <div className="rounded-3xl bg-paper p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                      Spent
-                    </p>
-
-                    <p className="mt-2 text-xl font-black text-ink">
-                      {totalSpent} EUR
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  <div className="rounded-3xl bg-paper p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                      Average
-                    </p>
-
-                    <p className="mt-2 text-xl font-black text-ink">
-                      {averagePrice} EUR
-                    </p>
-                  </div>
-
-                  <div className="rounded-3xl bg-paper p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                      Paid
-                    </p>
-
-                    <p className="mt-2 text-xl font-black text-green-700">
-                      {paidCommissionsCount}
-                    </p>
-                  </div>
-
-                  <div className="rounded-3xl bg-paper p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                      Unpaid
-                    </p>
-
-                    <p className="mt-2 text-xl font-black text-red-600">
-                      {unpaidCommissionsCount}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
-            <div className="mt-6 rounded-3xl bg-paper p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                  Commissions
-                </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-4">
+                {renderAvatar(selectedClient, "lg")}
 
-                <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-faint shadow-sm">
-                  {selectedClientCommissions.length}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-2xl font-black">{selectedClient.name}</h3>
+                  <p className="text-sm text-muted">
+                    {selectedClient.platform || "No platform"}
+                    {selectedClient.handle ? ` · ${selectedClient.handle}` : ""}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 gap-2">
+                  {selectedClient.platform === "Bluesky" && selectedClient.handle && (
+                    <button
+                      type="button"
+                      onClick={() => handleFetchClientAvatar(selectedClient)}
+                      className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-ink hover:text-ink"
+                    >
+                      Fetch avatar
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditClient(selectedClient)}
+                    className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setClientToDelete(selectedClient)}
+                    className="rounded-md px-3 py-1.5 text-xs font-semibold text-red-500 transition hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
+
+              <dl className="mt-6 grid grid-cols-4 gap-3">
+                {[
+                  {
+                    label: "Commissions",
+                    value: selectedClientCommissions.length,
+                    detail: `${activeCommissions.length} active · ${completedCommissions.length} done`,
+                    className: "text-ink",
+                  },
+                  {
+                    label: "Spent",
+                    value: `${totalSpent} EUR`,
+                    detail: `${averagePrice} EUR average`,
+                    className: "text-ink",
+                  },
+                  { label: "Paid", value: paidCommissionsCount, detail: "commissions", className: "text-green-600" },
+                  { label: "Unpaid", value: unpaidCommissionsCount, detail: "commissions", className: "text-red-500" },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-md bg-paper p-3">
+                    <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-faint">
+                      {stat.label}
+                    </dt>
+                    <dd className={`mt-1 text-xl font-black ${stat.className}`}>{stat.value}</dd>
+                    <dd className="text-[11px] text-muted">{stat.detail}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              <h4 className="mb-2 mt-8 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
+                Commissions · {selectedClientCommissions.length}
+              </h4>
 
               {selectedClientCommissions.length === 0 ? (
-                <p className="mt-3 text-sm text-muted">
-                  No commissions yet.
-                </p>
+                <p className="text-sm text-muted">No commissions yet.</p>
               ) : (
-                <div className="mt-3 space-y-2">
+                <div className="divide-y divide-line border-y border-line">
                   {selectedClientCommissions.map((commission) => {
                     const commissionImages = stageImagesByCommissionId[commission.id] ?? [];
-
-                    const commissionPreview =
-                      commissionImages.length > 0
-                        ? commissionImages[commissionImages.length - 1]
-                        : null;
-
+                    const commissionPreview = commissionImages[commissionImages.length - 1] ?? null;
                     const completionPercentage = getCommissionCompletionPercentage(commission);
                     const isCompleted = isCommissionCompleted(commission);
 
                     return (
-                      <div
+                      <button
                         key={commission.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 shadow-sm"
+                        type="button"
+                        onClick={() => handleOpenCommissionFromClient(commission)}
+                        title="Open commission"
+                        className="flex w-full items-center gap-4 px-2 py-2.5 text-left transition hover:bg-paper"
                       >
-                        <div className="flex min-w-0 items-center gap-3">
-                          {commissionPreview && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setZoomedImage(imageUrl(commissionPreview.image_data_url));
-                              }}
-                              className="shrink-0 overflow-hidden rounded-2xl border border-line bg-paper shadow-sm transition hover:scale-[1.03]"
-                            >
-                              <img
-                                src={thumbUrl(commissionPreview.image_data_url)}
-                                loading="lazy" decoding="async"
-                                alt={commission.title}
-                                className="h-16 w-16 object-cover"
-                              />
-                            </button>
-                          )}
+                        {commissionPreview ? (
+                          <img
+                            src={thumbUrl(commissionPreview.image_data_url)}
+                            loading="lazy" decoding="async"
+                            alt={commission.title}
+                            className="h-12 w-12 shrink-0 rounded-md object-cover"
+                          />
+                        ) : (
+                          <div className="h-12 w-12 shrink-0 rounded-md bg-paper" />
+                        )}
 
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-black text-ink">
-                                {commission.title}
-                              </p>
-
-                              <p className="mt-1 text-xs text-muted">
-                                {commission.price
-                                  ? `${commission.price} ${commission.currency || "EUR"}`
-                                  : "No price"}
-                                {" · "}
-                                {commission.deadline || "No deadline"}
-                              </p>
-
-                              <div className="mt-2">
-                                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.12em] text-faint">
-                                  <span>
-                                    {isCompleted ? "Completed" : "Progress"}
-                                  </span>
-
-                                  <span>
-                                    {completionPercentage}%
-                                  </span>
-                                </div>
-
-                                <div className="mt-1 h-2 overflow-hidden rounded-sm bg-paper">
-                                  <div
-                                    className={
-                                      isCompleted
-                                        ? "h-full rounded-sm bg-green-500"
-                                        : "h-full rounded-sm bg-primary"
-                                    }
-                                    style={{ width: `${completionPercentage}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold">{commission.title}</p>
+                          <p className="text-xs text-muted">
+                            {commission.price
+                              ? `${commission.price} ${commission.currency || "EUR"}`
+                              : "No price"}
+                            {" · "}
+                            {commission.deadline || "No deadline"}
+                          </p>
                         </div>
 
-                        <button
-                          onClick={() => handleOpenCommissionFromClient(commission)}
-                          className="rounded-sm bg-primary px-3 py-1 text-xs font-black text-on-primary shadow-sm"
-                        >
-                          Open
-                        </button>
-                      </div>
+                        <div className="w-32 shrink-0">
+                          <div className="flex justify-between text-[10px] font-bold text-faint">
+                            <span>{isCompleted ? "Done" : "Progress"}</span>
+                            <span>{completionPercentage}%</span>
+                          </div>
+                          <div className="mt-1 h-1.5 overflow-hidden rounded-sm bg-paper">
+                            <div
+                              className={isCompleted ? "h-full bg-green-500" : "h-full bg-primary"}
+                              style={{ width: `${completionPercentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
               )}
-            </div>
-            <div className="mt-6 rounded-3xl bg-paper p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                  Characters
-                </p>
 
-                <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-muted">
-                  {(charactersByClientId[selectedClient.id] ?? []).length}
-                </span>
-              </div>
+              <div className="mt-6 rounded-3xl bg-paper p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
+                    Characters
+                  </p>
 
-              <div className="mt-4 flex gap-2">
-                <input
-                  value={newCharacterName}
-                  onChange={(event) =>
-                    setNewCharacterName(event.target.value)
-                  }
-                  placeholder="Character name"
-                  className="flex-1 rounded-2xl border border-line-strong bg-surface px-4 py-2"
-                />
+                  <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-muted">
+                    {(charactersByClientId[selectedClient.id] ?? []).length}
+                  </span>
+                </div>
 
-                <button
-                  onClick={handleCreateCharacter}
-                  className="rounded-2xl bg-primary px-4 py-2 text-sm font-black text-on-primary"
-                >
-                  Add
-                </button>
-              </div>
+                <div className="mt-4 flex gap-2">
+                  <input
+                    value={newCharacterName}
+                    onChange={(event) =>
+                      setNewCharacterName(event.target.value)
+                    }
+                    placeholder="Character name"
+                    className="flex-1 rounded-2xl border border-line-strong bg-surface px-4 py-2"
+                  />
 
-              <div className="mt-4 space-y-2">
-                {(charactersByClientId[selectedClient.id] ?? []).map((character) => {
-                  const references = referencesByCharacterId[character.id] ?? [];
+                  <button
+                    onClick={handleCreateCharacter}
+                    className="rounded-2xl bg-primary px-4 py-2 text-sm font-black text-on-primary"
+                  >
+                    Add
+                  </button>
+                </div>
 
-                  const commissionsUsingCharacter = commissions.filter((commission) =>
-                    (commissionCharactersById[commission.id] ?? []).includes(character.id),
-                  );
+                <div className="mt-4 space-y-2">
+                  {(charactersByClientId[selectedClient.id] ?? []).map((character) => {
+                    const references = referencesByCharacterId[character.id] ?? [];
 
-                  const lastUsedCommission =
-                    commissionsUsingCharacter.length > 0
-                      ? [...commissionsUsingCharacter].sort(
-                          (a, b) =>
-                            new Date(b.created_at).getTime() -
-                            new Date(a.created_at).getTime(),
-                        )[0]
-                      : null;
+                    const commissionsUsingCharacter = commissions.filter((commission) =>
+                      (commissionCharactersById[commission.id] ?? []).includes(character.id),
+                    );
 
-                  return (
-                    <div
-                      key={character.id}
-                      className="rounded-2xl bg-surface p-3 shadow-sm"
-                    >
-                      <button
-                        onClick={() =>
-                          setExpandedCharacterId(
-                            expandedCharacterId === character.id
-                              ? null
-                              : character.id,
-                          )
-                        }
-                        className="flex w-full items-center justify-between"
+                    const lastUsedCommission =
+                      commissionsUsingCharacter.length > 0
+                        ? [...commissionsUsingCharacter].sort(
+                            (a, b) =>
+                              new Date(b.created_at).getTime() -
+                              new Date(a.created_at).getTime(),
+                          )[0]
+                        : null;
+
+                    return (
+                      <div
+                        key={character.id}
+                        className="rounded-2xl bg-surface p-3 shadow-sm"
                       >
-                        <div className="text-left">
-                          <p className="font-black">
-                            {character.name}
-                          </p>
+                        <button
+                          onClick={() =>
+                            setExpandedCharacterId(
+                              expandedCharacterId === character.id
+                                ? null
+                                : character.id,
+                            )
+                          }
+                          className="flex w-full items-center justify-between"
+                        >
+                          <div className="text-left">
+                            <p className="font-black">
+                              {character.name}
+                            </p>
 
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <span className="rounded-sm bg-paper px-3 py-1 text-xs font-black text-muted shadow-sm">
-                              {references.length} refs
-                            </span>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <span className="rounded-sm bg-paper px-3 py-1 text-xs font-black text-muted shadow-sm">
+                                {references.length} refs
+                              </span>
 
-                            <span className="rounded-sm bg-paper px-3 py-1 text-xs font-black text-muted shadow-sm">
-                              {commissionsUsingCharacter.length} commissions
-                            </span>
+                              <span className="rounded-sm bg-paper px-3 py-1 text-xs font-black text-muted shadow-sm">
+                                {commissionsUsingCharacter.length} commissions
+                              </span>
+                            </div>
+
+                            {lastUsedCommission && (
+                              <p className="mt-2 text-xs font-semibold text-faint">
+                                Last used in{" "}
+                                <span className="font-black text-ink">
+                                  {lastUsedCommission.title}
+                                </span>
+                              </p>
+                            )}
                           </div>
 
-                          {lastUsedCommission && (
-                            <p className="mt-2 text-xs font-semibold text-faint">
-                              Last used in{" "}
-                              <span className="font-black text-ink">
-                                {lastUsedCommission.title}
-                              </span>
-                            </p>
-                          )}
-                        </div>
+                          <span className="text-lg font-black">
+                            {expandedCharacterId === character.id ? "−" : "+"}
+                          </span>
+                        </button>
 
-                        <span className="text-lg font-black">
-                          {expandedCharacterId === character.id ? "−" : "+"}
-                        </span>
-                      </button>
+                        {expandedCharacterId === character.id && (
+                          <div className="mt-4">
+                            <button
+                              type="button"
+                              data-image-drop={`character:${character.id}`}
+                              title="Click, drop images here or paste with Ctrl+V"
+                              disabled={importingCharacterId !== null}
+                              onClick={() => handleAddCharacterReferences(character.id)}
+                              className={`block w-full cursor-pointer rounded-2xl border border-dashed px-4 py-3 text-center text-xs font-black transition hover:border-ink disabled:cursor-wait disabled:opacity-60 ${
+                                dragZoneId === `character:${character.id}`
+                                  ? "scale-[1.02] border-ink bg-highlight text-ink"
+                                  : "border-line-strong bg-paper text-muted"
+                              }`}
+                            >
+                              {importingCharacterId === character.id
+                                ? "Optimizing…"
+                                : dragZoneId === `character:${character.id}`
+                                  ? "Drop to add"
+                                  : "Add reference"}
+                            </button>
 
-                      {expandedCharacterId === character.id && (
-                        <div className="mt-4">
-                          <button
-                            type="button"
-                            data-image-drop={`character:${character.id}`}
-                            title="Click, drop images here or paste with Ctrl+V"
-                            disabled={importingCharacterId !== null}
-                            onClick={() => handleAddCharacterReferences(character.id)}
-                            className={`block w-full cursor-pointer rounded-2xl border border-dashed px-4 py-3 text-center text-xs font-black transition hover:border-ink disabled:cursor-wait disabled:opacity-60 ${
-                              dragZoneId === `character:${character.id}`
-                                ? "scale-[1.02] border-ink bg-highlight text-ink"
-                                : "border-line-strong bg-paper text-muted"
-                            }`}
-                          >
-                            {importingCharacterId === character.id
-                              ? "Optimizing…"
-                              : dragZoneId === `character:${character.id}`
-                                ? "Drop to add"
-                                : "Add reference"}
-                          </button>
-
-                          {references.length === 0 ? (
-                            <p className="mt-3 text-center text-sm text-faint">
-                              No references yet.
-                            </p>
-                          ) : (
-                            <div className="mt-4 grid grid-cols-4 gap-3">
-                              {references.map((reference) => (
-                                <div
-                                  key={reference.id}
-                                  className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setZoomedImage(imageUrl(reference.image_data_url))
-                                    }
-                                    className="block w-full"
+                            {references.length === 0 ? (
+                              <p className="mt-3 text-center text-sm text-faint">
+                                No references yet.
+                              </p>
+                            ) : (
+                              <div className="mt-4 grid grid-cols-4 gap-3">
+                                {references.map((reference) => (
+                                  <div
+                                    key={reference.id}
+                                    className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm"
                                   >
-                                    <img
-                                      src={thumbUrl(reference.image_data_url)}
-                                      loading="lazy" decoding="async"
-                                      alt={reference.label}
-                                      className="aspect-square w-full object-cover"
-                                    />
-                                  </button>
-
-                                  <div className="flex items-center justify-between px-2 py-1">
-                                    <span className="truncate text-[10px] font-black text-muted">
-                                      {reference.label}
-                                    </span>
-
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        handleDeleteCharacterReference(
-                                          character.id,
-                                          reference.id,
-                                        )
+                                        setZoomedImage(imageUrl(reference.image_data_url))
                                       }
-                                      className="text-[10px] font-black text-red-500"
+                                      className="block w-full"
                                     >
-                                      ×
+                                      <img
+                                        src={thumbUrl(reference.image_data_url)}
+                                        loading="lazy" decoding="async"
+                                        alt={reference.label}
+                                        className="aspect-square w-full object-cover"
+                                      />
                                     </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <div className="mt-6">
-                            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-faint">
-                                Commission history
-                            </p>
 
-                            {commissionsUsingCharacter.length === 0 ? (
-                                <p className="text-center text-sm text-faint">
-                                No commissions yet.
-                                </p>
-                            ) : (
-                                <div className="grid grid-cols-4 gap-3">
-                                {commissionsUsingCharacter.map((historyCommission) => {
-                                    const historyImages = stageImagesByCommissionId[historyCommission.id] ?? [];
-                                    const latestHistoryImage =
-                                    historyImages.length > 0
-                                        ? historyImages[historyImages.length - 1]
-                                        : null;
+                                    <div className="flex items-center justify-between px-2 py-1">
+                                      <span className="truncate text-[10px] font-black text-muted">
+                                        {reference.label}
+                                      </span>
 
-                                    return (
-                                    <button
-                                        key={historyCommission.id}
+                                      <button
                                         type="button"
-                                        onClick={() => handleOpenCommissionFromClient(historyCommission)}
-                                        className="overflow-hidden rounded-2xl border border-line bg-surface text-left shadow-sm transition hover:scale-[1.02] hover:border-ink"
-                                    >
-                                        {latestHistoryImage ? (
-                                        <img
-                                            src={thumbUrl(latestHistoryImage.image_data_url)}
-                                            loading="lazy" decoding="async"
-                                            alt={historyCommission.title}
-                                            className="aspect-square w-full object-cover"
-                                        />
-                                        ) : (
-                                        <div className="flex aspect-square items-center justify-center bg-paper text-[10px] text-faint">
-                                            No image
-                                        </div>
-                                        )}
-
-                                        <div className="px-2 py-1">
-                                        <p className="truncate text-[10px] font-black text-muted">
-                                            {historyCommission.title}
-                                        </p>
-                                        </div>
-                                    </button>
-                                    );
-                                })}
-                                </div>
+                                        onClick={() =>
+                                          handleDeleteCharacterReference(
+                                            character.id,
+                                            reference.id,
+                                          )
+                                        }
+                                        className="text-[10px] font-black text-red-500"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             )}
-                            </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            {selectedClient.notes && (
-              <div className="mt-6 rounded-3xl bg-paper p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                  Notes
-                </p>
+                            <div className="mt-6">
+                              <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-faint">
+                                  Commission history
+                              </p>
 
-                <p className="mt-2 text-sm text-muted">
-                  {selectedClient.notes}
-                </p>
-              </div>
-            )}
+                              {commissionsUsingCharacter.length === 0 ? (
+                                  <p className="text-center text-sm text-faint">
+                                  No commissions yet.
+                                  </p>
+                              ) : (
+                                  <div className="grid grid-cols-4 gap-3">
+                                  {commissionsUsingCharacter.map((historyCommission) => {
+                                      const historyImages = stageImagesByCommissionId[historyCommission.id] ?? [];
+                                      const latestHistoryImage =
+                                      historyImages.length > 0
+                                          ? historyImages[historyImages.length - 1]
+                                          : null;
 
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setSelectedClient(null)}
-                className="rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+                                      return (
+                                      <button
+                                          key={historyCommission.id}
+                                          type="button"
+                                          onClick={() => handleOpenCommissionFromClient(historyCommission)}
+                                          className="overflow-hidden rounded-2xl border border-line bg-surface text-left shadow-sm transition hover:scale-[1.02] hover:border-ink"
+                                      >
+                                          {latestHistoryImage ? (
+                                          <img
+                                              src={thumbUrl(latestHistoryImage.image_data_url)}
+                                              loading="lazy" decoding="async"
+                                              alt={historyCommission.title}
+                                              className="aspect-square w-full object-cover"
+                                          />
+                                          ) : (
+                                          <div className="flex aspect-square items-center justify-center bg-paper text-[10px] text-faint">
+                                              No image
+                                          </div>
+                                          )}
+
+                                          <div className="px-2 py-1">
+                                          <p className="truncate text-[10px] font-black text-muted">
+                                              {historyCommission.title}
+                                          </p>
+                                          </div>
+                                      </button>
+                                      );
+                                  })}
+                                  </div>
+                              )}
+                              </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {selectedClient.notes && (
+                <>
+                  <h4 className="mb-2 mt-8 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
+                    Notes
+                  </h4>
+                  <p className="whitespace-pre-wrap text-sm text-muted">{selectedClient.notes}</p>
+                </>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </section>
+
       {zoomedImage && (
         <div
           className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-md"
@@ -1141,73 +968,68 @@ function ClientsPage({
           />
         </div>
       )}
-      {clientToEdit && (
+      {clientForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="w-[520px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-              Edit client
-            </p>
-
-            <h3 className="mt-2 text-2xl font-black text-ink">
-              Update client
+          <div className="w-[480px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+            <h3 className="text-xl font-black text-ink">
+              {clientForm === "new" ? "New client" : "Edit client"}
             </h3>
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-5 space-y-3">
               <input
+                autoFocus
                 value={clientName}
                 onChange={(event) => setClientName(event.target.value)}
                 placeholder="Client name"
-                className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
+                className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
               />
 
-              <select
-                value={clientPlatform}
-                onChange={(event) => setClientPlatform(event.target.value)}
-                className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
-              >
-                <option>Twitter / X</option>
-                <option>Bluesky</option>
-                <option>Telegram</option>
-                <option>Discord</option>
-                <option>Other</option>
-              </select>
+              <div className="grid grid-cols-[160px_minmax(0,1fr)] gap-3">
+                <select
+                  value={clientPlatform}
+                  onChange={(event) => setClientPlatform(event.target.value)}
+                  className="rounded-md border border-line-strong bg-paper px-3 py-2.5"
+                >
+                  <option>Twitter / X</option>
+                  <option>Bluesky</option>
+                  <option>Telegram</option>
+                  <option>Discord</option>
+                  <option>Other</option>
+                </select>
 
-              <input
-                value={clientHandle}
-                onChange={(event) => setClientHandle(event.target.value)}
-                placeholder="@username"
-                className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
-              />
+                <input
+                  value={clientHandle}
+                  onChange={(event) => setClientHandle(event.target.value)}
+                  placeholder="@username"
+                  className="rounded-md border border-line-strong bg-paper px-3 py-2.5"
+                />
+              </div>
 
               <textarea
                 value={clientNotes}
                 onChange={(event) => setClientNotes(event.target.value)}
                 placeholder="Notes"
                 rows={4}
-                className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
+                className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
               />
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex justify-end gap-2">
               <button
-                onClick={() => {
-                  setClientToEdit(null);
-                  setClientName("");
-                  setClientPlatform("Twitter / X");
-                  setClientHandle("");
-                  setClientNotes("");
-                }}
-                className="rounded-2xl border border-line-strong px-4 py-2 font-semibold"
+                type="button"
+                onClick={closeClientForm}
+                className="rounded-md px-4 py-2 text-sm font-semibold text-muted hover:text-ink"
               >
                 Cancel
               </button>
 
               <button
-                onClick={handleSaveClientChanges}
-                disabled={savingClient}
-                className="rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary"
+                type="button"
+                onClick={clientForm === "new" ? handleCreateClient : handleSaveClientChanges}
+                disabled={savingClient || !clientName.trim()}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
               >
-                {savingClient ? "Saving..." : "Save"}
+                {savingClient ? "Saving…" : clientForm === "new" ? "Create client" : "Save"}
               </button>
             </div>
           </div>

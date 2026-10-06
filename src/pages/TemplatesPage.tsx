@@ -9,6 +9,7 @@ import {
   getTemplates,
   saveTemplateStages,
   updateTemplateBasePrice,
+  updateTemplateRevisions,
   updateTemplateName,
   type StageDraft,
   type Template,
@@ -85,6 +86,7 @@ function TemplatesPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editBasePrice, setEditBasePrice] = useState("");
+  const [editRevisions, setEditRevisions] = useState("");
   const [editStages, setEditStages] = useState<EditableStage[]>([]);
   const [newStageName, setNewStageName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -120,6 +122,7 @@ function TemplatesPage() {
     if (!template) {
       setEditName("");
       setEditBasePrice("");
+      setEditRevisions("");
       setEditStages([]);
       return;
     }
@@ -127,6 +130,7 @@ function TemplatesPage() {
     const stages = await getTemplateStages(template.id);
     setEditName(template.name);
     setEditBasePrice(template.base_price !== null ? String(template.base_price).replace(".", ",") : "");
+    setEditRevisions(template.revisions_included !== null ? String(template.revisions_included) : "");
     setEditStages(stages.map(({ id, name }) => ({ id, name, key: String(id) })));
   }
 
@@ -154,6 +158,11 @@ function TemplatesPage() {
       setSaving(true);
       await updateTemplateName(selectedTemplate.id, editName);
       await updateTemplateBasePrice(selectedTemplate.id, parsePrice(editBasePrice));
+      // Vacío = sin límite de revisiones
+      await updateTemplateRevisions(
+        selectedTemplate.id,
+        editRevisions.trim() === "" ? null : Math.max(0, Math.round(Number(editRevisions)) || 0),
+      );
       await saveTemplateStages(selectedTemplate.id, editStages);
       await loadTemplates(selectedTemplate.id);
       showToast("Template saved.", "success");
@@ -307,6 +316,19 @@ function TemplatesPage() {
                 <span className="text-xs text-faint">
                   for one character · +{EXTRA_CHARACTER_RATE * 100}% per extra character
                 </span>
+              </label>
+
+              <label className="mt-2 flex items-center gap-3 px-2 text-sm">
+                <span className="text-muted">Revisions included</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={editRevisions}
+                  onChange={(event) => setEditRevisions(event.target.value)}
+                  placeholder="—"
+                  className="w-20 rounded-md border border-line-strong bg-paper px-2 py-1 text-sm font-bold outline-none focus:border-ink"
+                />
+                <span className="text-xs text-faint">each client correction counts as one · empty = no limit</span>
               </label>
 
               <h4 className="mb-2 mt-6 text-[11px] font-black uppercase tracking-[0.16em] text-faint">

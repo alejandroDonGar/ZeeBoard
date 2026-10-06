@@ -32,6 +32,8 @@ export type Template = {
   name: string;
   /** Precio por un personaje; cada personaje extra suma un porcentaje (ver calculateCommissionPrice) */
   base_price: number | null;
+  /** Correcciones que entran en el precio; null = sin límite (no se muestra contador) */
+  revisions_included: number | null;
 };
 
 export type TemplateStage = {
@@ -101,6 +103,18 @@ export async function initializeDatabase() {
   `);
 
   await database.execute(`ALTER TABLE templates ADD COLUMN base_price REAL;`).catch(() => {});
+  await database.execute(`ALTER TABLE templates ADD COLUMN revisions_included INTEGER;`).catch(() => {});
+
+  // Correcciones que pide el cliente, cada una ligada a una etapa; cada una cuenta como una revisión
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS commission_corrections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commission_id INTEGER NOT NULL,
+      stage_id INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
 
   await database.execute(`
     CREATE TABLE IF NOT EXISTS template_stages (
@@ -232,7 +246,7 @@ export async function getTemplates(): Promise<Template[]> {
   const database = await getDatabase();
 
   return await database.select<Template[]>(`
-    SELECT id, name, base_price
+    SELECT id, name, base_price, revisions_included
     FROM templates
     ORDER BY id DESC;
   `);
@@ -320,7 +334,7 @@ export async function duplicateTemplate(templateId: number): Promise<void> {
 
   const templates = await database.select<Template[]>(
     `
-    SELECT id, name, base_price
+    SELECT id, name, base_price, revisions_included
     FROM templates
     WHERE id = ?;
     `,
@@ -336,10 +350,10 @@ export async function duplicateTemplate(templateId: number): Promise<void> {
 
   const result = await database.execute(
     `
-    INSERT INTO templates (name, base_price)
-    VALUES (?, ?);
+    INSERT INTO templates (name, base_price, revisions_included)
+    VALUES (?, ?, ?);
     `,
-    [`${sourceTemplate.name} Copy`, sourceTemplate.base_price],
+    [`${sourceTemplate.name} Copy`, sourceTemplate.base_price, sourceTemplate.revisions_included],
   );
 
   const newTemplateId = result.lastInsertId;
@@ -363,6 +377,12 @@ export async function updateTemplateBasePrice(templateId: number, basePrice: num
   const database = await getDatabase();
 
   await database.execute(`UPDATE templates SET base_price = ? WHERE id = ?;`, [basePrice, templateId]);
+}
+
+export async function updateTemplateRevisions(templateId: number, revisions: number | null): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE templates SET revisions_included = ? WHERE id = ?;`, [revisions, templateId]);
 }
 
 export async function updateTemplateName(
@@ -416,14 +436,15 @@ export async function saveTemplateStages(
         `
         SELECT
           (SELECT COUNT(*) FROM commissions WHERE current_stage_id = ?) +
-          (SELECT COUNT(*) FROM commission_stage_images WHERE stage_id = ?) AS count;
+          (SELECT COUNT(*) FROM commission_stage_images WHERE stage_id = ?) +
+          (SELECT COUNT(*) FROM commission_corrections WHERE stage_id = ?) AS count;
         `,
-        [stage.id, stage.id],
+        [stage.id, stage.id, stage.id],
       );
 
       if (usage[0].count > 0) {
         throw new Error(
-          `"${stage.name}" is in use by a commission (current stage or images), so it can't be removed.`,
+          `"${stage.name}" is in use by a commission (current stage, images or corrections), so it can't be removed.`,
         );
       }
     }
@@ -680,6 +701,11 @@ export async function deleteCommission(
 
   await database.execute(
     `DELETE FROM commission_payments WHERE commission_id = ?;`,
+    [commissionId],
+  );
+
+  await database.execute(
+    `DELETE FROM commission_corrections WHERE commission_id = ?;`,
     [commissionId],
   );
 
@@ -1463,4 +1489,40 @@ export async function migratePaymentTags(): Promise<void> {
       await database.execute(`DELETE FROM tags WHERE id = ?;`, [tag.id]);
     }
   });
+}
+
+export type CommissionCorrection = {
+  id: number;
+  commission_id: number;
+  stage_id: number;
+  text: string;
+  created_at: string;
+};
+
+export async function getAllCorrections(): Promise<CommissionCorrection[]> {
+  const database = await getDatabase();
+
+  return await database.select<CommissionCorrection[]>(
+    `SELECT id, commission_id, stage_id, text, created_at FROM commission_corrections ORDER BY created_at ASC, id ASC;`,
+  );
+}
+
+export async function addCorrection(commissionId: number, stageId: number, text: string): Promise<void> {
+  const database = await getDatabase();
+  const cleanText = text.trim();
+
+  if (!cleanText) {
+    throw new Error("Write what the client asked to change");
+  }
+
+  await database.execute(
+    `INSERT INTO commission_corrections (commission_id, stage_id, text, created_at) VALUES (?, ?, ?, ?);`,
+    [commissionId, stageId, cleanText, new Date().toISOString()],
+  );
+}
+
+export async function deleteCorrection(correctionId: number): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`DELETE FROM commission_corrections WHERE id = ?;`, [correctionId]);
 }

@@ -21,6 +21,9 @@ import {
   createCommission,
   getCommissions,
   getAllPayments,
+  getAllCorrections,
+  addCorrection,
+  deleteCorrection,
   updateCommissionStage,
   updateCommission,
   duplicateCommission,
@@ -42,6 +45,7 @@ import {
   type Tag,
   type Commission,
   type CommissionPayment,
+  type CommissionCorrection,
   type Template,
   type TemplateStage,
 } from "../lib/database";
@@ -85,6 +89,10 @@ function CommissionsPage() {
   const [activeStageImageIndexByStageId, setActiveStageImageIndexByStageId] = useState<Record<number, number>>({});
   // Imagen abierta en modo foco (pantalla completa, ← → entre todas las etapas)
   const [focusImageId, setFocusImageId] = useState<number | null>(null);
+  const [corrections, setCorrections] = useState<CommissionCorrection[]>([]);
+  // Etapa cuyas correcciones se ven bajo la tira; null = ninguna
+  const [correctionsStageId, setCorrectionsStageId] = useState<number | null>(null);
+  const [correctionDraft, setCorrectionDraft] = useState("");
   const [stripHeight, setStripHeight] = useState(0);
   const stripObserver = useRef<ResizeObserver | null>(null);
   const stripRef = useCallback((node: HTMLDivElement | null) => {
@@ -297,6 +305,7 @@ function CommissionsPage() {
   async function loadTagsForCommissions(data: Commission[]) {
     // Los pagos se recargan en los mismos momentos que las etiquetas
     loadPayments().catch(console.error);
+    getAllCorrections().then(setCorrections).catch(console.error);
 
     const entries = await Promise.all(
       data.map(async (commission) => {
@@ -610,6 +619,13 @@ function CommissionsPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
+  const activeCorrections = activeCommission
+    ? corrections.filter((correction) => correction.commission_id === activeCommission.id)
+    : [];
+  const revisionsIncluded =
+    templates.find((template) => template.id === activeCommission?.template_id)?.revisions_included ?? null;
+  const correctionsStage = workflowStages.find((stage) => stage.id === correctionsStageId) ?? null;
+
   const activeDeadlineStatus = activeCommission ? getDeadlineStatus(activeCommission.deadline) : null;
   const activePaymentStatus =
     PAYMENT_STATUS_STYLE[
@@ -655,6 +671,11 @@ function CommissionsPage() {
   useEffect(() => {
     document.getElementById("current-stage")?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [activeCommissionId, workflowStages]);
+
+  // Las correcciones abiertas son de la comisión anterior
+  useEffect(() => {
+    setCorrectionsStageId(null);
+  }, [activeCommissionId]);
 
 
   const today = new Date();
@@ -858,6 +879,24 @@ function CommissionsPage() {
                       <span className={`rounded-sm px-2 py-0.5 text-xs font-bold ${activePaymentStatus.className}`}>
                         {activePaymentStatus.label}
                       </span>
+                      {(revisionsIncluded !== null || activeCorrections.length > 0) && (
+                        <span
+                          title="Each client correction counts as one revision"
+                          className={`rounded-sm px-2 py-0.5 text-xs font-bold ${
+                            revisionsIncluded === null
+                              ? "bg-highlight text-muted"
+                              : activeCorrections.length > revisionsIncluded
+                                ? "bg-red-50 text-red-600"
+                                : activeCorrections.length === revisionsIncluded
+                                  ? "bg-amber-100 text-amber-900"
+                                  : "bg-highlight text-muted"
+                          }`}
+                        >
+                          Revisions {activeCorrections.length}
+                          {revisionsIncluded !== null && ` / ${revisionsIncluded}`}
+                          {revisionsIncluded !== null && activeCorrections.length > revisionsIncluded && " · extra"}
+                        </span>
+                      )}
                       {activeNormalTags.map((tag) => (
                         <span
                           key={tag.id}
@@ -1061,10 +1100,85 @@ function CommissionsPage() {
                                 <span className="text-xs text-faint">Optimizing…</span>
                               )}
                             </p>
+
+                            {(() => {
+                              const count = activeCorrections.filter((correction) => correction.stage_id === stage.id).length;
+                              const open = correctionsStageId === stage.id;
+
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCorrectionDraft("");
+                                    setCorrectionsStageId(open ? null : stage.id);
+                                  }}
+                                  className={`mt-1 self-start rounded-sm px-1.5 py-0.5 text-xs transition ${
+                                    count > 0
+                                      ? "bg-amber-100 font-semibold text-amber-900"
+                                      : open
+                                        ? "text-ink"
+                                        : "text-faint hover:text-ink"
+                                  }`}
+                                >
+                                  {count > 0 ? `${count} correction${count === 1 ? "" : "s"}` : "+ correction"}
+                                  {open ? " ▴" : count > 0 ? " ▾" : ""}
+                                </button>
+                              );
+                            })()}
                           </div>
                         );
                       })}
                     </div>
+
+                    {correctionsStage && (
+                      <div className="shrink-0 rounded-md border border-line bg-paper p-3">
+                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
+                          Corrections · {correctionsStage.name}
+                        </p>
+
+                        {activeCorrections
+                          .filter((correction) => correction.stage_id === correctionsStage.id)
+                          .map((correction) => (
+                            <div key={correction.id} className="group flex items-baseline gap-3 py-1 text-sm">
+                              <span className="w-14 shrink-0 text-xs text-faint">
+                                {new Date(correction.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                              </span>
+                              <span className="flex-1 whitespace-pre-wrap">{correction.text}</span>
+                              <button
+                                type="button"
+                                title="Remove correction"
+                                onClick={async () => {
+                                  await deleteCorrection(correction.id);
+                                  setCorrections(await getAllCorrections());
+                                }}
+                                className="text-faint opacity-0 transition hover:text-red-500 group-hover:opacity-100"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+
+                        <input
+                          autoFocus
+                          value={correctionDraft}
+                          onChange={(event) => setCorrectionDraft(event.target.value)}
+                          onKeyDown={async (event) => {
+                            if (event.key === "Escape") setCorrectionsStageId(null);
+                            if (event.key !== "Enter" || !correctionDraft.trim()) return;
+
+                            try {
+                              await addCorrection(activeCommission.id, correctionsStage.id, correctionDraft);
+                              setCorrectionDraft("");
+                              setCorrections(await getAllCorrections());
+                            } catch (error) {
+                              showToast(error instanceof Error ? error.message : `${error}`, "error");
+                            }
+                          }}
+                          placeholder="What did the client ask to change? Enter to add"
+                          className="mt-2 w-full rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink"
+                        />
+                      </div>
+                    )}
 
                     <div className="flex shrink-0 items-center gap-2">
                       <button

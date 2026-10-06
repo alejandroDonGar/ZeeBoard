@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
 import BoardFilters, { Segmented, type PaymentFilter } from "../components/BoardFilters";
@@ -87,8 +87,18 @@ function CommissionsPage() {
   const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
   const [activeStageImageIndexByStageId, setActiveStageImageIndexByStageId] = useState<Record<number, number>>({});
-  // Etapa que se ve en el visor; null = la etapa actual de la comisión
-  const [viewedStageId, setViewedStageId] = useState<number | null>(null);
+  // Imagen abierta en modo foco (pantalla completa, ← → entre todas las etapas)
+  const [focusImageId, setFocusImageId] = useState<number | null>(null);
+  const [stripHeight, setStripHeight] = useState(0);
+  const stripObserver = useRef<ResizeObserver | null>(null);
+  const stripRef = useCallback((node: HTMLDivElement | null) => {
+    stripObserver.current?.disconnect();
+
+    if (node) {
+      stripObserver.current = new ResizeObserver(([entry]) => setStripHeight(entry.contentRect.height));
+      stripObserver.current.observe(node);
+    }
+  }, []);
   const [commissionMenuOpen, setCommissionMenuOpen] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [importingStageId, setImportingStageId] = useState<number | null>(null);
@@ -386,8 +396,6 @@ function CommissionsPage() {
     }
 
     await updateCommissionStage(activeCommission.id, nextStage.id);
-    // El visor sigue a la etapa actual
-    setViewedStageId(null);
 
     const data = await getCommissions();
     setCommissions(data);
@@ -567,8 +575,8 @@ function CommissionsPage() {
     },
     // Ctrl+V añade la imagen a la etapa actual de la comisión abierta
     onPaste: (files) => {
-      if (activeCommission && viewedStage) {
-        handleAddStageImages(viewedStage.id, files);
+      if (activeCommission && pasteStage) {
+        handleAddStageImages(pasteStage.id, files);
       }
     },
   });
@@ -625,6 +633,7 @@ function CommissionsPage() {
 
       if (
         viewMode !== "list" ||
+        focusImageId !== null ||
         (event.key !== "ArrowDown" && event.key !== "ArrowUp") ||
         target.closest("input, textarea, select, [contenteditable]")
       ) {
@@ -657,11 +666,39 @@ function CommissionsPage() {
         .filter((character) => (commissionCharactersById[activeCommission.id] ?? []).includes(character.id))
     : [];
 
-  const viewedStage =
-    workflowStages.find((stage) => stage.id === viewedStageId) ??
-    workflowStages[currentStageIndex] ??
-    workflowStages[0] ??
-    null;
+  const pasteStage = workflowStages[currentStageIndex] ?? workflowStages[0] ?? null;
+  // Hueco de la tira menos la etiqueta de cada etapa
+  const stageImageHeight = Math.max(stripHeight - 36, 140);
+
+  // Modo foco: todas las imágenes de todas las etapas, en orden
+  const focusImages = activeCommission
+    ? workflowStages.flatMap((stage) =>
+        getStageImages(activeCommission.id, stage.id).map((image) => ({ image, stage })),
+      )
+    : [];
+  const focusIndex = focusImages.findIndex((item) => item.image.id === focusImageId);
+
+  useEffect(() => {
+    if (focusIndex < 0) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setFocusImageId(null);
+      if (event.key === "ArrowRight") setFocusImageId(focusImages[(focusIndex + 1) % focusImages.length].image.id);
+      if (event.key === "ArrowLeft")
+        setFocusImageId(focusImages[(focusIndex - 1 + focusImages.length) % focusImages.length].image.id);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
+  // Al abrir una comisión, la tira se centra en la etapa actual
+  useEffect(() => {
+    document.getElementById("current-stage")?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [activeCommissionId, workflowStages]);
+
 
   const today = new Date();
   const currentMonth = today.toLocaleString("en-US", {
@@ -924,247 +961,203 @@ function CommissionsPage() {
                   </div>
                 </div>
 
-                <div className="grid min-h-0 flex-1 grid-cols-[290px_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-x-6 gap-y-5 min-[1400px]:grid-cols-[220px_minmax(0,1fr)_340px] min-[1400px]:grid-rows-[minmax(0,1fr)]">
-                {workflowStages.length === 0 ? (
-                  <p className="col-start-1 row-start-1 rounded-md border border-dashed border-line-strong p-6 text-center text-sm text-faint">
-                    This commission has no template, so it has no stages. Edit it to pick one.
-                  </p>
-                ) : (
-                  <>
-                    {/* Línea de tiempo: el historial del dibujo */}
-                    <div className="col-start-1 row-start-1 min-h-0 overflow-y-auto">
-                      <ol>
-                        {workflowStages.map((stage, index) => {
-                          const stageImages = getStageImages(activeCommission.id, stage.id);
-                          const latest = stageImages[stageImages.length - 1] ?? null;
-                          const isDone = index < currentStageIndex;
-                          const isCurrent = index === currentStageIndex;
-                          const isViewed = stage.id === viewedStage?.id;
-
-                          return (
-                            <li key={stage.id} className="relative">
-                              {index < workflowStages.length - 1 && (
-                                <span
-                                  className={`absolute left-[19px] top-9 h-[calc(100%-20px)] w-px ${
-                                    isDone ? "bg-green-500" : "bg-line-strong"
-                                  }`}
-                                />
-                              )}
-
-                              <button
-                                type="button"
-                                data-image-drop={`stage:${stage.id}`}
-                                onClick={() => setViewedStageId(stage.id)}
-                                className={`relative flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition ${
-                                  dragZoneId === `stage:${stage.id}`
-                                    ? "bg-highlight ring-1 ring-ink"
-                                    : isViewed
-                                      ? "bg-highlight"
-                                      : "hover:bg-paper"
-                                }`}
-                              >
-                                <span
-                                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                                    isDone
-                                      ? "bg-green-600 text-white"
-                                      : isCurrent
-                                        ? "bg-primary text-on-primary"
-                                        : "border border-line-strong text-faint"
-                                  }`}
-                                >
-                                  {isDone ? "✓" : index + 1}
-                                </span>
-
-                                {latest ? (
-                                  <img
-                                    src={thumbUrl(latest.image_data_url)}
-                                    loading="lazy" decoding="async"
-                                    alt=""
-                                    className="h-9 w-9 shrink-0 rounded-sm object-cover"
-                                  />
-                                ) : (
-                                  <span className="h-9 w-9 shrink-0 rounded-sm bg-paper" />
-                                )}
-
-                                <span className="min-w-0">
-                                  <span className={`block truncate text-sm ${isCurrent ? "font-black" : "font-semibold"} ${!isDone && !isCurrent ? "text-muted" : ""}`}>
-                                    {stage.name}
-                                  </span>
-                                  <span className="block text-[11px] text-faint">
-                                    {importingStageId === stage.id
-                                      ? "Optimizing…"
-                                      : stageImages.length === 0
-                                        ? "No images"
-                                        : stageImages.length === 1
-                                          ? "1 image"
-                                          : `${stageImages.length} images`}
-                                  </span>
-                                </span>
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ol>
-
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          title="Back to the previous stage"
-                          onClick={() => handleMoveStage(-1)}
-                          disabled={currentStageIndex <= 0}
-                          className="rounded-md border border-line-strong px-3 py-2 text-sm text-muted transition hover:border-ink hover:text-ink disabled:opacity-30"
-                        >
-                          ‹
-                        </button>
-
-                        {isLastStage ? (
-                          <span className="flex-1 rounded-md bg-green-600 px-3 py-2 text-center text-sm font-bold text-white">
-                            ✓ Finished
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleMoveStage(1)}
-                            className="min-w-0 flex-1 truncate rounded-md bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-hover"
-                          >
-                            {currentStageIndex < 0
-                              ? `Start ${workflowStages[0].name}`
-                              : `${workflowStages[currentStageIndex].name} done →`}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Visor de la etapa elegida */}
-                    {viewedStage && (() => {
-                      const stageImages = getStageImages(activeCommission.id, viewedStage.id);
-                      const imageIndex = getActiveStageImageIndex(viewedStage.id, stageImages);
-                      const mainImage = stageImages[imageIndex] ?? null;
-                      const dropId = `stage:${viewedStage.id}`;
-
-                      return (
-                        <div className="col-start-2 row-span-2 row-start-1 flex min-h-0 min-w-0 flex-col min-[1400px]:row-span-1">
-                          <div className="mb-2 flex items-baseline justify-between gap-3">
-                            <p className="text-sm font-black">
-                              {viewedStage.name}
-                              <span className="ml-2 text-xs font-normal text-faint">
-                                Stage {workflowStages.indexOf(viewedStage) + 1} of {workflowStages.length}
-                                {mainImage && ` · ${mainImage.label}`}
-                              </span>
-                            </p>
-
-                            {mainImage && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteStageImage(mainImage.id)}
-                                className="rounded-sm px-2 py-1 text-xs font-semibold text-red-500 transition hover:bg-red-50"
-                              >
-                                Remove image
-                              </button>
-                            )}
-                          </div>
-
-                          {mainImage ? (
-                            <button
-                              type="button"
-                              title="View full size"
-                              onClick={() => setZoomedImage(imageUrl(mainImage.image_data_url))}
-                              className="flex min-h-0 w-full flex-1 cursor-zoom-in items-center justify-center rounded-md bg-paper p-2"
-                            >
-                              <img
-                                src={imageUrl(mainImage.image_data_url)}
-                                alt={mainImage.label}
-                                className="max-h-full max-w-full rounded-sm object-contain"
-                              />
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              data-image-drop={dropId}
-                              disabled={importingStageId !== null}
-                              onClick={() => handleAddStageImages(viewedStage.id)}
-                              className={`flex min-h-48 w-full flex-1 flex-col items-center justify-center rounded-md border border-dashed text-sm transition ${
-                                dragZoneId === dropId
-                                  ? "border-ink bg-highlight text-ink"
-                                  : "border-line-strong text-muted hover:border-ink hover:text-ink"
-                              }`}
-                            >
-                              <span className="text-2xl">+</span>
-                              {importingStageId === viewedStage.id
-                                ? "Optimizing…"
-                                : "Click, drop images here or paste with Ctrl+V"}
-                            </button>
-                          )}
-
-                          {stageImages.length > 0 && (
-                            <div className="mt-2 flex shrink-0 flex-wrap gap-2 p-1">
-                              {stageImages.map((image, index) => (
-                                <button
-                                  key={image.id}
-                                  type="button"
-                                  title={image.label}
-                                  onClick={() =>
-                                    setActiveStageImageIndexByStageId((current) => ({
-                                      ...current,
-                                      [viewedStage.id]: index,
-                                    }))
-                                  }
-                                  className={`h-14 w-14 overflow-hidden rounded-sm transition ${
-                                    index === imageIndex ? "ring-2 ring-ink ring-offset-2 ring-offset-surface" : "opacity-70 hover:opacity-100"
-                                  }`}
-                                >
-                                  <img
-                                    src={thumbUrl(image.image_data_url)}
-                                    loading="lazy" decoding="async"
-                                    alt={image.label}
-                                    className="h-full w-full object-cover"
-                                  />
-                                </button>
-                              ))}
-
-                              <button
-                                type="button"
-                                data-image-drop={`${dropId}:alt`}
-                                title="Add images: click, drop or Ctrl+V"
-                                disabled={importingStageId !== null}
-                                onClick={() => handleAddStageImages(viewedStage.id)}
-                                className={`flex h-14 w-14 items-center justify-center rounded-sm border border-dashed text-lg transition ${
-                                  dragZoneId === `${dropId}:alt`
-                                    ? "border-ink bg-highlight text-ink"
-                                    : "border-line-strong text-faint hover:border-ink hover:text-ink"
-                                }`}
-                              >
-                                {importingStageId === viewedStage.id ? "…" : "+"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
-
-                {/* Pago, notas y personajes: debajo en ventanas estrechas, columna propia en anchas */}
-                <div className="col-start-1 row-start-2 min-h-0 space-y-5 overflow-y-auto min-[1400px]:col-start-3 min-[1400px]:row-start-1">
                 <CommissionPayments
                   commission={activeCommission}
                   payments={paymentsByCommissionId[activeCommission.id] ?? []}
                   onChange={loadPayments}
                 />
 
-                {(activeCommission.notes || activeCharacters.length > 0) && (
-                  <div className="space-y-5">
-                    {activeCommission.notes && (
-                      <div>
-                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Notes</p>
-                        <p className="whitespace-pre-wrap text-sm text-muted">{activeCommission.notes}</p>
-                      </div>
-                    )}
+                {workflowStages.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-line-strong p-6 text-center text-sm text-faint">
+                    This commission has no template, so it has no stages. Edit it to pick one.
+                  </p>
+                ) : (
+                  <>
+                    {/* Tira de etapas: misma altura para todas, cada imagen con su proporción real */}
+                    <div
+                      ref={stripRef}
+                      onWheel={(event) => {
+                        // La rueda vertical desplaza la tira en horizontal
+                        if (event.deltaY !== 0) event.currentTarget.scrollLeft += event.deltaY;
+                      }}
+                      className="flex min-h-48 flex-1 gap-4 overflow-x-auto"
+                    >
+                      {workflowStages.map((stage, index) => {
+                        const stageImages = getStageImages(activeCommission.id, stage.id);
+                        const imageIndex = getActiveStageImageIndex(stage.id, stageImages);
+                        const image = stageImages[imageIndex] ?? null;
+                        const isDone = index < currentStageIndex;
+                        const isCurrent = index === currentStageIndex;
+                        const dropId = `stage:${stage.id}`;
+                        const isDropTarget = dragZoneId === dropId;
 
-                    {activeCharacters.length > 0 && (
-                      <div>
-                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Characters</p>
-                        <div className="space-y-2">
+                        return (
+                          <div
+                            key={stage.id}
+                            id={isCurrent ? "current-stage" : undefined}
+                            data-image-drop={dropId}
+                            className="flex shrink-0 flex-col"
+                          >
+                            {image ? (
+                              <div
+                                className={`group relative ${
+                                  isDropTarget ? "opacity-60" : ""
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  title="Open in focus mode"
+                                  onClick={() => setFocusImageId(image.id)}
+                                  className="block cursor-zoom-in"
+                                >
+                                  <img
+                                    src={imageUrl(image.image_data_url)}
+                                    alt={`${stage.name} · ${image.label}`}
+                                    style={{ height: stageImageHeight }}
+                                    className={`w-auto rounded-md object-contain ${
+                                      isCurrent ? "ring-2 ring-ink ring-offset-2 ring-offset-surface" : ""
+                                    }`}
+                                  />
+                                </button>
+
+                                {stageImages.length > 1 && (
+                                  <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-sm bg-black/60 px-1.5 py-0.5 text-[11px] text-white">
+                                    <button
+                                      type="button"
+                                      title="Previous alt"
+                                      onClick={() => setActiveStageImageIndexByStageId((current) => ({
+                                        ...current,
+                                        [stage.id]: (imageIndex - 1 + stageImages.length) % stageImages.length,
+                                      }))}
+                                      className="px-1 hover:text-white/70"
+                                    >
+                                      ‹
+                                    </button>
+                                    Alt {imageIndex + 1} of {stageImages.length}
+                                    <button
+                                      type="button"
+                                      title="Next alt"
+                                      onClick={() => setActiveStageImageIndexByStageId((current) => ({
+                                        ...current,
+                                        [stage.id]: (imageIndex + 1) % stageImages.length,
+                                      }))}
+                                      className="px-1 hover:text-white/70"
+                                    >
+                                      ›
+                                    </button>
+                                  </span>
+                                )}
+
+                                <span className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
+                                  <button
+                                    type="button"
+                                    title="Add an alt"
+                                    disabled={importingStageId !== null}
+                                    onClick={() => handleAddStageImages(stage.id)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-sm bg-black/60 text-white hover:bg-black/80"
+                                  >
+                                    +
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Remove this image"
+                                    onClick={() => handleDeleteStageImage(image.id)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-sm bg-black/60 text-white hover:bg-red-500"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={importingStageId !== null}
+                                onClick={() => handleAddStageImages(stage.id)}
+                                style={{ height: stageImageHeight, width: stageImageHeight * 0.75 }}
+                                className={`flex flex-col items-center justify-center rounded-md border border-dashed text-center text-xs transition ${
+                                  isDropTarget
+                                    ? "border-ink bg-highlight text-ink"
+                                    : "border-line-strong text-faint hover:border-ink hover:text-ink"
+                                }`}
+                              >
+                                <span className="text-xl">+</span>
+                                {importingStageId === stage.id ? "Optimizing…" : isCurrent ? "Drop or Ctrl+V" : "Drop here"}
+                              </button>
+                            )}
+
+                            <p className="mt-2 flex items-center gap-2 text-sm">
+                              <span
+                                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                                  isDone
+                                    ? "bg-green-600 text-white"
+                                    : isCurrent
+                                      ? "bg-primary text-on-primary"
+                                      : "border border-line-strong text-faint"
+                                }`}
+                              >
+                                {isDone ? "✓" : index + 1}
+                              </span>
+                              <span className={isCurrent ? "font-black" : isDone ? "font-semibold" : "text-faint"}>
+                                {stage.name}
+                              </span>
+                              {importingStageId === stage.id && image && (
+                                <span className="text-xs text-faint">Optimizing…</span>
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        title="Back to the previous stage"
+                        onClick={() => handleMoveStage(-1)}
+                        disabled={currentStageIndex <= 0}
+                        className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-muted transition hover:border-ink hover:text-ink disabled:opacity-30"
+                      >
+                        ‹ Back
+                      </button>
+
+                      {isLastStage ? (
+                        <span className="rounded-md bg-green-600 px-4 py-1.5 text-sm font-bold text-white">✓ Finished</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleMoveStage(1)}
+                          className="rounded-md bg-primary px-4 py-1.5 text-sm font-bold text-on-primary transition hover:bg-primary-hover"
+                        >
+                          {currentStageIndex < 0
+                            ? `Start ${workflowStages[0].name}`
+                            : `${workflowStages[currentStageIndex].name} done →`}
+                        </button>
+                      )}
+
+                      {pasteStage && (
+                        <span className="ml-2 text-xs text-faint">
+                          Ctrl+V adds to <b className="text-ink">{pasteStage.name}</b>
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {(activeCommission.notes || activeCharacters.length > 0) && (
+                  <div className="grid shrink-0 grid-cols-2 gap-6 border-t border-line pt-4">
+                    <div>
+                      <p className="mb-1 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Notes</p>
+                      <p className="line-clamp-4 whitespace-pre-wrap text-sm text-muted">
+                        {activeCommission.notes || "No notes."}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="mb-1 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Characters</p>
+                      {activeCharacters.length === 0 ? (
+                        <p className="text-sm text-faint">No characters.</p>
+                      ) : (
+                        <div className="space-y-1.5">
                           {activeCharacters.map((character) => (
                             <div key={character.id} className="flex items-center gap-2">
                               <span className="w-24 shrink-0 truncate text-sm font-semibold">{character.name}</span>
@@ -1181,7 +1174,7 @@ function CommissionsPage() {
                                       src={thumbUrl(reference.image_data_url)}
                                       loading="lazy" decoding="async"
                                       alt={reference.label}
-                                      className="h-10 w-10 rounded-sm object-cover"
+                                      className="h-8 w-8 rounded-sm object-cover"
                                     />
                                   </button>
                                 ))}
@@ -1189,12 +1182,10 @@ function CommissionsPage() {
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
-                </div>
-                </div>
               </div>
             ) : commissions.length === 0 ? (
               <div className="flex h-full items-center justify-center">
@@ -2036,6 +2027,25 @@ function CommissionsPage() {
             onCancel={() => setShowDeleteCommissionModal(false)}
         />
         )}
+      {focusIndex >= 0 && (
+        <div
+          className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-black/90"
+          onClick={() => setFocusImageId(null)}
+        >
+          <img
+            src={imageUrl(focusImages[focusIndex].image.image_data_url)}
+            alt=""
+            className="max-h-[88vh] max-w-[94vw] object-contain"
+          />
+          <p className="mt-3 text-sm text-white/80">
+            {focusImages[focusIndex].stage.name} · {focusImages[focusIndex].image.label}
+            <span className="ml-3 text-white/50">
+              {focusIndex + 1} / {focusImages.length} · ← → to move · Esc to close
+            </span>
+          </p>
+        </div>
+      )}
+
       {zoomedImage && (
         <div
           className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-md"

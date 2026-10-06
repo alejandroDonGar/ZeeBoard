@@ -10,6 +10,33 @@ import { join } from "@tauri-apps/api/path";
 
 const DB_FILE_NAME = "zeeboard.db";
 const IMAGES_FOLDER = "images";
+const THUMBS_FOLDER = "images/thumbs";
+
+async function copyFolderFiles(folder: string, destination: string): Promise<void> {
+  const folderExists = await exists(folder, {
+    baseDir: BaseDirectory.AppData,
+  });
+
+  if (!folderExists) {
+    return;
+  }
+
+  await mkdir(destination, { recursive: true });
+
+  const entries = await readDir(folder, {
+    baseDir: BaseDirectory.AppData,
+  });
+
+  for (const entry of entries) {
+    if (entry.isFile) {
+      await copyFile(
+        `${folder}/${entry.name}`,
+        await join(destination, entry.name),
+        { fromPathBaseDir: BaseDirectory.AppData },
+      );
+    }
+  }
+}
 
 function getTimestampFolderName(): string {
   const now = new Date();
@@ -42,25 +69,8 @@ export async function exportBackup(): Promise<string | null> {
     fromPathBaseDir: BaseDirectory.AppData,
   });
 
-  const imagesFolderExists = await exists(IMAGES_FOLDER, {
-    baseDir: BaseDirectory.AppData,
-  });
-
-  if (imagesFolderExists) {
-    const entries = await readDir(IMAGES_FOLDER, {
-      baseDir: BaseDirectory.AppData,
-    });
-
-    for (const entry of entries) {
-      if (entry.isFile) {
-        await copyFile(
-          `${IMAGES_FOLDER}/${entry.name}`,
-          await join(backupImagesPath, entry.name),
-          { fromPathBaseDir: BaseDirectory.AppData },
-        );
-      }
-    }
-  }
+  await copyFolderFiles(IMAGES_FOLDER, backupImagesPath);
+  await copyFolderFiles(THUMBS_FOLDER, await join(backupImagesPath, "thumbs"));
 
   return backupPath;
 }

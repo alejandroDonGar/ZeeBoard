@@ -1,6 +1,7 @@
 import "./App.css";
 import { useEffect, useState } from "react";
-import { initializeDatabase } from "./lib/database";
+import { initializeDatabase, migrateLegacyImages } from "./lib/database";
+import { initImageUrls } from "./lib/images";
 import CommissionsPage from "./pages/CommissionsPage";
 import ClientsPage from "./pages/ClientsPage";
 import TagsPage from "./pages/TagsPage";
@@ -22,14 +23,65 @@ const navigationItems: { id: Page; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
+type Progress = { done: number; total: number };
+
+// El componente se suscribe al montarse para mostrar el progreso de la migración
+let reportProgress: (progress: Progress) => void = () => {};
+
+// Fuera del componente para que se ejecute una sola vez (StrictMode monta los efectos dos veces)
+const startup = initImageUrls()
+  .then(initializeDatabase)
+  .then(() => migrateLegacyImages((done, total) => reportProgress({ done, total })));
+
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
+  const [ready, setReady] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
 
   useEffect(() => {
-    initializeDatabase()
-      .then(() => console.log("Database initialized"))
-      .catch(console.error);
+    reportProgress = setProgress;
+
+    startup
+      .then(({ migrated, failed }) => {
+        if (migrated > 0 || failed > 0) {
+          console.log(`Images migrated: ${migrated}, failed: ${failed}`);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setReady(true));
   }, []);
+
+  if (!ready) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#f6f3ee] text-[#1f2933]">
+        <div className="text-center">
+          <p className="text-4xl">🦓</p>
+          <p className="mt-3 text-sm font-bold text-[#7c7163]">
+            {progress
+              ? progress.done < progress.total
+                ? `Optimizing images ${progress.done + 1} / ${progress.total}…`
+                : "Compacting the database…"
+              : "Loading ZeeBoard…"}
+          </p>
+
+          {progress && (
+            <div className="mx-auto mt-4 h-2 w-64 overflow-hidden rounded-full bg-[#e6ded2]">
+              <div
+                className="h-full rounded-full bg-[#1f2933] transition-all duration-500"
+                style={{ width: `${(progress.done / progress.total) * 100}%` }}
+              />
+            </div>
+          )}
+
+          {progress && progress.done < progress.total && (
+            <p className="mt-3 text-xs text-[#9a8f82]">
+              Only needed once. Large canvases take a few seconds each.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ToastProvider>

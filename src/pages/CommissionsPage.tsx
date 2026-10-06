@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { imageUrl, thumbUrl, importImageFromPath, pickImagePaths } from "../lib/images";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
@@ -78,9 +79,9 @@ function CommissionsPage() {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
-  const [displayUrlByStageImageId, setDisplayUrlByStageImageId] = useState<Record<number, string>>({});
   const [activeStageImageIndexByStageId, setActiveStageImageIndexByStageId] = useState<Record<number, number>>({});
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [importingStageId, setImportingStageId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTagIds, setFilterTagIds] = useState<number[]>([]);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "overdue">("all");
@@ -339,14 +340,7 @@ function CommissionsPage() {
   }
 
   async function loadStageImagesForCommissions(data: Commission[]) {
-    const { stageImagesByCommissionId, displayUrlByStageImageId } =
-      await loadStageImagesForCommissionsHelper(data);
-
-    setStageImagesByCommissionId(stageImagesByCommissionId);
-    setDisplayUrlByStageImageId((current) => ({
-      ...current,
-      ...displayUrlByStageImageId,
-    }));
+    setStageImagesByCommissionId(await loadStageImagesForCommissionsHelper(data));
   }
 
   async function loadCharactersForCommissions(data: Commission[]) {
@@ -556,37 +550,35 @@ function CommissionsPage() {
     }
     }
 
-  async function handleUploadStageImage(stageId: number, file: File) {
+  async function handleAddStageImages(stageId: number) {
     if (!activeCommission) {
       console.error("No active commission");
       return;
     }
 
-    const reader = new FileReader();
+    const paths = await pickImagePaths();
 
-    reader.onload = async () => {
-      try {
-        const imageDataUrl = String(reader.result);
+    if (paths.length === 0) {
+      return;
+    }
 
-        await createCommissionStageImage(
-          activeCommission.id,
-          stageId,
-          imageDataUrl,
-        );
+    setImportingStageId(stageId);
 
-        const data = await getCommissions();
-        setCommissions(data);
-        await loadStageImagesForCommissions(data);
-      } catch (error) {
-        console.error("Could not upload stage image", error);
+    try {
+      for (const path of paths) {
+        const stored = await importImageFromPath(path);
+        await createCommissionStageImage(activeCommission.id, stageId, stored.path);
       }
-    };
+    } catch (error) {
+      console.error("Could not upload stage image", error);
+      showToast(`Could not add image: ${error}`, "error");
+    } finally {
+      setImportingStageId(null);
+    }
 
-    reader.onerror = () => {
-      console.error("Could not read image file");
-    };
-
-    reader.readAsDataURL(file);
+    const data = await getCommissions();
+    setCommissions(data);
+    await loadStageImagesForCommissions(data);
   }
 
   async function handleDeleteStageImage(imageId: number) {
@@ -1099,7 +1091,8 @@ function CommissionsPage() {
                                     )}
                                     {previousStageImage && (
                                       <img
-                                        src={displayUrlByStageImageId[previousStageImage.id]}
+                                        src={thumbUrl(previousStageImage.image_data_url)}
+                                        loading="lazy" decoding="async"
                                         alt=""
                                         className="
                                           absolute
@@ -1118,7 +1111,8 @@ function CommissionsPage() {
 
                                     {nextStageImage && (
                                       <img
-                                        src={displayUrlByStageImageId[nextStageImage.id]}
+                                        src={thumbUrl(nextStageImage.image_data_url)}
+                                        loading="lazy" decoding="async"
                                         alt=""
                                         className="
                                           absolute
@@ -1137,7 +1131,7 @@ function CommissionsPage() {
                                     <AnimatePresence mode="wait">
                                       <motion.img
                                         key={mainStageImage.id}
-                                        src={displayUrlByStageImageId[mainStageImage.id]}
+                                        src={imageUrl(mainStageImage.image_data_url)}
                                         alt={mainStageImage.label}
                                         initial={{
                                           opacity: 0,
@@ -1193,22 +1187,18 @@ function CommissionsPage() {
                               </div>
                             )}
 
-                            <label className="mt-4 block cursor-pointer rounded-2xl border border-dashed border-[#d8cec0] bg-white px-3 py-3 text-center text-xs font-black text-[#7c7163] transition hover:border-[#1f2933]">
-                              {stageImages.length === 0 ? "Add image" : "Add alt"}
-
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(event) => {
-                                  const file = event.target.files?.[0];
-
-                                  if (file) {
-                                    handleUploadStageImage(stage.id, file);
-                                  }
-                                }}
-                              />
-                            </label>
+                            <button
+                              type="button"
+                              disabled={importingStageId !== null}
+                              onClick={() => handleAddStageImages(stage.id)}
+                              className="mt-4 block w-full cursor-pointer rounded-2xl border border-dashed border-[#d8cec0] bg-white px-3 py-3 text-center text-xs font-black text-[#7c7163] transition hover:border-[#1f2933] disabled:cursor-wait disabled:opacity-60"
+                            >
+                              {importingStageId === stage.id
+                                ? "Optimizing…"
+                                : stageImages.length === 0
+                                  ? "Add image"
+                                  : "Add alt"}
+                            </button>
                           </div>
                         );
                       })
@@ -1269,12 +1259,13 @@ function CommissionsPage() {
                         <div
                           onClick={(event) => {
                             event.stopPropagation();
-                            setZoomedImage(displayUrlByStageImageId[latestImage.id]);
+                            setZoomedImage(imageUrl(latestImage.image_data_url));
                           }}
                           className="mb-3 cursor-zoom-in overflow-hidden rounded-2xl bg-white shadow-sm transition hover:scale-[1.02]"
                         >
                           <img
-                            src={displayUrlByStageImageId[latestImage.id]}
+                            src={thumbUrl(latestImage.image_data_url)}
+                            loading="lazy" decoding="async"
                             alt={commission.title}
                             className="h-auto w-full object-contain"
                           />
@@ -1685,12 +1676,13 @@ function CommissionsPage() {
                                     key={reference.id}
                                     type="button"
                                     onClick={() =>
-                                      setZoomedImage(reference.image_data_url)
+                                      setZoomedImage(imageUrl(reference.image_data_url))
                                     }
                                     className="overflow-hidden rounded-2xl border border-[#e6ded2] bg-white shadow-sm"
                                   >
                                     <img
-                                      src={reference.image_data_url}
+                                      src={thumbUrl(reference.image_data_url)}
+                                      loading="lazy" decoding="async"
                                       alt={reference.label}
                                       className="h-20 w-full object-cover"
                                     />

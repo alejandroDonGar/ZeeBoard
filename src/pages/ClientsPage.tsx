@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getImageDisplayUrl } from "../lib/images";
+import { imageUrl, thumbUrl, importImageFromPath, pickImagePaths } from "../lib/images";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
@@ -49,8 +49,8 @@ function ClientsPage({
   const [savingClient, setSavingClient] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [importingCharacterId, setImportingCharacterId] = useState<number | null>(null);
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
-  const [displayUrlByStageImageId, setDisplayUrlByStageImageId] = useState<Record<number, string>>({});
   const [templateStagesByTemplateId, setTemplateStagesByTemplateId] = useState<Record<number, TemplateStage[]>>({});
   const [charactersByClientId, setCharactersByClientId] = useState<Record<number, ClientCharacter[]>>({});
   const [referencesByCharacterId, setReferencesByCharacterId] = useState<Record<number, CharacterReference[]>>({});
@@ -58,7 +58,6 @@ function ClientsPage({
   const [expandedCharacterId, setExpandedCharacterId] = useState<number | null>(null);
   const [newCharacterName, setNewCharacterName] = useState("");
   const [newCharacterNotes, setNewCharacterNotes] = useState("");
-  const [displayUrlByReferenceId, setDisplayUrlByReferenceId] = useState<Record<number, string>>({});
   const { showToast } = useToast();
 
   async function loadClients() {
@@ -125,14 +124,7 @@ function ClientsPage({
   }
 
   async function loadStageImagesForCommissions(data: Commission[]) {
-    const { stageImagesByCommissionId, displayUrlByStageImageId } =
-      await loadStageImagesForCommissionsHelper(data);
-
-    setStageImagesByCommissionId(stageImagesByCommissionId);
-    setDisplayUrlByStageImageId((current) => ({
-      ...current,
-      ...displayUrlByStageImageId,
-    }));
+    setStageImagesByCommissionId(await loadStageImagesForCommissionsHelper(data));
   }
 
   async function loadCharactersForCommissions(data: Commission[]) {
@@ -160,22 +152,6 @@ function ClientsPage({
 
     setReferencesByCharacterId(Object.fromEntries(entries));
 
-    const allReferences = entries.flatMap(([, refs]) => refs);
-    await loadDisplayUrlsForReferences(allReferences);
-  }
-
-  async function loadDisplayUrlsForReferences(references: CharacterReference[]) {
-    const entries = await Promise.all(
-      references.map(async (reference) => {
-        const url = await getImageDisplayUrl(reference.image_data_url);
-        return [reference.id, url] as const;
-      }),
-    );
-
-    setDisplayUrlByReferenceId((current) => ({
-      ...current,
-      ...Object.fromEntries(entries),
-    }));
   }
 
   useEffect(() => {
@@ -356,33 +332,33 @@ function ClientsPage({
     setNewCharacterNotes("");
   }
 
-  async function handleUploadCharacterReference(
-    characterId: number,
-    file: File,
-  ) {
-    const reader = new FileReader();
+  async function handleAddCharacterReferences(characterId: number) {
+    const paths = await pickImagePaths();
 
-    reader.onload = async () => {
-      try {
-        const imageDataUrl = String(reader.result);
+    if (paths.length === 0) {
+      return;
+    }
 
-        await createCharacterReference(characterId, imageDataUrl);
+    setImportingCharacterId(characterId);
 
-        const updatedReferences = await getCharacterReferences(characterId);
+    try {
+      for (const path of paths) {
+        const stored = await importImageFromPath(path);
+        await createCharacterReference(characterId, stored.path);
+      }
+    } catch (error) {
+      console.error(error);
+      showToast(`Could not add reference image: ${error}`, "error");
+    } finally {
+      setImportingCharacterId(null);
+    }
 
-        setReferencesByCharacterId((current) => ({
-          ...current,
-          [characterId]: updatedReferences,
-        }));
+    const updatedReferences = await getCharacterReferences(characterId);
 
-        await loadDisplayUrlsForReferences(updatedReferences);
-      } catch (error) {
-        console.error(error);
-        showToast("Could not upload reference image.", "error");
-        }
-    };
-
-    reader.readAsDataURL(file);
+    setReferencesByCharacterId((current) => ({
+      ...current,
+      [characterId]: updatedReferences,
+    }));
   }
 
   async function handleDeleteCharacterReference(
@@ -827,12 +803,13 @@ function ClientsPage({
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                setZoomedImage(displayUrlByStageImageId[commissionPreview.id]);
+                                setZoomedImage(imageUrl(commissionPreview.image_data_url));
                               }}
                               className="shrink-0 overflow-hidden rounded-2xl border border-[#e6ded2] bg-[#fffaf2] shadow-sm transition hover:scale-[1.03]"
                             >
                               <img
-                                src={displayUrlByStageImageId[commissionPreview.id]}
+                                src={thumbUrl(commissionPreview.image_data_url)}
+                                loading="lazy" decoding="async"
                                 alt={commission.title}
                                 className="h-16 w-16 object-cover"
                               />
@@ -984,25 +961,14 @@ function ClientsPage({
 
                       {expandedCharacterId === character.id && (
                         <div className="mt-4">
-                          <label className="block cursor-pointer rounded-2xl border border-dashed border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-center text-xs font-black text-[#7c7163] transition hover:border-[#1f2933]">
-                            Add reference
-
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-
-                                if (file) {
-                                  handleUploadCharacterReference(
-                                    character.id,
-                                    file,
-                                  );
-                                }
-                              }}
-                            />
-                          </label>
+                          <button
+                            type="button"
+                            disabled={importingCharacterId !== null}
+                            onClick={() => handleAddCharacterReferences(character.id)}
+                            className="block w-full cursor-pointer rounded-2xl border border-dashed border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-center text-xs font-black text-[#7c7163] transition hover:border-[#1f2933] disabled:cursor-wait disabled:opacity-60"
+                          >
+                            {importingCharacterId === character.id ? "Optimizing…" : "Add reference"}
+                          </button>
 
                           {references.length === 0 ? (
                             <p className="mt-3 text-center text-sm text-[#9a8f82]">
@@ -1018,12 +984,13 @@ function ClientsPage({
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      setZoomedImage(displayUrlByReferenceId[reference.id])
+                                      setZoomedImage(imageUrl(reference.image_data_url))
                                     }
                                     className="block w-full"
                                   >
                                     <img
-                                      src={displayUrlByReferenceId[reference.id]}
+                                      src={thumbUrl(reference.image_data_url)}
+                                      loading="lazy" decoding="async"
                                       alt={reference.label}
                                       className="aspect-square w-full object-cover"
                                     />
@@ -1078,7 +1045,8 @@ function ClientsPage({
                                     >
                                         {latestHistoryImage ? (
                                         <img
-                                            src={displayUrlByStageImageId[latestHistoryImage.id]}
+                                            src={thumbUrl(latestHistoryImage.image_data_url)}
+                                            loading="lazy" decoding="async"
                                             alt={historyCommission.title}
                                             className="aspect-square w-full object-cover"
                                         />

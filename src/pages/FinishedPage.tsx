@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { imageUrl, thumbUrl } from "../lib/images";
 import {
   isCommissionCompleted as isCommissionCompletedHelper,
   loadStageImagesForCommissions,
@@ -33,7 +34,6 @@ function FinishedPage({
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [templateStagesByTemplateId, setTemplateStagesByTemplateId] = useState<Record<number, TemplateStage[]>>({});
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
-  const [displayUrlByStageImageId, setDisplayUrlByStageImageId] = useState<Record<number, string>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -62,11 +62,7 @@ function FinishedPage({
 
         setTemplateStagesByTemplateId(Object.fromEntries(stageEntries));
 
-        const { stageImagesByCommissionId, displayUrlByStageImageId } =
-          await loadStageImagesForCommissions(data);
-
-        setStageImagesByCommissionId(stageImagesByCommissionId);
-        setDisplayUrlByStageImageId(displayUrlByStageImageId);
+        setStageImagesByCommissionId(await loadStageImagesForCommissions(data));
       })
       .catch(console.error);
   }, []);
@@ -382,7 +378,8 @@ function FinishedPage({
 
                           {previousSlide && (
                             <img
-                              src={displayUrlByStageImageId[previousSlide.image.id]}
+                              src={thumbUrl(previousSlide.image.image_data_url)}
+                              loading="lazy" decoding="async"
                               alt=""
                               className="absolute left-4 z-0 max-h-[260px] scale-75 rounded-2xl object-contain opacity-20 blur-sm pointer-events-none"
                             />
@@ -390,7 +387,8 @@ function FinishedPage({
 
                           {nextSlide && (
                             <img
-                              src={displayUrlByStageImageId[nextSlide.image.id]}
+                              src={thumbUrl(nextSlide.image.image_data_url)}
+                              loading="lazy" decoding="async"
                               alt=""
                               className="absolute right-4 z-0 max-h-[260px] scale-75 rounded-2xl object-contain opacity-20 blur-sm pointer-events-none"
                             />
@@ -409,7 +407,7 @@ function FinishedPage({
                                 className="mx-auto"
                               >
                                 <img
-                                  src={displayUrlByStageImageId[currentSlide.image.id]}
+                                  src={imageUrl(currentSlide.image.image_data_url)}
                                   alt={currentSlide.commission.title}
                                   className="mx-auto max-h-[360px] w-auto rounded-2xl object-contain shadow-sm transition hover:scale-[1.02]"
                                 />

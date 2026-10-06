@@ -1,5 +1,9 @@
 import Database from "@tauri-apps/plugin-sql";
-import { saveImageFile, deleteImageFile } from "./images";
+import {
+  deleteImageFiles,
+  importImageFromDataDir,
+  isProcessedImage,
+} from "./images";
 
 type ZeeDatabase = Awaited<ReturnType<typeof Database.load>>;
 
@@ -158,15 +162,8 @@ export async function initializeDatabase() {
     );
   `);
 
-  await database.execute(`
-    CREATE TABLE IF NOT EXISTS commission_references (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      commission_id INTEGER NOT NULL,
-      label TEXT NOT NULL DEFAULT 'Reference',
-      image_data_url TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-  `);
+  // Tabla antigua que nunca llegó a usarse
+  await database.execute(`DROP TABLE IF EXISTS commission_references;`);
 
   await database.execute(`
     ALTER TABLE commission_stage_images
@@ -638,15 +635,19 @@ export async function deleteCommission(
     [commissionId],
   );
 
+  const images = await database.select<{ image_data_url: string }[]>(
+    `SELECT image_data_url FROM commission_stage_images WHERE commission_id = ?;`,
+    [commissionId],
+  );
+
   await database.execute(
     `DELETE FROM commission_stage_images WHERE commission_id = ?;`,
     [commissionId],
   );
 
-  await database.execute(
-    `DELETE FROM commission_references WHERE commission_id = ?;`,
-    [commissionId],
-  );
+  for (const image of images) {
+    await deleteImageIfUnused(image.image_data_url);
+  }
 
   await database.execute(
     `DELETE FROM commission_characters WHERE commission_id = ?;`,
@@ -1014,7 +1015,7 @@ export async function getCharacterReferences(
 
 export async function createCharacterReference(
   characterId: number,
-  imageDataUrl: string,
+  imagePath: string,
 ): Promise<void> {
   const database = await getDatabase();
 
@@ -1028,7 +1029,6 @@ export async function createCharacterReference(
   );
 
   const referenceNumber = existingReferences[0].count + 1;
-  const imagePath = await saveImageFile(imageDataUrl);
 
   await database.execute(
     `
@@ -1063,10 +1063,6 @@ export async function deleteCharacterReference(
     [referenceId],
   );
 
-  if (references.length > 0) {
-    await deleteImageFile(references[0].image_data_url);
-  }
-
   await database.execute(
     `
     DELETE FROM character_references
@@ -1074,6 +1070,10 @@ export async function deleteCharacterReference(
     `,
     [referenceId],
   );
+
+  if (references.length > 0) {
+    await deleteImageIfUnused(references[0].image_data_url);
+  }
 }
 
 export async function getCommissionCharacterIds(
@@ -1130,14 +1130,6 @@ export type CommissionStageImage = {
   created_at: string;
 };
 
-export type CommissionReference = {
-  id: number;
-  commission_id: number;
-  label: string;
-  image_data_url: string;
-  created_at: string;
-};
-
 export async function getCommissionStageImages(
   commissionId: number,
 ): Promise<CommissionStageImage[]> {
@@ -1157,7 +1149,7 @@ export async function getCommissionStageImages(
 export async function createCommissionStageImage(
   commissionId: number,
   stageId: number,
-  imageDataUrl: string,
+  imagePath: string,
 ): Promise<void> {
   const database = await getDatabase();
 
@@ -1173,7 +1165,6 @@ export async function createCommissionStageImage(
 
   const altNumber = existingImages[0].count + 1;
   const label = `Alt ${altNumber}`;
-  const imagePath = await saveImageFile(imageDataUrl);
 
   await database.execute(
     `
@@ -1210,10 +1201,6 @@ export async function deleteCommissionStageImage(
     [imageId],
   );
 
-  if (images.length > 0) {
-    await deleteImageFile(images[0].image_data_url);
-  }
-
   await database.execute(
     `
     DELETE FROM commission_stage_images
@@ -1221,73 +1208,10 @@ export async function deleteCommissionStageImage(
     `,
     [imageId],
   );
-}
 
-export async function getCommissionReferences(
-  commissionId: number,
-): Promise<CommissionReference[]> {
-  const database = await getDatabase();
-
-  return await database.select<CommissionReference[]>(
-    `
-    SELECT id, commission_id, label, image_data_url, created_at
-    FROM commission_references
-    WHERE commission_id = ?
-    ORDER BY id ASC;
-    `,
-    [commissionId],
-  );
-}
-
-export async function createCommissionReference(
-  commissionId: number,
-  imageDataUrl: string,
-): Promise<void> {
-  const database = await getDatabase();
-
-  const existingReferences = await database.select<{ count: number }[]>(
-    `
-    SELECT COUNT(*) as count
-    FROM commission_references
-    WHERE commission_id = ?;
-    `,
-    [commissionId],
-  );
-
-  const referenceNumber = existingReferences[0].count + 1;
-  const label = `Reference ${referenceNumber}`;
-
-  await database.execute(
-    `
-    INSERT INTO commission_references (
-      commission_id,
-      label,
-      image_data_url,
-      created_at
-    )
-    VALUES (?, ?, ?, ?);
-    `,
-    [
-      commissionId,
-      label,
-      imageDataUrl,
-      new Date().toISOString(),
-    ],
-  );
-}
-
-export async function deleteCommissionReference(
-  referenceId: number,
-): Promise<void> {
-  const database = await getDatabase();
-
-  await database.execute(
-    `
-    DELETE FROM commission_references
-    WHERE id = ?;
-    `,
-    [referenceId],
-  );
+  if (images.length > 0) {
+    await deleteImageIfUnused(images[0].image_data_url);
+  }
 }
 
 export async function getAllUsedImagePaths(): Promise<string[]> {
@@ -1305,4 +1229,67 @@ export async function getAllUsedImagePaths(): Promise<string[]> {
     ...characterRefs.map((row) => row.image_data_url),
     ...stageImages.map((row) => row.image_data_url),
   ];
+}
+const IMAGE_TABLES = ["character_references", "commission_stage_images"] as const;
+
+/** Una misma imagen puede estar en varias filas (mismo archivo): solo se borra si ya nadie la usa. */
+async function deleteImageIfUnused(imagePath: string): Promise<void> {
+  const usedPaths = await getAllUsedImagePaths();
+
+  if (!usedPaths.includes(imagePath)) {
+    await deleteImageFiles([imagePath]);
+  }
+}
+
+/**
+ * Pasa las imágenes antiguas (archivos a tamaño completo) al formato nuevo: copia WebP ligera + miniatura.
+ * Los archivos antiguos no se borran aquí: quedan como huérfanos y se limpian desde Ajustes.
+ */
+export async function migrateLegacyImages(
+  onProgress: (done: number, total: number) => void = () => {},
+): Promise<{ migrated: number; failed: number }> {
+  const database = await getDatabase();
+  let migrated = 0;
+  let failed = 0;
+
+  // Primero se reúnen todas las pendientes para poder mostrar "x de total"
+  const pending: { table: string; id: number; image_data_url: string }[] = [];
+
+  for (const table of IMAGE_TABLES) {
+    const rows = await database.select<{ id: number; image_data_url: string }[]>(
+      `SELECT id, image_data_url FROM ${table};`,
+    );
+
+    pending.push(
+      ...rows
+        .filter((row) => !isProcessedImage(row.image_data_url))
+        .map((row) => ({ table, ...row })),
+    );
+  }
+
+  for (const [index, { table, ...row }] of pending.entries()) {
+    onProgress(index, pending.length);
+
+    try {
+      const stored = await importImageFromDataDir(row.image_data_url);
+
+      await database.execute(
+        `UPDATE ${table} SET image_data_url = ? WHERE id = ?;`,
+        [stored.path, row.id],
+      );
+
+      migrated += 1;
+    } catch (error) {
+      console.error("Could not migrate image", table, row.id, error);
+      failed += 1;
+    }
+  }
+
+  if (migrated > 0) {
+    onProgress(pending.length, pending.length);
+    // Recupera el espacio que dejaron las imágenes en base64 de versiones anteriores
+    await database.execute("VACUUM;");
+  }
+
+  return { migrated, failed };
 }

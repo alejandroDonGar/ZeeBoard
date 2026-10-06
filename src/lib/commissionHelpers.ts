@@ -4,14 +4,10 @@ import {
   type CommissionStageImage,
   type TemplateStage,
 } from "./database";
-import { getImageDisplayUrl } from "./images";
 
 export async function loadStageImagesForCommissions(
   data: Commission[],
-): Promise<{
-  stageImagesByCommissionId: Record<number, CommissionStageImage[]>;
-  displayUrlByStageImageId: Record<number, string>;
-}> {
+): Promise<Record<number, CommissionStageImage[]>> {
   const entries = await Promise.all(
     data.map(async (commission) => {
       const images = await getCommissionStageImages(commission.id);
@@ -19,19 +15,7 @@ export async function loadStageImagesForCommissions(
     }),
   );
 
-  const stageImagesByCommissionId = Object.fromEntries(entries);
-  const allImages = Object.values(stageImagesByCommissionId).flat();
-
-  const urlEntries = await Promise.all(
-    allImages.map(async (image) => {
-      const url = await getImageDisplayUrl(image.image_data_url);
-      return [image.id, url] as const;
-    }),
-  );
-
-  const displayUrlByStageImageId = Object.fromEntries(urlEntries);
-
-  return { stageImagesByCommissionId, displayUrlByStageImageId };
+  return Object.fromEntries(entries);
 }
 
 export function getCommissionCompletionPercentage(

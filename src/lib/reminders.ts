@@ -9,7 +9,7 @@ import {
 
 const DAY = 24 * 60 * 60 * 1000;
 
-export type AttentionKind = "overdue" | "due-today" | "due-soon" | "stalled";
+export type AttentionKind = "overdue" | "due-today" | "payment" | "due-soon" | "stalled";
 
 export type Attention<T> = {
   commission: T;
@@ -52,21 +52,36 @@ export const ATTENTION_STYLE: Record<AttentionKind, { label: string; className: 
   overdue: { label: "Overdue", className: "bg-red-50 text-red-600" },
   "due-today": { label: "Today", className: "bg-red-50 text-red-600" },
   "due-soon": { label: "Soon", className: "bg-amber-100 text-amber-900" },
+  payment: { label: "Unpaid", className: "bg-amber-100 text-amber-900" },
   stalled: { label: "Stalled", className: "bg-highlight text-muted" },
 };
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
-/** Qué comisiones piden atención hoy: entrega que se acerca o pasada, y comisiones paradas. */
+/**
+ * Qué comisiones piden atención hoy: entrega que se acerca o pasada, comisiones paradas y las que ya
+ * pasaron del boceto sin cobrar nada (`unpaidPastSketch`).
+ */
 export function computeAttention<T extends Reminderable>(
   commissions: T[],
   lastActivity: Record<number, string>,
   options: Options,
   now: Date,
+  unpaidPastSketch: Set<number> = new Set(),
 ): Attention<T>[] {
   const items: Attention<T>[] = [];
 
   for (const commission of commissions) {
+    if (options.reminders_enabled && unpaidPastSketch.has(commission.id)) {
+      items.push({
+        commission,
+        kind: "payment",
+        days: 0,
+        key: `${commission.id}:payment`,
+        text: `${commission.title} is past the sketch and still unpaid`,
+      });
+    }
+
     const { daysLeft, implicit, deadline } = daysToDeadline(commission, options.promise_max_days, now);
     const limit = implicit ? "your promised time" : "its deadline";
     const deadlineKey = `${commission.id}:${isoDay(deadline)}`;
@@ -111,7 +126,7 @@ export function computeAttention<T extends Reminderable>(
     }
   }
 
-  const order: Record<AttentionKind, number> = { overdue: 0, "due-today": 1, "due-soon": 2, stalled: 3 };
+  const order: Record<AttentionKind, number> = { overdue: 0, "due-today": 1, payment: 2, "due-soon": 3, stalled: 4 };
 
   return items.sort((a, b) => order[a.kind] - order[b.kind] || b.days - a.days);
 }
@@ -134,7 +149,23 @@ export async function loadAttention(now = new Date()): Promise<Attention<Commiss
     FROM commissions c;
   `);
 
-  return computeAttention(open, Object.fromEntries(rows.map((row) => [row.id, row.last_activity])), appSettings(), now);
+  // ponytail: "boceto aprobado" = la comisión ya salió de la primera etapa de su plantilla; "sin cobrar" = ningún pago
+  // (con adelanto no avisa). Cambiarlo aquí si usas una etapa concreta como señal.
+  const unpaid = await database.select<{ id: number }[]>(`
+    SELECT c.id FROM commissions c
+    JOIN template_stages s ON s.id = c.current_stage_id
+    WHERE c.price > 0
+      AND s.stage_order > (SELECT MIN(stage_order) FROM template_stages WHERE template_id = c.template_id)
+      AND NOT EXISTS (SELECT 1 FROM commission_payments WHERE commission_id = c.id);
+  `);
+
+  return computeAttention(
+    open,
+    Object.fromEntries(rows.map((row) => [row.id, row.last_activity])),
+    appSettings(),
+    now,
+    new Set(unpaid.map((row) => row.id)),
+  );
 }
 
 const NOTIFIED_KEY = "zeeboard-notified-reminders";

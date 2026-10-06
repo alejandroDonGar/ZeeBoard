@@ -41,4 +41,10 @@ assert.strictEqual(b.days, 2);
 // Edad: 8 ago → 6 oct = 59 días
 assert.strictEqual(ageInDays(commission(1, at(8, 8)), now), 59);
 
+// Pasó del boceto sin cobrar: avisa una vez (clave fija), y se apaga con los avisos de entrega
+const unpaid = new Set([3]);
+assert.deepStrictEqual(kinds(computeAttention([commission(3, at(10, 1))], { 3: at(10, 3) }, base, now, unpaid)), ["3:payment:0"]);
+assert.deepStrictEqual(kinds(computeAttention([commission(4, at(10, 1))], { 4: at(10, 3) }, base, now, unpaid)), []);
+assert.deepStrictEqual(kinds(computeAttention([commission(3, at(10, 1))], { 3: at(10, 3) }, { ...base, reminders_enabled: false }, now, unpaid)), []);
+
 console.log("reminders ok");

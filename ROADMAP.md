@@ -62,7 +62,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 **Prioritarias**
 - [ ] Papelera con deshacer (Ctrl+Z)
 - [ ] Cronómetro por comisión y etapa, con el precio real por hora
-- [ ] Modo privado para directos (ocultar clientes y precios)
+- [x] Modo privado para directos (ocultar clientes y precios)
 - [ ] Anotaciones de correcciones sobre las imágenes
 
 **Negocio**

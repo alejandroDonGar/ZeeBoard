@@ -268,38 +268,15 @@ export async function createTemplate(name: string, stages: string[]): Promise<vo
 export async function deleteTemplate(templateId: number): Promise<void> {
   const database = await getDatabase();
 
-  const lastStages = await database.select<{ id: number }[]>(
-    `
-    SELECT id
-    FROM template_stages
-    WHERE template_id = ?
-    ORDER BY stage_order DESC
-    LIMIT 1;
-    `,
+  // También las terminadas: sin sus etapas dejarían de contar como terminadas y perderían sus imágenes
+  const commissionsUsingTemplate = await database.select<{ count: number }[]>(
+    `SELECT COUNT(*) as count FROM commissions WHERE template_id = ?;`,
     [templateId],
   );
 
-  const lastStageId = lastStages.length > 0 ? lastStages[0].id : null;
-
-  const activeCommissionsUsingTemplate = await database.select<{ count: number }[]>(
-    lastStageId
-      ? `
-        SELECT COUNT(*) as count
-        FROM commissions
-        WHERE template_id = ?
-          AND (current_stage_id IS NULL OR current_stage_id != ?);
-        `
-      : `
-        SELECT COUNT(*) as count
-        FROM commissions
-        WHERE template_id = ?;
-        `,
-    lastStageId ? [templateId, lastStageId] : [templateId],
-  );
-
-  if (activeCommissionsUsingTemplate[0].count > 0) {
+  if (commissionsUsingTemplate[0].count > 0) {
     throw new Error(
-      "This template is in use by one or more active commissions and cannot be deleted.",
+      "This template is used by one or more commissions (active or finished), so it can't be deleted. Duplicate it if you want a variation.",
     );
   }
 

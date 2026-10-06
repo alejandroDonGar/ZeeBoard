@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Reorder, useDragControls } from "framer-motion";
 import {
   createTemplate,
   deleteTemplate,
   duplicateTemplate,
+  getCommissions,
   getTemplateStages,
   getTemplates,
   saveTemplateStages,
@@ -15,224 +16,198 @@ import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 
+// `key` solo sirve a la lista arrastrable: las etapas nuevas aún no tienen id
+type EditableStage = StageDraft & { key: string };
+
+type TemplateSummary = { stages: number; commissions: number };
+
+function StageRow({
+  stage,
+  index,
+  isLast,
+  onRename,
+  onRemove,
+}: {
+  stage: EditableStage;
+  index: number;
+  isLast: boolean;
+  onRename: (name: string) => void;
+  onRemove: () => void;
+}) {
+  const dragControls = useDragControls();
+
+  return (
+    <Reorder.Item
+      value={stage}
+      dragListener={false}
+      dragControls={dragControls}
+      className="flex items-center gap-3 border-b border-line bg-surface px-2 py-2"
+    >
+      <span
+        title="Drag to reorder"
+        onPointerDown={(event) => dragControls.start(event)}
+        className="cursor-grab touch-none select-none px-1 text-faint active:cursor-grabbing"
+      >
+        ⋮⋮
+      </span>
+
+      <span
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+          isLast ? "bg-green-600 text-white" : "bg-primary text-on-primary"
+        }`}
+      >
+        {index + 1}
+      </span>
+
+      <input
+        value={stage.name}
+        onChange={(event) => onRename(event.target.value)}
+        className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-semibold outline-none hover:border-line focus:border-ink focus:bg-paper"
+      />
+
+      <button
+        type="button"
+        title="Remove stage"
+        onClick={onRemove}
+        className="rounded-sm px-2 py-1 text-sm text-faint transition hover:bg-red-50 hover:text-red-500"
+      >
+        ×
+      </button>
+    </Reorder.Item>
+  );
+}
+
 function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [templateName, setTemplateName] = useState("");
-  const [stageName, setStageName] = useState("");
-  const [newStages, setNewStages] = useState<string[]>([]);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [summaries, setSummaries] = useState<Record<number, TemplateSummary>>({});
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStages, setEditStages] = useState<EditableStage[]>([]);
+  const [newStageName, setNewStageName] = useState("");
+  const [saving, setSaving] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
-  const [editTemplateName, setEditTemplateName] = useState("");
-  const [editStages, setEditStages] = useState<StageDraft[]>([]);
-  const [editStageName, setEditStageName] = useState("");
-  const [savingTemplate, setSavingTemplate] = useState(false);
-  const [templateSaved, setTemplateSaved] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [creatingTemplate, setCreatingTemplate] = useState(false);
   const { showToast } = useToast();
 
-  async function loadTemplates() {
-    const data = await getTemplates();
-    setTemplates(data);
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
 
-    if (!selectedTemplate && data.length > 0) {
-      setSelectedTemplate(data[0]);
-      const stageData = await getTemplateStages(data[0].id);
-      setEditTemplateName(data[0].name);
-      setEditStages(stageData.map(({ id, name }) => ({ id, name })));
-    }
-  }
+  async function loadTemplates(selectId?: number) {
+    const [data, commissions] = await Promise.all([getTemplates(), getCommissions()]);
+    const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
 
-  function handleAddEditStage() {
-    const cleanStage = editStageName.trim();
-
-    if (!cleanStage) {
-      return;
-    }
-
-    setEditStages((currentStages) => [...currentStages, { id: null, name: cleanStage }]);
-    setEditStageName("");
-  }
-
-  function handleRemoveEditStage(indexToRemove: number) {
-    setEditStages((currentStages) =>
-      currentStages.filter((_, index) => index !== indexToRemove),
+    const entries = await Promise.all(
+      sorted.map(async (template) => {
+        const stages = await getTemplateStages(template.id);
+        const used = commissions.filter((commission) => commission.template_id === template.id);
+        return [template.id, { stages: stages.length, commissions: used.length }] as const;
+      }),
     );
+
+    setTemplates(sorted);
+    setSummaries(Object.fromEntries(entries));
+
+    const nextId = selectId ?? selectedTemplateId ?? sorted[0]?.id ?? null;
+    await selectTemplate(sorted.find((template) => template.id === nextId) ?? sorted[0] ?? null);
   }
 
-  function handleMoveEditStageUp(index: number) {
-    if (index === 0) {
+  async function selectTemplate(template: Template | null) {
+    setSelectedTemplateId(template?.id ?? null);
+    setNewStageName("");
+
+    if (!template) {
+      setEditName("");
+      setEditStages([]);
       return;
     }
 
-    setEditStages((currentStages) => {
-      const updatedStages = [...currentStages];
-
-      [updatedStages[index - 1], updatedStages[index]] = [
-        updatedStages[index],
-        updatedStages[index - 1],
-      ];
-
-      return updatedStages;
-    });
+    const stages = await getTemplateStages(template.id);
+    setEditName(template.name);
+    setEditStages(stages.map(({ id, name }) => ({ id, name, key: String(id) })));
   }
 
-  function handleMoveEditStageDown(index: number) {
-    if (index === editStages.length - 1) {
+  useEffect(() => {
+    loadTemplates().catch(console.error);
+  }, []);
+
+  function handleAddStage() {
+    const name = newStageName.trim();
+
+    if (!name) {
       return;
     }
 
-    setEditStages((currentStages) => {
-      const updatedStages = [...currentStages];
-
-      [updatedStages[index], updatedStages[index + 1]] = [
-        updatedStages[index + 1],
-        updatedStages[index],
-      ];
-
-      return updatedStages;
-    });
+    setEditStages((current) => [...current, { id: null, name, key: crypto.randomUUID() }]);
+    setNewStageName("");
   }
 
-  async function handleSaveTemplateChanges() {
+  async function handleSave() {
     if (!selectedTemplate) {
       return;
     }
 
     try {
-      setSavingTemplate(true);
-
-      await updateTemplateName(selectedTemplate.id, editTemplateName);
+      setSaving(true);
+      await updateTemplateName(selectedTemplate.id, editName);
       await saveTemplateStages(selectedTemplate.id, editStages);
-
-      const data = await getTemplates();
-      setTemplates(data);
-
-      const updatedTemplate =
-        data.find((template) => template.id === selectedTemplate.id) ?? null;
-
-      setSelectedTemplate(updatedTemplate);
-
-      if (updatedTemplate) {
-        const stageData = await getTemplateStages(updatedTemplate.id);
-        setEditTemplateName(updatedTemplate.name);
-        setEditStages(stageData.map(({ id, name }) => ({ id, name })));
-      }
-
-      setTemplateSaved(true);
-
-      setTimeout(() => {
-        setTemplateSaved(false);
-      }, 1800);
+      await loadTemplates(selectedTemplate.id);
+      showToast("Template saved.", "success");
     } catch (error) {
-    console.error(error);
-    showToast(error instanceof Error ? error.message : `Save error: ${error}`, "error");
+      console.error(error);
+      showToast(error instanceof Error ? error.message : `Save error: ${error}`, "error");
     } finally {
-      setSavingTemplate(false);
+      setSaving(false);
     }
   }
 
-  async function handleSelectTemplate(template: Template) {
-    setSelectedTemplate(template);
-
-    const stageData = await getTemplateStages(template.id);
-
-    console.log("Template:", template);
-    console.log("Stages:", stageData);
-
-    setEditTemplateName(template.name);
-    setEditStages(stageData.map(({ id, name }) => ({ id, name })));
-  }
-
-  async function handleCreateTemplate() {
-    if (creatingTemplate) {
-        return;
-    }
-
+  async function handleNewTemplate() {
     try {
-        setCreatingTemplate(true);
-
-        await createTemplate(templateName, newStages);
-
-        setTemplateName("");
-        setStageName("");
-        setNewStages([]);
-
-        const data = await getTemplates();
-        setTemplates(data);
-
-        if (data.length > 0) {
-        setSelectedTemplate(data[0]);
-        }
+      await createTemplate("Untitled template", []);
+      // La nueva es la de id más alto
+      const data = await getTemplates();
+      await loadTemplates(Math.max(...data.map((template) => template.id)));
     } catch (error) {
-    console.error(error);
-    showToast(`Template error: ${error}`, "error");
-    } finally {
-        setCreatingTemplate(false);
+      console.error(error);
+      showToast(`Template error: ${error}`, "error");
     }
-    }
-  async function handleDuplicateTemplate(templateId: number) {
+  }
+
+  async function handleDuplicate(templateId: number) {
     try {
       await duplicateTemplate(templateId);
-
       const data = await getTemplates();
-      setTemplates(data);
-
-      if (data.length > 0) {
-        setSelectedTemplate(data[0]);
-      }
+      await loadTemplates(Math.max(...data.map((template) => template.id)));
     } catch (error) {
-    console.error(error);
-    showToast(`Duplicate error: ${error}`, "error");
+      console.error(error);
+      showToast(`Duplicate error: ${error}`, "error");
     }
   }
-  async function confirmDeleteTemplate() {
+
+  async function confirmDelete() {
     if (!templateToDelete) {
       return;
     }
 
     try {
       await deleteTemplate(templateToDelete.id);
-
-      setShowDeleteModal(false);
       setTemplateToDelete(null);
-
-      const data = await getTemplates();
-      setTemplates(data);
-
-      if (data.length > 0) {
-        setSelectedTemplate(data[0]);
-      } else {
-        setSelectedTemplate(null);
-      }
+      setSelectedTemplateId(null);
+      await loadTemplates(-1);
     } catch (error) {
       console.error(error);
-      setShowDeleteModal(false);
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not delete template.",
-      );
+      setTemplateToDelete(null);
+      setErrorMessage(error instanceof Error ? error.message : "Could not delete template.");
     }
   }
-  useEffect(() => {
-    loadTemplates().catch(console.error);
-  }, []);
 
-  function handleAddStage() {
-    const cleanStage = stageName.trim();
+  function summaryLabel(templateId: number) {
+    const summary = summaries[templateId];
 
-    if (!cleanStage) {
-      return;
+    if (!summary) {
+      return "";
     }
 
-    setNewStages((currentStages) => [...currentStages, cleanStage]);
-    setStageName("");
-  }
-
-  function handleRemoveStage(indexToRemove: number) {
-    setNewStages((currentStages) =>
-      currentStages.filter((_, index) => index !== indexToRemove),
-    );
+    const stages = `${summary.stages} ${summary.stages === 1 ? "stage" : "stages"}`;
+    return summary.commissions > 0 ? `${stages} · ${summary.commissions} in use` : stages;
   }
 
   return (
@@ -240,287 +215,155 @@ function TemplatesPage() {
       <PageHeader
         label="Workflow library"
         title="Templates"
-        description="Create reusable commission workflows and arrange their stages."
+        description="Reusable workflows: the stages a commission goes through."
+        action="+ New template"
+        onAction={handleNewTemplate}
       />
 
-      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[380px_minmax(0,1fr)] gap-5 p-5 pb-6 overflow-hidden">
-        <div className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <div className="mb-5">
-            <h3 className="text-xl font-black">New template</h3>
-            <p className="mt-1 text-sm text-muted">
-              Create a workflow with one stage per line.
-            </p>
-          </div>
-
-          <input
-            value={templateName}
-            onChange={(event) => setTemplateName(event.target.value)}
-            placeholder="Template name"
-            className="rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold outline-none transition focus:border-ink"
-          />
-
-          <div className="mt-3 flex gap-2">
-            <input
-              value={stageName}
-              onChange={(event) => setStageName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  handleAddStage();
-                }
-              }}
-              placeholder="Stage name"
-              className="min-w-0 flex-1 rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold outline-none transition focus:border-ink"
-            />
-
-            <button
-              onClick={handleAddStage}
-              className="rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-bold text-ink transition hover:border-ink"
-            >
-              Add
-            </button>
-          </div>
-
-          <div className="mt-3 min-h-28 rounded-2xl border border-line-strong bg-paper p-3">
-            {newStages.length === 0 ? (
-              <p className="text-sm text-faint">
-                No stages added yet.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {newStages.map((stage, index) => (
-                  <div
-                    key={`${stage}-${index}`}
-                    className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-3 py-2 text-sm font-semibold shadow-sm"
-                  >
-                    <span>
-                      {index + 1}. {stage}
-                    </span>
-
-                    <button
-                      onClick={() => handleRemoveStage(index)}
-                      className="rounded-xl px-2 py-1 text-xs font-bold text-red-500 transition hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={handleCreateTemplate}
-            disabled={creatingTemplate}
-            className="mt-3 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
-            >
-            {creatingTemplate ? "Creating..." : "Create template"}
-            </button>
-
-          <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-faint">
-              Templates
-            </p>
-
-            {templates.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-line-strong bg-paper p-4 text-center text-sm text-faint">
-                No templates yet
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {templates.map((template) => {
-                  const isSelected = selectedTemplate?.id === template.id;
-
-                  return (
-                    <button
-                      key={template.id}
-                      onClick={() => handleSelectTemplate(template)}
-                      className={
-                        isSelected
-                          ? "w-full rounded-3xl border border-ink bg-primary px-4 py-4 text-left font-bold text-on-primary shadow-sm"
-                          : "w-full rounded-3xl border border-line bg-paper px-4 py-4 text-left font-semibold text-ink transition hover:border-ink"
-                      }
-                    >
-                      {template.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[280px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
+        <div className="min-h-0 space-y-0.5 overflow-y-auto rounded-3xl border border-line bg-surface p-3 shadow-sm">
+          {templates.length === 0 ? (
+            <p className="p-4 text-center text-sm text-faint">No templates yet</p>
+          ) : (
+            templates.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => selectTemplate(template)}
+                className={`w-full rounded-md px-3 py-2 text-left transition ${
+                  template.id === selectedTemplateId ? "bg-highlight" : "hover:bg-paper"
+                }`}
+              >
+                <p className="truncate text-sm font-bold">{template.name}</p>
+                <p className="text-xs text-faint">{summaryLabel(template.id)}</p>
+              </button>
+            ))
+          )}
         </div>
 
-        <div className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          {selectedTemplate ? (
-            <>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-                Selected template
+        <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-6 shadow-sm">
+          {!selectedTemplate ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <p className="text-lg font-black">Create your first template</p>
+              <p className="mt-1 text-sm text-muted">
+                A template is the list of stages a commission moves through.
               </p>
+              <button
+                type="button"
+                onClick={handleNewTemplate}
+                className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary"
+              >
+                New template
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                <input
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  placeholder="Template name"
+                  className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-2xl font-black outline-none hover:border-line focus:border-ink"
+                />
 
-              <h3 className="mt-2 text-2xl font-black">
-                {selectedTemplate.name}
-              </h3>
-              <div className="mt-4 flex gap-3">
                 <button
-                  onClick={() => handleDuplicateTemplate(selectedTemplate.id)}
-                  className="rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm font-bold text-ink transition hover:border-ink"
+                  type="button"
+                  onClick={() => handleDuplicate(selectedTemplate.id)}
+                  className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
                 >
                   Duplicate
                 </button>
 
                 <button
-                  onClick={() => {
-                    setTemplateToDelete(selectedTemplate);
-                    setShowDeleteModal(true);
-                  }}
-                  className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 transition hover:border-red-400"
+                  type="button"
+                  onClick={() => setTemplateToDelete(selectedTemplate)}
+                  className="rounded-md px-3 py-1.5 text-xs font-semibold text-red-500 transition hover:bg-red-50"
                 >
                   Delete
                 </button>
               </div>
 
-              <div className="mt-6 flex min-h-0 flex-1 flex-col space-y-4">
-                <input
-                  value={editTemplateName}
-                  onChange={(event) => setEditTemplateName(event.target.value)}
-                  className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-bold outline-none focus:border-ink"
-                />
+              <h4 className="mb-2 mt-6 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
+                Stages · {editStages.length}
+              </h4>
 
-                <div className="flex gap-2">
-                  <input
-                    value={editStageName}
-                    onChange={(event) => setEditStageName(event.target.value)}
-                    placeholder="New stage"
-                    className="min-w-0 flex-1 rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold outline-none focus:border-ink"
-                  />
-
-                  <button
-                    onClick={handleAddEditStage}
-                    className="rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-bold"
-                  >
-                    Add
-                  </button>
-                </div>
-
-                <AnimatePresence mode="popLayout">
-                   <div className="min-h-0 flex-1 overflow-y-auto space-y-2 pr-2">
-                    {editStages.length === 0 ? (
-                      <div className="rounded-3xl border border-dashed border-line-strong bg-paper p-5 text-sm text-faint">
-                        This template has no stages.
-                      </div>
-                    ) : (
-                      editStages.map((stage, index) => (
-                        <motion.div
-                          key={stage.id ?? `new-${index}`}
-                          layout="position"
-                          transition={{
-                            layout: {
-                              duration: 0.35,
-                              ease: "easeInOut",
-                            },
-                          }}
-                            className="flex items-center gap-3 rounded-3xl border border-line bg-paper p-4"
-                          >
-                          <span className="font-black">
-                            {index + 1}
-                          </span>
-
-                          <input
-                            value={stage.name}
-                            onChange={(event) => {
-                              const updatedStages = [...editStages];
-                              updatedStages[index] = { ...stage, name: event.target.value };
-                              setEditStages(updatedStages);
-                            }}
-                            className="flex-1 rounded-xl border border-line-strong bg-surface px-3 py-2 text-sm font-semibold outline-none focus:border-ink"
-                          />
-
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() => handleMoveEditStageUp(index)}
-                              disabled={index === 0}
-                              className="rounded-xl px-2 py-1 text-xs font-bold text-muted transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-30"
-                            >
-                              ↑
-                            </button>
-
-                            <button
-                              onClick={() => handleMoveEditStageDown(index)}
-                              disabled={index === editStages.length - 1}
-                              className="rounded-xl px-2 py-1 text-xs font-bold text-muted transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-30"
-                            >
-                              ↓
-                            </button>
-
-                            <button
-                              onClick={() => handleRemoveEditStage(index)}
-                              className="rounded-xl px-2 py-1 text-xs font-bold text-red-500 transition hover:bg-red-50"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </motion.div>
-                      ))
-                    )}
-                  </div>
-                </AnimatePresence>
-
-
-
-                <button
-                  onClick={handleSaveTemplateChanges}
-                  disabled={savingTemplate}
-                  className={
-                    templateSaved
-                      ? "rounded-2xl bg-green-600 px-5 py-3 text-sm font-bold text-white shadow-md transition-all duration-300"
-                      : "rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-on-primary shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
-                  }
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <Reorder.Group
+                  axis="y"
+                  values={editStages}
+                  onReorder={setEditStages}
+                  className="border-t border-line"
                 >
-                  {savingTemplate
-                    ? "Saving..."
-                    : templateSaved
-                      ? "✓ Saved"
-                      : "Save changes"}
+                  {editStages.map((stage, index) => (
+                    <StageRow
+                      key={stage.key}
+                      stage={stage}
+                      index={index}
+                      isLast={index === editStages.length - 1}
+                      onRename={(name) =>
+                        setEditStages((current) =>
+                          current.map((item) => (item.key === stage.key ? { ...item, name } : item)),
+                        )
+                      }
+                      onRemove={() =>
+                        setEditStages((current) => current.filter((item) => item.key !== stage.key))
+                      }
+                    />
+                  ))}
+                </Reorder.Group>
+
+                <div className="flex items-center gap-3 px-2 py-2">
+                  <span className="px-1 text-faint">+</span>
+                  <input
+                    value={newStageName}
+                    onChange={(event) => setNewStageName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") handleAddStage();
+                    }}
+                    placeholder="Add a stage and press Enter"
+                    className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm outline-none hover:border-line focus:border-ink focus:bg-paper"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-end gap-3">
+                <p className="text-xs text-faint">The last stage marks the commission as finished.</p>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving || !editName.trim()}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save changes"}
                 </button>
               </div>
             </>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <h3 className="text-xl font-black">No template selected</h3>
-
-                <p className="mt-2 text-sm text-muted">
-                  Create or select a template to view its stages.
-                </p>
-              </div>
-            </div>
           )}
         </div>
       </section>
-      {showDeleteModal && (
+
+      {templateToDelete && (
         <ConfirmModal
-            eyebrow="Delete template"
-            title={templateToDelete?.name ?? ""}
-            message={"This action cannot be undone.\nAll stages inside this template will be deleted permanently."}
-            confirmLabel="Delete"
-            onConfirm={confirmDeleteTemplate}
-            onCancel={() => {
-            setShowDeleteModal(false);
-            setTemplateToDelete(null);
-            }}
+          eyebrow="Delete template"
+          title={templateToDelete.name}
+          message="Its stages are deleted too. This can't be undone."
+          confirmLabel="Delete"
+          onConfirm={confirmDelete}
+          onCancel={() => setTemplateToDelete(null)}
         />
-        )}
+      )}
+
       {errorMessage && (
         <ConfirmModal
-            eyebrow="Action not allowed"
-            eyebrowTone="danger"
-            title="Cannot delete template"
-            message={errorMessage}
-            confirmLabel="Understood"
-            confirmVariant="primary"
-            onConfirm={() => setErrorMessage(null)}
+          eyebrow="Action not allowed"
+          eyebrowTone="danger"
+          title="Can't delete template"
+          message={errorMessage}
+          confirmLabel="Understood"
+          confirmVariant="primary"
+          onConfirm={() => setErrorMessage(null)}
         />
-        )}
+      )}
     </>
   );
 }

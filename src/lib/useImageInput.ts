@@ -3,11 +3,11 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { IMAGE_EXTENSIONS } from "./images";
 
 /**
- * Arrastrar y soltar + pegar con Ctrl+V.
+ * Drag and drop + Ctrl+V paste.
  *
- * Las zonas que aceptan imágenes se marcan con `data-image-drop="<id>"`. Tauri entrega los archivos
- * soltados con su ruta y la posición del cursor; con esa posición se busca la zona que hay debajo.
- * Devuelve el id de la zona sobre la que se está arrastrando, para resaltarla.
+ * Image-accepting zones are marked with `data-image-drop="<id>"`. Tauri delivers dropped files
+ * with their path and the cursor position; that position finds the zone underneath.
+ * Returns the id of the zone being dragged over, to highlight it.
  */
 export function useImageInput({
   onDrop,
@@ -18,7 +18,7 @@ export function useImageInput({
 }): string | null {
   const [dragZoneId, setDragZoneId] = useState<string | null>(null);
 
-  // Los handlers cambian en cada render; los listeners se registran una sola vez y leen siempre el último
+  // Handlers change every render; listeners register once and always read the latest
   const handlers = useRef({ onDrop, onPaste });
   handlers.current = { onDrop, onPaste };
 
@@ -58,7 +58,7 @@ export function useImageInput({
         }
       })
       .then((stop) => {
-        // StrictMode desmonta antes de que llegue la promesa: se limpia aquí
+        // StrictMode unmounts before the promise resolves: clean up here
         if (cancelled) {
           stop();
         } else {

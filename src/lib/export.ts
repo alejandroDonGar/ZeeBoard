@@ -20,8 +20,8 @@ import {
 type Cell = string | number | null;
 
 /**
- * Punto y coma y coma decimal: es lo que abre bien el Excel en español
- * (con comas como separador lo mostraría todo en una sola columna).
+ * Semicolon and decimal comma: what Spanish Excel opens correctly
+ * (with commas as separator everything lands in one column).
  */
 const SEPARATOR = ";";
 
@@ -34,7 +34,7 @@ function cell(value: Cell): string {
     return round2(value).toFixed(2).replace(".", ",");
   }
 
-  // Una celda que empieza por = + - @ se ejecutaría como fórmula al abrirla en Excel
+  // A cell starting with = + - @ would run as a formula when opened in Excel
   const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 
   return /[;"\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;

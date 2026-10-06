@@ -2,10 +2,10 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
 
-// El procesado pesado (decodificar, reducir, comprimir a WebP) se hace en Rust: src-tauri/src/images.rs
+// Heavy processing (decode, downscale, compress to WebP) runs in Rust: src-tauri/src/images.rs
 
 export type StoredImage = {
-  /** Ruta relativa a la carpeta de datos, p. ej. `images/ab12….webp` */
+  /** Path relative to the data folder, e.g. `images/ab12….webp` */
   path: string;
   thumbPath: string;
   width: number;
@@ -23,19 +23,19 @@ export type StorageStats = {
 
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff"];
 
-// Se rellena una vez al arrancar (initImageUrls) para poder construir las URLs sin await
+// Filled once at startup (initImageUrls) so URLs can be built without await
 let dataDir = "";
 
 export async function initImageUrls(): Promise<void> {
   dataDir = await appDataDir();
 }
 
-/** Las imágenes nuevas guardan su miniatura en `images/thumbs/` con el mismo nombre. */
+/** New images keep their thumbnail in `images/thumbs/` with the same name. */
 export function getThumbPath(path: string): string {
   return isProcessedImage(path) ? path.replace("images/", "images/thumbs/") : path;
 }
 
-/** `true` si la imagen ya pasó por el procesado nuevo (WebP con nombre por contenido). */
+/** `true` if the image already went through the new processing (WebP named by content). */
 export function isProcessedImage(path: string): boolean {
   return /^images\/[0-9a-f]{24}\.webp$/.test(path);
 }
@@ -49,17 +49,17 @@ function toAssetUrl(path: string): string {
   return convertFileSrc(`${dataDir}${separator}${path.replace(/\//g, separator)}`);
 }
 
-/** Versión para ver a tamaño grande (zoom, carrusel principal). */
+/** Large version for viewing (zoom, main carousel). */
 export function imageUrl(path: string): string {
   return toAssetUrl(path);
 }
 
-/** Miniatura para tarjetas, listas y rejillas. */
+/** Thumbnail for cards, lists and grids. */
 export function thumbUrl(path: string): string {
   return toAssetUrl(getThumbPath(path));
 }
 
-/** La foto de un cliente: si es un archivo nuestro, su miniatura; si es una dirección antigua (Bluesky), tal cual. */
+/** A client's photo: our own file → its thumbnail; an old address (Bluesky) → as is. */
 export function avatarSrc(avatar: string): string {
   return isProcessedImage(avatar) ? thumbUrl(avatar) : avatar;
 }
@@ -68,14 +68,14 @@ export async function importImageFromPath(path: string): Promise<StoredImage> {
   return await invoke<StoredImage>("import_image_from_path", { path });
 }
 
-/** Ruta del disco (selector, arrastrar) o archivo en memoria (Ctrl+V). */
+/** Disk path (picker, drag) or in-memory file (Ctrl+V). */
 export async function importImage(source: string | Blob): Promise<StoredImage> {
   return typeof source === "string"
     ? await importImageFromPath(source)
     : await importImageFromFile(source);
 }
 
-/** Para imágenes pegadas con Ctrl+V: los bytes viajan en binario, sin base64. */
+/** For images pasted with Ctrl+V: bytes travel as binary, no base64. */
 export async function importImageFromFile(file: Blob): Promise<StoredImage> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   return await invoke<StoredImage>("import_image_from_bytes", bytes);
@@ -85,7 +85,7 @@ export async function importImageFromDataDir(relativePath: string): Promise<Stor
   return await importImageFromPath(await join(dataDir, relativePath));
 }
 
-/** Abre el selector de archivos del sistema; devuelve las rutas elegidas. */
+/** Opens the system file picker; returns the chosen paths. */
 export async function pickImagePaths(): Promise<string[]> {
   const selection = await open({
     multiple: true,
@@ -110,7 +110,7 @@ export async function deleteImageFiles(paths: string[]): Promise<void> {
   }
 }
 
-/** Borra todo lo que hay en `images/` y `images/thumbs/` que no esté en `usedPaths`. */
+/** Deletes everything in `images/` and `images/thumbs/` that isn't in `usedPaths`. */
 export async function cleanUpOrphanedImages(usedPaths: string[]): Promise<{ deletedCount: number }> {
   const keep = usedPaths.flatMap((path) => [path, getThumbPath(path)]);
   const deletedCount = await invoke<number>("cleanup_orphan_images", { usedPaths: keep });

@@ -3,12 +3,12 @@ import { sendNotification } from "@tauri-apps/plugin-notification";
 import { appSettings, getTemplates, importRequests, updateSettings } from "./database";
 import { parseResponses } from "./formImport";
 
-/** Se lanza cuando cambian las solicitudes, para que la barra lateral vuelva a contar las nuevas. */
+/** Fired when requests change, so the sidebar recounts the new ones. */
 export const REQUESTS_CHANGED = "zeeboard-requests-changed";
 
 /**
- * Lee el CSV de respuestas que deja el script de Google en tu Drive y guarda las solicitudes nuevas.
- * Devuelve null si aún no has elegido el archivo. Las ya importadas no se repiten.
+ * Reads the responses CSV the Google script leaves in your Drive and saves new requests.
+ * Returns null if no file is chosen yet. Already imported ones aren't repeated.
  */
 export async function syncFormResponses(): Promise<{ added: number; skipped: number } | null> {
   const path = appSettings().responses_file;
@@ -34,7 +34,7 @@ export async function syncFormResponses(): Promise<{ added: number; skipped: num
     });
   }
 
-  // Siempre: aunque no haya nuevas, la fecha de "última comprobación" ha cambiado
+  // Always: even with nothing new, the "last checked" date changed
   window.dispatchEvent(new Event(REQUESTS_CHANGED));
 
   return result;

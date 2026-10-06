@@ -1,8 +1,8 @@
-//! Descarga de fotos de perfil (Bluesky y Telegram) desde Rust, no desde el navegador:
-//! así no hay CORS ni choque con la política de seguridad de la app.
+//! Profile-photo download (Bluesky and Telegram) from Rust, not the browser:
+//! no CORS, no clash with the app's security policy.
 //!
-//! Solo habla con una lista cerrada de servidores, por https, con límite de tiempo y de tamaño:
-//! no sirve para pedir cualquier otra cosa de internet.
+//! Talks only to a closed list of servers, over https, with time and size limits:
+//! it can't be used to fetch anything else from the internet.
 
 use std::time::Duration;
 
@@ -10,7 +10,7 @@ use tauri::ipc::Response;
 
 const MAX_BYTES: usize = 5 * 1024 * 1024;
 
-/// Bluesky (API y fotos) y Telegram (página pública y su CDN de fotos).
+/// Bluesky (API and photos) and Telegram (public page and its photo CDN).
 fn host_allowed(host: &str) -> bool {
     matches!(host, "public.api.bsky.app" | "cdn.bsky.app" | "t.me")
         || host.ends_with(".cdn-telegram.org")
@@ -21,7 +21,7 @@ fn url_allowed(url: &reqwest::Url) -> bool {
     url.scheme() == "https" && url.host_str().is_some_and(host_allowed)
 }
 
-/// Descarga una dirección permitida y devuelve sus bytes (texto de la API, página HTML o imagen).
+/// Downloads an allowed address and returns its bytes (API text, HTML page or image).
 #[tauri::command]
 pub async fn fetch_avatar_resource(url: String) -> Result<Response, String> {
     let url = reqwest::Url::parse(&url).map_err(|error| error.to_string())?;
@@ -33,7 +33,7 @@ pub async fn fetch_avatar_resource(url: String) -> Result<Response, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZeeBoard")
-        // Una redirección solo se sigue si también va a un servidor permitido
+        // A redirect is followed only if it also goes to an allowed server
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             if attempt.previous().len() >= 3 {
                 attempt.error("too many redirects")

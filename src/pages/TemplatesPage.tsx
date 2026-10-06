@@ -21,7 +21,7 @@ import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 
-// `key` solo sirve a la lista arrastrable: las etapas nuevas aún no tienen id
+// `key` only serves the draggable list: new stages have no id yet
 type EditableStage = StageDraft & { key: string };
 
 type TemplateSummary = { stages: number; commissions: number };
@@ -162,7 +162,7 @@ function TemplatesPage() {
       setSaving(true);
       await updateTemplateName(selectedTemplate.id, editName);
       await updateTemplateBasePrice(selectedTemplate.id, parsePrice(editBasePrice));
-      // Vacío = sin límite de revisiones
+      // Empty = no revision limit
       await updateTemplateRevisions(
         selectedTemplate.id,
         editRevisions.trim() === "" ? null : Math.max(0, Math.round(Number(editRevisions)) || 0),
@@ -181,7 +181,7 @@ function TemplatesPage() {
   async function handleNewTemplate() {
     try {
       await createTemplate("Untitled template", []);
-      // La nueva es la de id más alto
+      // The new one has the highest id
       const data = await getTemplates();
       await loadTemplates(Math.max(...data.map((template) => template.id)));
     } catch (error) {

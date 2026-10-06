@@ -1,11 +1,11 @@
-//! Procesado y almacenamiento de imágenes.
+//! Image processing and storage.
 //!
-//! Los lienzos originales pueden pesar 40–70 MB. La app solo guarda dos copias ligeras:
-//! - una versión para ver, de como mucho `VIEW_MAX_SIDE` px de lado, en WebP;
-//! - una miniatura de `THUMB_MAX_SIDE` px para tarjetas, listas y carruseles.
+//! Original canvases can weigh 40–70 MB. The app keeps only two light copies:
+//! - a viewing version, at most `VIEW_MAX_SIDE` px on a side, in WebP;
+//! - a `THUMB_MAX_SIDE` px thumbnail for cards, lists and carousels.
 //!
-//! Los archivos se nombran con el hash del original: importar dos veces la misma imagen
-//! reutiliza los archivos que ya existen.
+//! Files are named by the original's hash: importing the same image twice
+//! reuses the existing files.
 
 use std::fs;
 use std::io::Cursor;
@@ -29,14 +29,14 @@ const THUMBS_DIR: &str = "images/thumbs";
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoredImage {
-    /// Ruta relativa a la carpeta de datos de la app, p. ej. `images/ab12….webp`
+    /// Path relative to the app data folder, e.g. `images/ab12….webp`
     path: String,
     thumb_path: String,
     width: u32,
     height: u32,
-    /// Tamaño en bytes de la versión para ver
+    /// Size in bytes of the viewing version
     bytes: u64,
-    /// `true` si la imagen ya existía y no hubo que procesarla
+    /// `true` if the image already existed and needed no processing
     reused: bool,
 }
 
@@ -53,7 +53,7 @@ fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|error| error.to_string())
 }
 
-/// Lee la imagen con su orientación correcta (fotos de móvil) y sin límite de tamaño.
+/// Reads the image with correct orientation (phone photos) and no size limit.
 fn decode(bytes: &[u8]) -> Result<RgbaImage, String> {
     let mut reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
@@ -74,7 +74,7 @@ fn decode(bytes: &[u8]) -> Result<RgbaImage, String> {
     Ok(image.into_rgba8())
 }
 
-/// Reduce la imagen para que su lado mayor no pase de `max_side`. Nunca la amplía.
+/// Downscales the image so its longest side doesn't exceed `max_side`. Never upscales.
 fn shrink(source: &RgbaImage, max_side: u32) -> Result<RgbaImage, String> {
     let (width, height) = source.dimensions();
     let longest = width.max(height);
@@ -110,8 +110,8 @@ fn encode_webp(image: &RgbaImage, quality: f32) -> Vec<u8> {
         .to_vec()
 }
 
-/// Escribe primero en un archivo temporal y luego lo renombra:
-/// así nunca queda una imagen a medias si la app se cierra durante la escritura.
+/// Writes to a temp file first, then renames:
+/// so a half-written image never remains if the app closes mid-write.
 fn write_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     fs::write(&temporary, bytes).map_err(|error| error.to_string())?;
@@ -129,7 +129,7 @@ fn process(base_dir: &Path, original: &[u8]) -> Result<StoredImage, String> {
 
     fs::create_dir_all(base_dir.join(THUMBS_DIR)).map_err(|error| error.to_string())?;
 
-    // La misma imagen ya se importó antes: se reutilizan sus archivos
+    // The same image was imported before: reuse its files
     if full_path.exists() && full_thumb_path.exists() {
         let (width, height) =
             image::image_dimensions(&full_path).map_err(|error| error.to_string())?;
@@ -139,7 +139,7 @@ fn process(base_dir: &Path, original: &[u8]) -> Result<StoredImage, String> {
 
     let decoded = decode(original)?;
     let view = shrink(&decoded, VIEW_MAX_SIDE)?;
-    drop(decoded); // libera la memoria del lienzo completo cuanto antes
+    drop(decoded); // frees the full canvas memory as soon as possible
     let thumb = shrink(&view, THUMB_MAX_SIDE)?;
 
     let view_bytes = encode_webp(&view, VIEW_QUALITY);
@@ -157,7 +157,7 @@ fn process(base_dir: &Path, original: &[u8]) -> Result<StoredImage, String> {
     })
 }
 
-/// Solo se aceptan rutas relativas dentro de `images/`: nunca se borra nada fuera de ahí.
+/// Only relative paths inside `images/` are accepted: nothing outside is ever deleted.
 fn safe_image_path(base_dir: &Path, relative: &str) -> Option<PathBuf> {
     let relative_path = Path::new(relative);
     let inside_images = relative.starts_with(&format!("{IMAGES_DIR}/"));
@@ -179,7 +179,7 @@ fn folder_size(folder: &Path) -> (u32, u64) {
         .fold((0, 0), |(count, total), metadata| (count + 1, total + metadata.len()))
 }
 
-/// Importa una imagen desde un archivo del disco (selector, arrastrar y soltar, migración).
+/// Imports an image from a disk file (picker, drag and drop, migration).
 #[tauri::command]
 pub async fn import_image_from_path(app: AppHandle, path: String) -> Result<StoredImage, String> {
     let base_dir = data_dir(&app)?;
@@ -192,8 +192,8 @@ pub async fn import_image_from_path(app: AppHandle, path: String) -> Result<Stor
     .map_err(|error| error.to_string())?
 }
 
-/// Importa una imagen recibida como bytes (pegar desde el portapapeles).
-/// Los bytes llegan en binario, sin pasar por JSON ni base64.
+/// Imports an image received as bytes (clipboard paste).
+/// The bytes arrive as binary, without going through JSON or base64.
 #[tauri::command]
 pub async fn import_image_from_bytes(
     app: AppHandle,

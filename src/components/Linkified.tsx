@@ -1,7 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { splitLinks } from "../lib/links";
 
-/** Un texto con sus enlaces clicables: se abren en el navegador, tras un clic tuyo. */
+/** Text with clickable links: they open in the browser after your click. */
 function Linkified({ text }: { text: string }) {
   return (
     <>

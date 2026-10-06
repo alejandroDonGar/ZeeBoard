@@ -60,7 +60,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 
 function CommissionsPage() {
-  // Un solo formulario para crear y editar: null = cerrado
+  // A single form to create and edit: null = closed
   const [formMode, setFormMode] = useState<"new" | "edit" | null>(null);
   const [characterSearch, setCharacterSearch] = useState("");
   const [commissionTitle, setCommissionTitle] = useState("");
@@ -94,10 +94,10 @@ function CommissionsPage() {
   const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
   const [activeStageImageIndexByStageId, setActiveStageImageIndexByStageId] = useState<Record<number, number>>({});
-  // Imagen abierta en modo foco (pantalla completa, ← → entre todas las etapas)
+  // Image open in focus mode (fullscreen, ← → across all stages)
   const [focusImageId, setFocusImageId] = useState<number | null>(null);
   const [corrections, setCorrections] = useState<CommissionCorrection[]>([]);
-  // Etapa cuyas correcciones se ven bajo la tira; null = ninguna
+  // Stage whose corrections show under the strip; null = none
   const [correctionsStageId, setCorrectionsStageId] = useState<number | null>(null);
   const [correctionDraft, setCorrectionDraft] = useState("");
   const [stripHeight, setStripHeight] = useState(0);
@@ -133,7 +133,7 @@ function CommissionsPage() {
         (commission.client_name ?? "").toLowerCase().includes(query);
 
     const tags = commissionTagsById[commission.id] ?? [];
-    // Dentro de una categoría basta con una etiqueta (Sketch o Full Colour); entre categorías, todas (y Paid)
+    // Within a category one tag is enough (Sketch or Full Colour); across categories, all (and Paid)
     const selectedTagsByCategory = Object.values(
         allTags
         .filter((tag) => filterTagIds.includes(tag.id))
@@ -274,7 +274,7 @@ function CommissionsPage() {
     setViewMode("list");
   }
 
-  /** Precio automático: lo llaman los cambios de plantilla y personajes, nunca al abrir un formulario */
+  /** Automatic price: called by template and character changes, never when opening a form */
   function applyAutoPrice(templateId: number | null, characterCount: number) {
     const basePrice = templates.find((template) => template.id === templateId)?.base_price;
 
@@ -285,7 +285,7 @@ function CommissionsPage() {
     }
   }
 
-  /** Al crear: pone solas las etiquetas de tipo y de personajes (las demás se respetan) */
+  /** On create: sets the type and character tags automatically (others are kept) */
   function applyAutoTags(templateId: number | null, characterCount: number) {
     if (formMode !== "new") {
       return;
@@ -299,7 +299,7 @@ function CommissionsPage() {
 
   const formTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
   const extraCharacters = Math.max(selectedCharacterIds.length, 1) - 1;
-  // Chips: los personajes del cliente elegido, más los de otros clientes que ya estén elegidos
+  // Chips: the chosen client's characters, plus those of other clients already chosen
   const formCharacterOptions = Object.values(charactersByClientId)
     .flat()
     .filter((character) => character.client_id === selectedClientId || selectedCharacterIds.includes(character.id));
@@ -325,7 +325,7 @@ function CommissionsPage() {
   }
 
   async function loadTagsForCommissions(data: Commission[]) {
-    // Los pagos se recargan en los mismos momentos que las etiquetas
+    // Payments reload at the same moments as tags
     loadPayments().catch(console.error);
     getAllCorrections().then(setCorrections).catch(console.error);
 
@@ -369,7 +369,7 @@ function CommissionsPage() {
     setReferencesByCharacterId(Object.fromEntries(entries));
   }
 
-  /** +1 avanza a la siguiente etapa, -1 vuelve a la anterior */
+  /** +1 advances to the next stage, -1 goes back to the previous one */
   async function handleMoveStage(direction: 1 | -1) {
     if (!activeCommission || workflowStages.length === 0) {
       return;
@@ -412,7 +412,7 @@ function CommissionsPage() {
     setFormMode("edit");
   }
 
-  /** Guarda el formulario: crea o actualiza, y en los dos casos guarda etiquetas y personajes */
+  /** Saves the form: creates or updates, and in both cases saves tags and characters */
   async function handleSaveCommissionForm() {
     try {
       setSavingCommission(true);
@@ -522,7 +522,7 @@ function CommissionsPage() {
     }
     }
 
-  /** Sin `sources` abre el selector; con ellas, vienen de arrastrar y soltar o de Ctrl+V. */
+  /** Without `sources` opens the picker; with them, they come from drag and drop or Ctrl+V. */
   async function handleAddStageImages(stageId: number, sources?: (string | File)[]) {
     if (!activeCommission || importingStageId !== null) {
       return;
@@ -561,7 +561,7 @@ function CommissionsPage() {
         handleAddStageImages(Number(stageId), paths);
       }
     },
-    // Ctrl+V añade la imagen a la etapa actual de la comisión abierta
+    // Ctrl+V adds the image to the open commission's current stage
     onPaste: (files) => {
       if (activeCommission && pasteStage) {
         handleAddStageImages(pasteStage.id, files);
@@ -601,7 +601,7 @@ function CommissionsPage() {
     workflowStages.length > 0 &&
     currentStageIndex === workflowStages.length - 1;
 
-  // Bandeja: las que ya están en una etapa, y en cola las que aún no han empezado; la entrega más cercana primero
+  // Inbox: those already in a stage, and queued ones not started yet; nearest delivery first
   const byDeadline = (a: Commission, b: Commission) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999");
   const inboxGroups = [
     {
@@ -651,7 +651,7 @@ function CommissionsPage() {
   const activeClient = clients.find((client) => client.id === activeCommission?.client_id) ?? null;
 
   function copyTag(handle: string) {
-    // El aviso no repite el usuario: así no se ve en un directo con el modo privado
+    // The toast doesn't repeat the handle, so it isn't visible on a stream in private mode
     navigator.clipboard
       .writeText(handle)
       .then(() => showToast("Tag copied.", "success"))
@@ -678,10 +678,10 @@ function CommissionsPage() {
     : [];
 
   const pasteStage = workflowStages[currentStageIndex] ?? workflowStages[0] ?? null;
-  // Hueco de la tira menos la etiqueta de cada etapa
+  // Strip gap minus each stage's label
   const stageImageHeight = Math.max(stripHeight - 36, 140);
 
-  // Modo foco: todas las imágenes de todas las etapas, en orden
+  // Focus mode: all images from all stages, in order
   const focusImages = activeCommission
     ? workflowStages.flatMap((stage) =>
         getStageImages(activeCommission.id, stage.id).map((image) => ({ image, stage })),
@@ -705,12 +705,12 @@ function CommissionsPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
-  // Al abrir una comisión, la tira se centra en la etapa actual
+  // On opening a commission, the strip centers on the current stage
   useEffect(() => {
     document.getElementById("current-stage")?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [activeCommissionId, workflowStages]);
 
-  // Las correcciones abiertas son de la comisión anterior
+  // Open corrections belong to the previous commission
   useEffect(() => {
     setCorrectionsStageId(null);
   }, [activeCommissionId]);
@@ -875,7 +875,7 @@ function CommissionsPage() {
                               {deadlineStatus.short}
                             </span>
                           ) : (
-                            // Sin fecha: los días desde que la aceptaste, con color al acercarse a lo que prometes
+                            // No deadline: days since acceptance, colored as it nears your promise
                             <span
                               title={t("Days since you accepted it")}
                               className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold ${
@@ -909,7 +909,7 @@ function CommissionsPage() {
               </div>
             ) : viewMode === "list" && activeCommission ? (
               <div className="flex h-full min-h-0 flex-col gap-5">
-                {/* Cabecera: todo lo importante en una línea */}
+                {/* Header: everything important on one line */}
                 <div className="flex items-start gap-4">
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-2xl font-black">{activeCommission.title}</h3>
@@ -1041,11 +1041,11 @@ function CommissionsPage() {
                   </p>
                 ) : (
                   <>
-                    {/* Tira de etapas: misma altura para todas, cada imagen con su proporción real */}
+                    {/* Stage strip: same height for all, each image at its real aspect ratio */}
                     <div
                       ref={stripRef}
                       onWheel={(event) => {
-                        // La rueda vertical desplaza la tira en horizontal
+                        // The vertical wheel scrolls the strip horizontally
                         if (event.deltaY !== 0) event.currentTarget.scrollLeft += event.deltaY;
                       }}
                       className="flex min-h-48 flex-1 gap-4 overflow-x-auto"
@@ -1631,7 +1631,7 @@ function CommissionsPage() {
       {formMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="grid max-h-[90vh] w-[900px] max-w-[94vw] grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl">
-            {/* Izquierda: elegir */}
+            {/* Left: pick */}
             <div className="min-h-0 space-y-5 overflow-y-auto p-6">
               <input
                 autoFocus
@@ -1666,7 +1666,7 @@ function CommissionsPage() {
                     ))}
                   </datalist>
 
-                  {/* La plataforma sale del cliente; solo se elige a mano para alguien que no está guardado */}
+                  {/* The platform comes from the client; pick it by hand only for someone not saved */}
                   {!selectedClientId && (
                     <select value={platform} onChange={(event) => setPlatform(event.target.value)} className={formField}>
                       <option>Discord</option>
@@ -1714,7 +1714,7 @@ function CommissionsPage() {
                     );
                   })}
 
-                  {/* Personajes de cualquier cliente: colaboraciones, personajes de amigos… */}
+                  {/* Characters from any client: collaborations, friends' characters… */}
                   <input
                     list={isPrivate() ? undefined : "character-options"}
                     value={characterSearch}
@@ -1799,7 +1799,7 @@ function CommissionsPage() {
                               return current.filter((id) => id !== tag.id);
                             }
 
-                            // Solo una etiqueta de "Characters" a la vez
+                            // Only one "Characters" tag at a time
                             const sameCategory =
                               tag.category === "Characters"
                                 ? allTags.filter((other) => other.category === tag.category).map((other) => other.id)
@@ -1823,7 +1823,7 @@ function CommissionsPage() {
               </div>
             </div>
 
-            {/* Derecha: resumen en vivo, precio, entrega y notas */}
+            {/* Right: live summary, price, delivery and notes */}
             <div className="flex min-h-0 flex-col gap-4 overflow-y-auto border-l border-line bg-paper p-6">
               <div>
                 <p className={formLabel}>{t("Summary")}</p>

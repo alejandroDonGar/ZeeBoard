@@ -32,9 +32,9 @@ async function runSerialized<T>(
 export type Template = {
   id: number;
   name: string;
-  /** Precio por un personaje; cada personaje extra suma un porcentaje (ver calculateCommissionPrice) */
+  /** Price for one character; each extra character adds a percentage (see calculateCommissionPrice) */
   base_price: number | null;
-  /** Correcciones que entran en el precio; null = sin límite (no se muestra contador) */
+  /** Corrections included in the price; null = unlimited (no counter shown) */
   revisions_included: number | null;
 };
 
@@ -55,7 +55,7 @@ export async function getDatabase(): Promise<ZeeDatabase> {
   return db;
 }
 
-/** Cierra la conexión: hace falta antes de reemplazar el archivo al restaurar un backup */
+/** Closes the connection: needed before replacing the file when restoring a backup */
 export async function closeDatabase(): Promise<void> {
   if (db) {
     await db.close();
@@ -65,32 +65,32 @@ export async function closeDatabase(): Promise<void> {
 
 export type AppSettings = {
   default_currency: string;
-  /** 0.5 = cada personaje extra suma el 50 % del precio base */
+  /** 0.5 = each extra character adds 50% of the base price */
   extra_character_rate: number;
   auto_backup_enabled: boolean;
   auto_backup_folder: string | null;
-  /** Cuántas copias automáticas se conservan */
+  /** How many automatic backups are kept */
   auto_backup_keep: number;
-  /** Cuándo se hizo la última copia automática (ISO) */
+  /** When the last automatic backup ran (ISO) */
   last_auto_backup: string | null;
-  /** Lo máximo que prometes a un cliente: sin fecha de entrega, es el límite desde que aceptas la comisión */
+  /** The longest you promise a client: with no deadline, the limit counts from acceptance */
   promise_max_days: number;
   reminders_enabled: boolean;
-  /** Avisos de entrega: este número de días antes y el mismo día */
+  /** Delivery reminders: this many days before and on the day */
   reminder_days_before: number;
   stalled_enabled: boolean;
-  /** Aviso de comisión parada: días sin cambios */
+  /** Stalled-commission alert: days without changes */
   stalled_days: number;
-  /** ¿Estás aceptando comisiones ahora? (el formulario externo lo abres y cierras tú) */
+  /** Are you accepting commissions now? (you open and close the external form) */
   slots_open: boolean;
-  /** Cuántas comisiones abiertas aceptas a la vez */
+  /** How many open commissions you take at once */
   slots_total: number;
-  /** CSV con las respuestas del formulario (lo deja al día el script de Google en tu Drive) */
+  /** CSV of form responses (kept up to date by the Google script in your Drive) */
   responses_file: string | null;
   last_form_sync: string | null;
 };
 
-// Se cargan una vez al arrancar para poder leerlos sin await desde cualquier pantalla
+// Loaded once at startup so any screen can read them without await
 let settings: AppSettings = {
   default_currency: "EUR",
   extra_character_rate: 0.5,
@@ -196,7 +196,7 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE settings ADD COLUMN responses_file TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE settings ADD COLUMN last_form_sync TEXT;`).catch(() => {});
 
-  // Solicitudes de comisión que aún no son comisión: nuevas, en lista de espera, aceptadas o rechazadas
+  // Commission requests that aren't commissions yet: new, waitlisted, accepted or declined
   await database.execute(`
     CREATE TABLE IF NOT EXISTS commission_requests (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -211,17 +211,17 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL
     );
   `);
-  // De dónde viene una solicitud importada (para no importarla dos veces) y su correo
+  // Where an imported request came from (to avoid importing it twice) and its email
   await database.execute(`ALTER TABLE commission_requests ADD COLUMN external_id TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE commission_requests ADD COLUMN email TEXT;`).catch(() => {});
-  // A quién etiquetar al publicar: en la solicitud, y en el cliente una vez aceptada
+  // Whom to tag when posting: on the request, and on the client once accepted
   await database.execute(`ALTER TABLE commission_requests ADD COLUMN tag_platform TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE commission_requests ADD COLUMN tag_handle TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE clients ADD COLUMN tag_platform TEXT;`).catch(() => {});
-  // El id de la transacción de PayPal: evita importar dos veces el mismo cobro
+  // PayPal transaction id: prevents importing the same payment twice
   await database.execute(`ALTER TABLE commission_payments ADD COLUMN external_id TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE clients ADD COLUMN tag_handle TEXT;`).catch(() => {});
-  // Cuándo cambió una comisión de etapa por última vez: cuenta como movimiento para el aviso de comisión parada
+  // When a commission last changed stage: counts as activity for the stalled alert
   await database.execute(`ALTER TABLE commissions ADD COLUMN stage_changed_at TEXT;`).catch(() => {});
   await database.execute(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
   await loadSettings();
@@ -259,7 +259,7 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE templates ADD COLUMN base_price REAL;`).catch(() => {});
   await database.execute(`ALTER TABLE templates ADD COLUMN revisions_included INTEGER;`).catch(() => {});
 
-  // Correcciones que pide el cliente, cada una ligada a una etapa; cada una cuenta como una revisión
+  // Client corrections, each tied to a stage; each counts as one revision
   await database.execute(`
     CREATE TABLE IF NOT EXISTS commission_corrections (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -342,7 +342,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  // Tabla antigua que nunca llegó a usarse
+  // Old table that was never used
   await database.execute(`DROP TABLE IF EXISTS commission_references;`);
 
   await database.execute(`
@@ -383,7 +383,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  // Tarifas de PayPal, Ko-fi…: lo recibido se calcula como importe − (importe × % + fijo)
+  // PayPal, Ko-fi… fees: received = amount − (amount × % + fixed)
   await database.execute(`
     CREATE TABLE IF NOT EXISTS payment_platforms (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -393,7 +393,7 @@ export async function initializeDatabase() {
     );
   `);
 
-  // amount = lo que pagó el cliente; received = lo que te llegó (NULL = aún no lo has apuntado)
+  // amount = what the client paid; received = what reached you (NULL = not entered yet)
   await database.execute(`
     CREATE TABLE IF NOT EXISTS commission_payments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -470,7 +470,7 @@ export async function createTemplate(name: string, stages: string[]): Promise<vo
 export async function deleteTemplate(templateId: number): Promise<void> {
   const database = await getDatabase();
 
-  // También las terminadas: sin sus etapas dejarían de contar como terminadas y perderían sus imágenes
+  // Finished ones too: without their stages they'd stop counting as finished and lose their images
   const commissionsUsingTemplate = await database.select<{ count: number }[]>(
     `SELECT COUNT(*) as count FROM commissions WHERE template_id = ?;`,
     [templateId],
@@ -574,9 +574,9 @@ export async function updateTemplateName(
 export type StageDraft = { id: number | null; name: string };
 
 /**
- * Guarda las etapas de una plantilla conservando sus ids: las comisiones guardan su etapa actual
- * y sus imágenes por id, así que renombrar o reordenar no puede crear etapas nuevas.
- * Una etapa que alguna comisión está usando no se puede quitar.
+ * Saves a template's stages keeping their ids: commissions store their current stage
+ * and images by id, so renaming or reordering must not create new stages.
+ * A stage in use by a commission can't be removed.
  */
 export async function saveTemplateStages(
   templateId: number,
@@ -939,7 +939,7 @@ export async function createTag(
 
 export async function deleteTag(tagId: number): Promise<void> {
   await runSerialized(async (database) => {
-    // Se quita también de las comisiones que la tenían
+    // Also removed from the commissions that had it
     await database.execute(`DELETE FROM commission_tags WHERE tag_id = ?;`, [tagId]);
     await database.execute(`DELETE FROM tags WHERE id = ?;`, [tagId]);
   });
@@ -960,7 +960,7 @@ export async function updateTag(tagId: number, name: string, color: string): Pro
   ]);
 }
 
-/** Cuántas comisiones usan cada etiqueta: { tagId: número } */
+/** How many commissions use each tag: { tagId: count } */
 export async function getTagUsageCounts(): Promise<Record<number, number>> {
   const database = await getDatabase();
   const rows = await database.select<{ tag_id: number; count: number }[]>(
@@ -1021,10 +1021,10 @@ export type Client = {
   avatar_url: string | null;
   notes: string | null;
   created_at: string;
-  /** La cuenta que se etiqueta al publicar sus comisiones (puede ser distinta de la de contacto) */
+  /** The account tagged when posting their commissions (may differ from the contact account) */
   tag_platform: string | null;
   tag_handle: string | null;
-  /** El correo con el que paga (PayPal): sirve para cruzar sus pagos al importar el CSV */
+  /** The email they pay with (PayPal): used to match their payments on CSV import */
   email: string | null;
 };
 
@@ -1252,7 +1252,7 @@ export async function deleteClientCharacter(
     await serialized.execute(`DELETE FROM client_characters WHERE id = ?;`, [characterId]);
   });
 
-  // Sus imágenes se borran del disco si ya no las usa nadie más
+  // Its images are deleted from disk if nobody else uses them
   for (const reference of references) {
     await deleteImageIfUnused(reference.image_data_url);
   }
@@ -1517,7 +1517,7 @@ export async function getAllUsedImagePaths(): Promise<string[]> {
 }
 const IMAGE_TABLES = ["character_references", "commission_stage_images"] as const;
 
-/** Una misma imagen puede estar en varias filas (mismo archivo): solo se borra si ya nadie la usa. */
+/** One image can be in several rows (same file): only deleted when nobody uses it. */
 async function deleteImageIfUnused(imagePath: string): Promise<void> {
   const usedPaths = await getAllUsedImagePaths();
 
@@ -1527,8 +1527,8 @@ async function deleteImageIfUnused(imagePath: string): Promise<void> {
 }
 
 /**
- * Pasa las imágenes antiguas (archivos a tamaño completo) al formato nuevo: copia WebP ligera + miniatura.
- * Los archivos antiguos no se borran aquí: quedan como huérfanos y se limpian desde Ajustes.
+ * Converts old images (full-size files) to the new format: light WebP copy + thumbnail.
+ * Old files aren't deleted here: they become orphans, cleaned from Settings.
  */
 export async function migrateLegacyImages(
   onProgress: (done: number, total: number) => void = () => {},
@@ -1537,7 +1537,7 @@ export async function migrateLegacyImages(
   let migrated = 0;
   let failed = 0;
 
-  // Primero se reúnen todas las pendientes para poder mostrar "x de total"
+  // Collect all pending ones first so progress can show "x of total"
   const pending: { table: string; id: number; image_data_url: string }[] = [];
 
   for (const table of IMAGE_TABLES) {
@@ -1572,7 +1572,7 @@ export async function migrateLegacyImages(
 
   if (migrated > 0) {
     onProgress(pending.length, pending.length);
-    // Recupera el espacio que dejaron las imágenes en base64 de versiones anteriores
+    // Reclaims the space left by base64 images from earlier versions
     await database.execute("VACUUM;");
   }
 
@@ -1613,8 +1613,8 @@ export async function addPayment(
 }
 
 /**
- * Guarda los cobros importados de PayPal. Sin transacción (el pool de SQLite no garantiza la misma conexión):
- * si falla a medias, volver a importar salta los ya guardados por su id de transacción.
+ * Saves imported PayPal payments. No transaction (the SQLite pool doesn't guarantee one connection):
+ * if it fails midway, re-importing skips those already saved by transaction id.
  */
 export async function importPayments(
   items: { commissionId: number; amount: number; received: number; paidAt: string; externalId: string }[],
@@ -1629,7 +1629,7 @@ export async function importPayments(
   });
 }
 
-/** El día del último cobro importado de PayPal (AAAA-MM-DD), o null si aún no importaste ninguno. */
+/** Day of the last imported PayPal payment (YYYY-MM-DD), or null if none yet. */
 export async function getLastImportedPaymentDate(): Promise<string | null> {
   const database = await getDatabase();
   const rows = await database.select<{ day: string | null }[]>(
@@ -1652,9 +1652,9 @@ export async function deletePayment(paymentId: number): Promise<void> {
 }
 
 /**
- * Las etiquetas "Paid" / "Not Paid" se sustituyen por pagos: cada comisión con "Paid" recibe un pago
- * por su precio (fechado el día de creación) y después se borran las etiquetas de pago.
- * No hace nada si ya no quedan etiquetas de pago.
+ * "Paid" / "Not Paid" tags are replaced by payments: each "Paid" commission gets one payment
+ * for its price (dated on creation), then the payment tags are deleted.
+ * Does nothing once no payment tags remain.
  */
 export async function migratePaymentTags(): Promise<void> {
   await runSerialized(async (database) => {
@@ -1737,9 +1737,9 @@ export async function deleteCorrection(correctionId: number): Promise<void> {
 export type PaymentPlatform = {
   id: number;
   name: string;
-  /** 3.4 = 3,4 % */
+  /** 3.4 = 3.4% */
   percent: number;
-  /** Parte fija por pago, en la moneda del pago */
+  /** Fixed part per payment, in the payment's currency */
   fixed: number;
 };
 
@@ -1751,7 +1751,7 @@ export async function getPaymentPlatforms(): Promise<PaymentPlatform[]> {
   );
 }
 
-/** Se guarda la lista entera: ningún pago apunta a una plataforma por id (usan la nota) */
+/** Saves the whole list: no payment points to a platform by id (they use the note) */
 export async function savePaymentPlatforms(platforms: Omit<PaymentPlatform, "id">[]): Promise<void> {
   await runSerialized(async (database) => {
     await database.execute(`DELETE FROM payment_platforms;`);
@@ -1777,7 +1777,7 @@ export type CommissionRequest = {
   characters: number;
   details: string | null;
   status: RequestStatus;
-  /** La comisión creada al aceptarla */
+  /** The commission created on acceptance */
   commission_id: number | null;
   created_at: string;
   external_id: string | null;
@@ -1841,7 +1841,7 @@ export async function deleteRequest(requestId: number): Promise<void> {
   await database.execute(`DELETE FROM commission_requests WHERE id = ?;`, [requestId]);
 }
 
-/** Guarda las solicitudes del formulario que aún no estén (se reconocen por su external_id). */
+/** Saves form requests not already stored (recognized by external_id). */
 export async function importRequests(items: ImportedRequest[]): Promise<{ added: number; skipped: number }> {
   return await runSerialized(async (database) => {
     const known = new Set(
@@ -1889,21 +1889,21 @@ export async function setRequestTemplate(requestId: number, templateId: number |
   await database.execute(`UPDATE commission_requests SET template_id = ? WHERE id = ?;`, [templateId, requestId]);
 }
 
-/** Guarda a quién etiquetar al publicar (null en los dos = a nadie). */
+/** Saves whom to tag when posting (null in both = nobody). */
 export async function setClientTag(clientId: number, platform: string | null, handle: string | null): Promise<void> {
   const database = await getDatabase();
 
   await database.execute(`UPDATE clients SET tag_platform = ?, tag_handle = ? WHERE id = ?;`, [platform, handle, clientId]);
 }
 
-/** Cambia el correo del cliente desde su ficha (vacío lo quita). */
+/** Changes the client's email from their profile (empty removes it). */
 export async function saveClientEmail(clientId: number, email: string): Promise<void> {
   const database = await getDatabase();
 
   await database.execute(`UPDATE clients SET email = ? WHERE id = ?;`, [email.trim() || null, clientId]);
 }
 
-/** Guarda el correo del cliente solo si aún no tenía uno. */
+/** Saves the client's email only if they had none. */
 export async function setClientEmail(clientId: number, email: string): Promise<void> {
   const database = await getDatabase();
 

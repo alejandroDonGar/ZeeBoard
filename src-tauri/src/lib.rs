@@ -6,12 +6,12 @@ mod images;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // Cada plugin se registra una sola vez
+        // Each plugin is registered once
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_sql::Builder::default().build()) // SQLite local
-        .plugin(tauri_plugin_fs::init()) // copias de seguridad
-        .plugin(tauri_plugin_notification::init()) // recordatorios de entrega
-        .plugin(tauri_plugin_dialog::init()) // selectores de archivos y carpetas
+        .plugin(tauri_plugin_sql::Builder::default().build()) // Local SQLite
+        .plugin(tauri_plugin_fs::init()) // backups
+        .plugin(tauri_plugin_notification::init()) // delivery reminders
+        .plugin(tauri_plugin_dialog::init()) // file and folder pickers
         .invoke_handler(tauri::generate_handler![
             images::import_image_from_path,
             images::import_image_from_bytes,

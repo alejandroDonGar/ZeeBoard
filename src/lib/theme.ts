@@ -11,7 +11,7 @@ export function getTheme(): ThemeChoice {
   }
 }
 
-/** "system" quita el atributo y deja que App.css siga a Windows (prefers-color-scheme). */
+/** "system" removes the attribute and lets App.css follow Windows (prefers-color-scheme). */
 export function applyTheme(theme: ThemeChoice): void {
   if (theme === "system") {
     delete document.documentElement.dataset.theme;
@@ -22,6 +22,6 @@ export function applyTheme(theme: ThemeChoice): void {
   try {
     localStorage.setItem(STORAGE_KEY, theme);
   } catch {
-    // Sin almacenamiento el tema solo dura esta sesión
+    // Without storage the theme lasts only this session
   }
 }

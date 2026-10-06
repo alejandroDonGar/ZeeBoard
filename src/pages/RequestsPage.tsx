@@ -116,7 +116,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
   }
 
   function startAccept(request: CommissionRequest) {
-    // Con las plazas llenas se pide confirmación: aceptar de más es una decisión, no un descuido
+    // With slots full, confirmation is asked: over-accepting is a decision, not an oversight
     if (settings.slots_total > 0 && taken >= settings.slots_total) {
       setConfirmAccept(request);
     } else {
@@ -124,7 +124,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
     }
   }
 
-  /** Crea el cliente (o reutiliza el que tenga ese nombre) y la comisión, y la abre. */
+  /** Creates the client (or reuses the one with that name) and the commission, and opens it. */
   async function accept(request: CommissionRequest) {
     setConfirmAccept(null);
 
@@ -133,7 +133,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
       const clients = await getClients();
       const handle = normalizeHandle(request.contact);
-      // Un cliente que ya tienes: por su usuario (lo más fiable) o, si no, por el nombre
+      // An existing client: by handle (most reliable) or else by name
       const existing =
         clients.find((client) => handle !== "" && normalizeHandle(client.handle) === handle) ??
         clients.find((client) => client.name.trim().toLowerCase() === request.name.trim().toLowerCase());
@@ -144,7 +144,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
         await setClientEmail(clientId, request.email);
       }
 
-      // Sin foto todavía: se busca en segundo plano (Bluesky o Telegram) y no retrasa la comisión
+      // No photo yet: fetched in the background (Bluesky or Telegram) and doesn't delay the commission
       if (!existing?.avatar_url) {
         fetchAvatar([
           { platform: request.tag_platform, handle: request.tag_handle },
@@ -158,7 +158,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
           .catch(console.error);
       }
 
-      // Lo último que dice el cliente es lo que manda: sustituye a la cuenta de etiqueta anterior
+      // The client's latest word wins: replaces the previous tag account
       if (request.tag_handle) {
         await setClientTag(clientId, request.tag_platform, request.tag_handle);
       }
@@ -169,7 +169,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
           ? calculateCommissionPrice(template.base_price, request.characters, settings.extra_character_rate)
           : null;
 
-      // El título es el tipo, sin el nombre del cliente: así no se cuela en un directo con el modo privado
+      // The title is the type, without the client's name, so it doesn't leak on a stream in private mode
       const commissionId = await createCommission(
         template?.name ?? "New commission",
         clientId,
@@ -182,7 +182,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
         request.details ?? "",
       );
 
-      // Etiquetas de tipo y de número de personajes, sin tocarlas a mano
+      // Type and character-count tags, without touching them by hand
       await replaceCommissionTags(commissionId, autoTagIds(template?.name ?? null, request.characters, await getTags()));
 
       await setRequestStatus(request.id, "accepted", commissionId);
@@ -472,7 +472,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                   className="hidden"
                   onChange={(event) => {
                     handleImport(event.target.files?.[0]);
-                    // Permite elegir el mismo archivo otra vez
+                    // Lets the same file be chosen again
                     event.target.value = "";
                   }}
                 />

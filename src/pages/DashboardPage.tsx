@@ -72,7 +72,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
   const today = new Date(new Date().toDateString()).getTime();
   const daysUntil = (deadline: string) => (new Date(`${deadline}T00:00:00`).getTime() - today) / DAY;
 
-  // Las que tienen fecha primero, de la más urgente a la menos; sin fecha al final
+  // Dated ones first, most urgent to least; undated last
   const inProgress = commissions
     .filter((commission) => !isCommissionCompletedHelper(commission, templateStagesByTemplateId))
     .sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"));
@@ -89,7 +89,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
       payments.filter((payment) => payment.commission_id === commission.id),
     );
 
-  // Lo que falta por cobrar: sin pagar y parciales con precio
+  // What's left to collect: unpaid and partial with a price
   const unpaid = commissions
     .map((commission) => ({ commission, remaining: summaryOf(commission).remaining }))
     .filter((entry) => entry.remaining > 0);
@@ -303,7 +303,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
 
           <div className="flex h-36 items-end gap-3 border-b border-line">
             {bookedByMonth.map((entry) => (
-              // ponytail: tooltip nativo (title); uno propio si hace falta más detalle
+              // ponytail: native tooltip (title); a custom one if more detail is needed
               <div
                 key={entry.label}
                 title={`${entry.label}: ${formatMoney(entry.total)}`}

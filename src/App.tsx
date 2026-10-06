@@ -33,16 +33,16 @@ const navigationItems: { id: Page; label: string }[] = [
 
 type Progress = { done: number; total: number };
 
-// El componente se suscribe al montarse para mostrar el progreso de la migración
+// Subscribes on mount to show migration progress
 let reportProgress: (progress: Progress) => void = () => {};
 
-// Fuera del componente para que se ejecute una sola vez (StrictMode monta los efectos dos veces)
+// Outside the component so it runs once (StrictMode mounts effects twice)
 const startup = initImageUrls()
   .then(initializeDatabase)
   .then(migratePaymentTags)
   .then(() => migrateLegacyImages((done, total) => reportProgress({ done, total })));
 
-/** Avisos de entrega y de comisiones paradas: al abrir y cada 30 minutos mientras la app siga abierta. */
+/** Delivery and stalled-commission alerts: on open and every 30 minutes while the app is open. */
 function Reminders() {
   useEffect(() => {
     const check = () => loadAttention().then(notifyNew).catch(console.error);
@@ -56,10 +56,10 @@ function Reminders() {
   return null;
 }
 
-/** Respuestas nuevas del formulario: al abrir y cada 30 minutos, si hay un archivo de respuestas elegido. */
+/** New form responses: on open and every 30 minutes, if a responses file is chosen. */
 function FormSync() {
   useEffect(() => {
-    // Si el archivo no está (Drive sin montar, sin conexión…) no molesta: se vuelve a intentar luego
+    // A missing file (Drive unmounted, offline…) is silent; retried later
     const check = () => syncFormResponses().catch(console.error);
 
     check();
@@ -73,7 +73,7 @@ function FormSync() {
 
 let autoBackupStarted = false;
 
-/** Una vez por arranque, ya con la app a la vista: si toca, hace la copia automática en segundo plano. */
+/** Once per launch, after the app is visible: runs the automatic backup in the background if due. */
 function AutoBackup() {
   const { showToast } = useToast();
 
@@ -102,7 +102,7 @@ function App() {
   useEffect(() => {
     sessionStorage.setItem("zeeboard-page", currentPage);
   }, [currentPage]);
-  // Al cambiar, toda la app se vuelve a pintar con los datos ocultos o visibles
+  // On change the whole app repaints with data hidden or visible
   const privateMode = usePrivacy();
   const [newRequests, setNewRequests] = useState(0);
 

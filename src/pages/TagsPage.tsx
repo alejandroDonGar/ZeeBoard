@@ -12,7 +12,7 @@ import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 
-// Colores que se leen bien con texto blanco encima y combinan con la app
+// Colors that read well under white text and match the app
 const PALETTE = [
   "#7c3aed",
   "#4f46e5",
@@ -30,7 +30,7 @@ const PALETTE = [
 
 type Draft = { name: string; color: string };
 
-/** Fila en modo edición: nombre, paleta y guardar/cancelar. Enter guarda, Esc cancela. */
+/** Row in edit mode: name, palette and save/cancel. Enter saves, Esc cancels. */
 function TagEditor({
   initial,
   saveLabel,
@@ -138,7 +138,7 @@ function TagsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [ready, setReady] = useState(false);
   const [usageByTagId, setUsageByTagId] = useState<Record<number, number>>({});
-  // Categorías recién creadas que aún no tienen etiquetas
+  // Newly created categories that have no tags yet
   const [newCategories, setNewCategories] = useState<string[]>([]);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [categoryName, setCategoryName] = useState("");

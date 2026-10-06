@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Modo privado para directos: oculta nombres de clientes y precios.
- * Los textos se sustituyen (`hide`, y `formatMoney` para los importes); los campos de texto,
- * que no se pueden enmascarar, se difuminan con CSS marcándolos con `data-private`.
+ * Private mode for streams: hides client names and prices.
+ * Text is replaced (`hide`, and `formatMoney` for amounts); text fields,
+ * which can't be masked, are blurred with CSS when marked `data-private`.
  */
 const STORAGE_KEY = "zeeboard-private-mode";
 
@@ -17,7 +17,7 @@ function readSaved(): boolean {
   }
 }
 
-// Se recuerda entre arranques: si reinicias la app en pleno directo, sigue oculto
+// Remembered across launches: if you restart the app mid-stream, it stays hidden
 let on = readSaved();
 const listeners = new Set<() => void>();
 
@@ -40,13 +40,13 @@ export function setPrivate(value: boolean): void {
   try {
     localStorage.setItem(STORAGE_KEY, value ? "1" : "0");
   } catch {
-    // Sin almacenamiento el modo solo dura esta sesión
+    // Without storage the mode lasts only this session
   }
 
   listeners.forEach((listener) => listener());
 }
 
-/** Un componente alto (App) lo usa para que todo se vuelva a pintar al activar o desactivar. */
+/** A high-level component (App) uses it so everything repaints on toggle. */
 export function usePrivacy(): boolean {
   return useSyncExternalStore((listener) => {
     listeners.add(listener);

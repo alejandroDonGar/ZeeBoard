@@ -9,7 +9,7 @@ import { hide } from "../lib/privacy";
 
 export type PaypalPreview = { matches: PaypalMatch[]; clients: Client[]; commissions: Commission[] };
 
-/** Elige el CSV de actividad de PayPal y lo cruza con tus clientes y comisiones; null si cancelas. */
+/** Picks the PayPal activity CSV and matches it to your clients and commissions; null if cancelled. */
 export async function pickPaypalFile(): Promise<PaypalPreview | null> {
   const file = await open({ title: t("Choose the PayPal activity CSV"), filters: [{ name: "CSV", extensions: ["csv"] }] });
 
@@ -37,7 +37,7 @@ const STATUS_TEXT: Record<PaypalMatch["status"], string> = {
 
 function PaypalImport({ preview, onClose }: { preview: PaypalPreview; onClose: () => void }) {
   const { matches, clients, commissions } = preview;
-  // la comisión elegida para cada cobro (se puede cambiar antes de importar)
+  // the commission chosen for each payment (editable before importing)
   const [choice, setChoice] = useState<Record<string, number>>(
     Object.fromEntries(matches.filter((item) => item.commissionId).map((item) => [item.row.txId, item.commissionId!])),
   );
@@ -60,7 +60,7 @@ function PaypalImport({ preview, onClose }: { preview: PaypalPreview; onClose: (
         })),
       );
       onClose();
-      // las pantallas cargan sus pagos al abrirse; se recarga para que muestren lo importado
+      // screens load their payments on open; reload so they show the import
       window.location.reload();
     } catch (importError) {
       console.error(importError);

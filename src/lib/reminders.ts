@@ -15,9 +15,9 @@ export type AttentionKind = "overdue" | "due-today" | "payment" | "due-soon" | "
 export type Attention<T> = {
   commission: T;
   kind: AttentionKind;
-  /** overdue: días de retraso · due-soon: días que faltan · stalled: días sin cambios */
+  /** overdue: days late · due-soon: days left · stalled: days without changes */
   days: number;
-  /** Cambia cuando cambia la situación: así se avisa una sola vez por cada aviso */
+  /** Changes when the situation changes, so each alert fires only once */
   key: string;
   text: string;
 };
@@ -31,8 +31,8 @@ type Options = Pick<
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 /**
- * Cuántos días faltan para el límite de una comisión (negativo = pasado).
- * Con fecha de entrega manda esa; sin ella, el límite es el día que la aceptaste + lo máximo que prometes.
+ * Days left until a commission's limit (negative = past).
+ * A deadline wins if set; otherwise the limit is the acceptance day + your maximum promise.
  */
 export function daysToDeadline(commission: Reminderable, promiseMaxDays: number, now: Date) {
   const created = new Date(commission.created_at);
@@ -44,7 +44,7 @@ export function daysToDeadline(commission: Reminderable, promiseMaxDays: number,
   return { daysLeft: Math.round((deadline.getTime() - startOfDay(now).getTime()) / DAY), implicit, deadline };
 }
 
-/** Días desde que aceptaste la comisión. */
+/** Days since you accepted the commission. */
 export function ageInDays(commission: Reminderable, now: Date): number {
   return Math.max(0, Math.round((startOfDay(now).getTime() - startOfDay(new Date(commission.created_at)).getTime()) / DAY));
 }
@@ -60,8 +60,8 @@ export const ATTENTION_STYLE: Record<AttentionKind, { label: string; className: 
 const days = (count: number) => t(count === 1 ? "{n} day" : "{n} days", { n: count });
 
 /**
- * Qué comisiones piden atención hoy: entrega que se acerca o pasada, comisiones paradas y las que ya
- * pasaron del boceto sin cobrar nada (`unpaidPastSketch`).
+ * Which commissions need attention today: approaching or past delivery, stalled ones, and those
+ * past the sketch with nothing paid (`unpaidPastSketch`).
  */
 export function computeAttention<T extends Reminderable>(
   commissions: T[],
@@ -132,11 +132,11 @@ export function computeAttention<T extends Reminderable>(
   return items.sort((a, b) => order[a.kind] - order[b.kind] || b.days - a.days);
 }
 
-/** Lee la base de datos y devuelve lo que pide atención ahora mismo. */
+/** Reads the database and returns what needs attention right now. */
 export async function loadAttention(now = new Date()): Promise<Attention<Commission>[]> {
   const open = await loadOpenCommissions();
 
-  // Movimiento = imagen nueva, corrección, pago o cambio de etapa (las fechas ISO ordenan como texto)
+  // Activity = new image, correction, payment or stage change (ISO dates sort as text)
   const database = await getDatabase();
   const rows = await database.select<{ id: number; last_activity: string }[]>(`
     SELECT c.id,
@@ -150,8 +150,8 @@ export async function loadAttention(now = new Date()): Promise<Attention<Commiss
     FROM commissions c;
   `);
 
-  // ponytail: "boceto aprobado" = la comisión ya salió de la primera etapa de su plantilla; "sin cobrar" = ningún pago
-  // (con adelanto no avisa). Cambiarlo aquí si usas una etapa concreta como señal.
+  // ponytail: "sketch approved" = the commission left its template's first stage; "unpaid" = no payments
+  // (an advance payment silences it). Change here if a specific stage should be the signal.
   const unpaid = await database.select<{ id: number }[]>(`
     SELECT c.id FROM commissions c
     JOIN template_stages s ON s.id = c.current_stage_id
@@ -171,14 +171,14 @@ export async function loadAttention(now = new Date()): Promise<Attention<Commiss
 
 const NOTIFIED_KEY = "zeeboard-notified-reminders";
 
-/** Manda una notificación de Windows por cada aviso que aún no se ha enviado. Devuelve cuántas. */
+/** Sends a Windows notification for each alert not yet sent. Returns how many. */
 export function notifyNew(items: Attention<Commission>[]): number {
   let notified: string[] = [];
 
   try {
     notified = JSON.parse(localStorage.getItem(NOTIFIED_KEY) ?? "[]");
   } catch {
-    // Sin historial se vuelve a avisar: mejor repetir que perder un aviso
+    // Without history it alerts again: better to repeat than to miss one
   }
 
   const fresh = items.filter((item) => !notified.includes(item.key));
@@ -187,7 +187,7 @@ export function notifyNew(items: Attention<Commission>[]): number {
     return 0;
   }
 
-  // Muchos a la vez (primer arranque, o tras varios días sin abrir): uno solo con el resumen
+  // Many at once (first launch, or after days closed): a single summary
   if (fresh.length > 3) {
     sendNotification({ title: "ZeeBoard", body: t("{n} commissions need your attention", { n: fresh.length }) });
   } else {
@@ -197,7 +197,7 @@ export function notifyNew(items: Attention<Commission>[]): number {
   try {
     localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...notified, ...fresh.map((item) => item.key)].slice(-500)));
   } catch {
-    // Igual que arriba
+    // Same as above
   }
 
   return fresh.length;

@@ -1,28 +1,28 @@
-// Comprobación rápida de la importación del formulario: npx tsx scripts/check-form-import.ts
-// Todos los usuarios y correos de aquí son inventados.
+// Quick check of the form import: npx tsx scripts/check-form-import.ts
+// All users and emails here are made up.
 import assert from "node:assert";
 import { splitLinks } from "../src/lib/links";
 import { parseTagAccount } from "../src/lib/formImport";
 import { autoTagIds, matchTemplate, normalizeHandle, parseContact, parseCsv, parseResponses, parseTimestamp } from "../src/lib/formImport";
 
-// CSV de Google: comillas, comillas escapadas y saltos de línea dentro de una celda
+// Google CSV: quotes, escaped quotes and line breaks inside a cell
 assert.deepStrictEqual(parseCsv('"a","b ""x"" c","line\n2"\n"d","e","f"\n'), [
   ["a", 'b "x" c', "line\n2"],
   ["d", "e", "f"],
 ]);
-assert.deepStrictEqual(parseCsv("﻿a;b\r\nc;d"), [["a", "b"], ["c", "d"]]); // Excel en español: ; y BOM
+assert.deepStrictEqual(parseCsv("﻿a;b\r\nc;d"), [["a", "b"], ["c", "d"]]); // Spanish Excel: ; and BOM
 
-// Fechas: la de Google en español (año primero y "p. m."), día primero, ISO
+// Dates: Google's Spanish one (year first and "p. m."), day first, ISO
 const local = (iso: string | null) => (iso ? new Date(iso).getHours() * 100 + new Date(iso).getMinutes() : null);
 assert.strictEqual(local(parseTimestamp("2026/10/04 4:59:22 p. m. CET")), 1659);
 assert.strictEqual(local(parseTimestamp("2026/10/04 12:05:00 a. m. CET")), 5); // 12 a. m. = 00:05
 assert.strictEqual(local(parseTimestamp("2026/10/04 12:05:00 p. m. CET")), 1205);
 assert.strictEqual(local(parseTimestamp("04/10/2026 16:59:22")), 1659);
-assert.strictEqual(new Date(parseTimestamp("04/10/2026 16:59:22")!).getMonth(), 9); // 4 de octubre, no 10 de abril
+assert.strictEqual(new Date(parseTimestamp("04/10/2026 16:59:22")!).getMonth(), 9); // 4 October, not 10 April
 assert.strictEqual(local(parseTimestamp("2026-10-04 16:59")), 1659);
 assert.strictEqual(parseTimestamp("ayer"), null);
 
-// Contactos tal como los escribe la gente
+// Contacts as people write them
 const cases: [string, { platform: string; handle: string }][] = [
   ["Telegram @fox_demo", { platform: "Telegram", handle: "@fox_demo" }],
   ["bsky -> @demo.bsky.social", { platform: "Bluesky", handle: "@demo.bsky.social" }],
@@ -32,7 +32,7 @@ const cases: [string, { platform: string; handle: string }][] = [
   ["discord: demo#1234", { platform: "Discord", handle: "demo#1234" }],
   ["mail me at demo@example.com", { platform: "Email", handle: "demo@example.com" }],
   ["@onlyhandle", { platform: "Other", handle: "@onlyhandle" }],
-  ["tg_fan", { platform: "Other", handle: "tg_fan" }], // "tg_fan" no es la palabra "tg"
+  ["tg_fan", { platform: "Other", handle: "tg_fan" }], // "tg_fan" isn't the word "tg"
   ["???", { platform: "Other", handle: "???" }],
 ];
 for (const [text, expected] of cases) {
@@ -40,7 +40,7 @@ for (const [text, expected] of cases) {
 }
 assert.strictEqual(normalizeHandle("@Fox_Demo"), normalizeHandle("fox_demo"));
 
-// Tipos: "Render" encaja con "Rendered", y las mayúsculas no importan
+// Types: "Render" matches "Rendered", and case doesn't matter
 const templates = [
   { id: 1, name: "Rendered Full Body + Simple Background" },
   { id: 2, name: "Reference Sheet" },
@@ -50,7 +50,7 @@ assert.strictEqual(matchTemplate("Render Full Body + Simple Background", templat
 assert.strictEqual(matchTemplate("Reference sheet", templates)?.id, 2);
 assert.strictEqual(matchTemplate("Something new", templates), null);
 
-// Un CSV completo con el formato real del formulario (columna de correo opcional)
+// A full CSV in the form's real format (email column optional)
 const header =
   '"Marca temporal","Which type of commission are you interested in?","Type your preferred method of communication and your handle on that site (Twitter - Telegram)"';
 const withoutEmail = parseResponses(`${header}\n"2026/10/04 4:59:22 p. m. CET","Render Full Body + Simple Background","Telegram @fox_demo"\n`, templates);
@@ -72,7 +72,7 @@ assert.deepStrictEqual(
 );
 assert.notStrictEqual(withEmail.requests[0].externalId, withoutEmail.requests[0].externalId);
 
-// El título real de la pregunta del correo, y correos que no lo parecen
+// The real title of the email question, and emails that don't look like one
 const realEmailTitle = "Type the paypal email you want to use for the invoice.";
 const real = parseResponses(
   `${header},"${realEmailTitle}"
@@ -87,7 +87,7 @@ assert.deepStrictEqual(
   [["@demo", "demo.person@example.com", null], ["@demo2", null, "Email in the form: no tengo"]],
 );
 
-// Con la pregunta de los personajes: "3 Characters" -> 3; sin la pregunta, 1
+// With the characters question: "3 Characters" -> 3; without it, 1
 const charactersTitle = "How many characters is your commission going to have?";
 const withCharacters = parseResponses(
   `${header},"${charactersTitle}"
@@ -99,7 +99,7 @@ const withCharacters = parseResponses(
 assert.deepStrictEqual(withCharacters.requests.map((request) => request.characters), [3, 1]);
 assert.strictEqual(withoutEmail.requests[0].characters, 1);
 
-// Las referencias (enlaces y descripciones) pasan a los detalles; su título real contiene "Reference"
+// References (links and descriptions) go to the details; their real title contains "Reference"
 const referencesTitle = "Reference links and a name or short description for the character/s";
 const withReferences = parseResponses(
   `${header},"${referencesTitle}"\n"2026/10/06 10:00:00 a. m. CET","Full Colour","bsky -> @demo","https://drive.example.com/folder/abc\nthe blue fox has no name"\n"2026/10/06 10:05:00 a. m. CET","Full Colour","tg demo2",""\n`,
@@ -110,25 +110,25 @@ assert.deepStrictEqual(withReferences.requests.map((request) => request.details)
   null,
 ]);
 
-// Enlaces en las referencias: con o sin https://, sin llevarse el punto final y sin falsos positivos
+// Links in references: with or without https://, without swallowing the final period and with no false positives
 const links = (text: string) => splitLinks(text).filter((part) => part.href).map((part) => part.href);
 assert.deepStrictEqual(links("see https://drive.google.com/x/y. thanks"), ["https://drive.google.com/x/y"]);
 assert.deepStrictEqual(links("toyhou.se/123 and Dropbox.com/s/abc?dl=0, ok"), ["https://toyhou.se/123", "https://Dropbox.com/s/abc?dl=0"]);
 assert.deepStrictEqual(links("www.example.com/a and (https://imgur.com/z)"), ["https://www.example.com/a", "https://imgur.com/z"]);
 assert.deepStrictEqual(links("x.com/someone"), ["https://x.com/someone"]);
 assert.deepStrictEqual(links("notdropbox.com/x, e.g. foto.png, name@x.com/y, box.com/z"), []);
-assert.strictEqual(splitLinks("a toyhou.se/1 b").map((part) => part.text).join(""), "a toyhou.se/1 b"); // el texto no se pierde
+assert.strictEqual(splitLinks("a toyhou.se/1 b").map((part) => part.text).join(""), "a toyhou.se/1 b"); // the text isn't lost
 
-// Cuenta que se etiqueta al publicar
+// Account to tag when posting
 const telegram = { platform: "Telegram", handle: "@contact_demo" };
 assert.deepStrictEqual(parseTagAccount("Twitter @name_demo", telegram), { platform: "Twitter / X", handle: "@name_demo" });
 assert.deepStrictEqual(parseTagAccount("bsky -> demo.bsky.social", telegram), { platform: "Bluesky", handle: "@demo.bsky.social" });
 assert.deepStrictEqual(parseTagAccount("same", telegram), telegram);
-assert.strictEqual(parseTagAccount("same", { platform: "Other", handle: "x" }), null); // no hay red de la que copiar
+assert.strictEqual(parseTagAccount("same", { platform: "Other", handle: "x" }), null); // no network to copy from
 for (const text of ["none", "None", "no", "don't tag me", "N/A", "", "-"]) {
   assert.strictEqual(parseTagAccount(text, telegram), null, text);
 }
-assert.strictEqual(parseTagAccount("demo@example.com", telegram), null); // un correo no se etiqueta
+assert.strictEqual(parseTagAccount("demo@example.com", telegram), null); // an email isn't tagged
 
 const tagTitle = "Which account should I tag when I post your commission?";
 const withTag = parseResponses(
@@ -143,14 +143,14 @@ assert.deepStrictEqual(
   withTag.requests.map((request) => [request.contact, request.tag_platform, request.tag_handle]),
   [["@contact_demo", "Bluesky", "@name_demo"], ["@other_demo", null, null], ["@third_demo", "Telegram", "@third_demo"]],
 );
-// El título del contacto, que también habla de "handle", no se confunde con el de la etiqueta
+// The contact's title, which also mentions "handle", isn't confused with the tag's
 assert.strictEqual(withoutEmail.requests[0].tag_handle, null);
 
-// Un archivo que no es el formulario
+// A file that isn't the form
 assert.ok(parseResponses('"a","b"\n"1","2"', templates).error);
 assert.ok(parseResponses("", templates).error);
 
-// Etiquetas automáticas con las de verdad del usuario
+// Automatic tags with the user's real ones
 const tag = (id: number, name: string, category: string) => ({ id, name, category });
 const tags = [
   tag(29, "Render + Complex Background", "Commission Type"), tag(30, "Render + Simple Background | Full Body", "Commission Type"),
@@ -162,8 +162,8 @@ const tags = [
 assert.deepStrictEqual(autoTagIds("Rendered Full Body + Complex Background", 3, tags), [29, 40]);
 assert.deepStrictEqual(autoTagIds("Rendered Full Body + Simple Background", 1, tags), [30, 43]);
 assert.deepStrictEqual(autoTagIds("Rendered Half Body + Simple Background", 2, tags), [31, 41]);
-assert.deepStrictEqual(autoTagIds("Sketch + Background", 1, tags), [34, 43]); // no también "Sketch"
+assert.deepStrictEqual(autoTagIds("Sketch + Background", 1, tags), [34, 43]); // not also "Sketch"
 assert.deepStrictEqual(autoTagIds("Sketch", 1, tags), [35, 43]);
-assert.deepStrictEqual(autoTagIds(null, 9, tags), []); // sin plantilla ni etiqueta de 9: nada
+assert.deepStrictEqual(autoTagIds(null, 9, tags), []); // no template and no tag for 9: nothing
 
 console.log("form import ok");

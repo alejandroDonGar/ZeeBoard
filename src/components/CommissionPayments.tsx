@@ -23,7 +23,7 @@ function parsePriceOrNull(text: string): number | null {
 }
 const dateFormatter = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric" });
 
-/** Bloque de pagos del detalle: precio, lo pagado, lo recibido y la comisión de la plataforma. */
+/** Payments block of the detail view: price, paid, received and platform fee. */
 function CommissionPayments({
   commission,
   payments,
@@ -37,7 +37,7 @@ function CommissionPayments({
   const currency = commission.currency;
   const { showToast } = useToast();
 
-  // Lo que pagó el cliente se rellena con lo que falta por cobrar
+  // Client paid defaults to the remaining balance
   const [amount, setAmount] = useState("");
   const [received, setReceived] = useState("");
   const [paidAt, setPaidAt] = useState(today);
@@ -50,7 +50,7 @@ function CommissionPayments({
   }, []);
 
   const platform = platforms.find((item) => item.id === platformId) ?? null;
-  // Lo que pagó el cliente (o lo que falta) menos la tarifa de la plataforma elegida
+  // What the client paid (or the remainder) minus the chosen platform's fee
   const clientPaidDraft = amount === "" ? summary.remaining : parsePriceOrNull(amount);
   const suggestedReceived =
     platform && clientPaidDraft ? receivedAfterFees(clientPaidDraft, platform) : null;
@@ -74,7 +74,7 @@ function CommissionPayments({
         throw new Error(t("Enter what the client paid"));
       }
 
-      // Sin "recibido" escrito, se usa el calculado con la tarifa de la plataforma (si hay)
+      // Without a typed "received", use the fee-based estimate (if any)
       await addPayment(commission.id, clientPaid, parsePrice(received) ?? suggestedReceived, paidAt, note);
       setAmount("");
       setReceived("");
@@ -132,7 +132,7 @@ function CommissionPayments({
                 <span>{dateFormatter.format(new Date(`${payment.paid_at}T00:00:00`))}</span>
                 <span className="font-semibold">{formatMoney(payment.amount, currency)}</span>
 
-                {/* Lo recibido se apunta cuando llega: Enter o al salir del campo */}
+                {/* Received is entered when it arrives: Enter or blur */}
                 <input
                   defaultValue={payment.received !== null ? String(payment.received).replace(".", ",") : ""}
                   placeholder={t("Not yet")}
@@ -201,7 +201,7 @@ function CommissionPayments({
                     value={platformId ?? ""}
                     onChange={(event) => {
                       const next = platforms.find((item) => item.id === Number(event.target.value)) ?? null;
-                      // La nota toma el nombre de la plataforma si estaba vacía o era la anterior
+                      // The note takes the platform name if empty or still the previous one
                       if (note === "" || note === platform?.name) setNote(next?.name ?? "");
                       setPlatformId(next?.id ?? null);
                     }}

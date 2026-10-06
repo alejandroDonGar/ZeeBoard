@@ -44,7 +44,7 @@ function SettingsPage() {
     getLastImportedPaymentDate().then(setLastImport).catch(console.error);
   }, []);
 
-  // Descarga desde 2 días antes del último cobro: los repetidos se saltan solos y no se escapa ninguno por el borde
+  // Download from 2 days before the last payment: repeats are skipped and none slips through the edge
   const downloadFrom = lastImport ? isoDay(new Date(new Date(`${lastImport}T12:00:00`).getTime() - 2 * 86400000)) : null;
 
   async function handleImportPaypal() {
@@ -76,14 +76,14 @@ function SettingsPage() {
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const [autoRunning, setAutoRunning] = useState(false);
 
-  // Guarda cualquier ajuste y refresca `auto`, que es una copia de todos
+  // Saves any setting and refreshes `auto`, a copy of all of them
   async function saveAuto(changes: Parameters<typeof updateSettings>[0]) {
     await updateSettings(changes);
     setAuto({ ...appSettings() });
   }
 
   async function handleToggleAuto(enabled: boolean) {
-    // Sin carpeta no hay dónde copiar: se pide al activarla
+    // Without a folder there's nowhere to copy: asked on enabling
     const folder = auto.auto_backup_folder ?? (enabled ? await pickFolder(t("Choose a folder for automatic backups")) : null);
 
     if (enabled && !folder) {
@@ -117,7 +117,7 @@ function SettingsPage() {
   }
 
   function savePlatforms() {
-    // Se guarda al salir de cada campo; las filas sin nombre no se guardan
+    // Saved on leaving each field; rows without a name aren't saved
     savePaymentPlatforms(platforms).catch(console.error);
   }
   const [storage, setStorage] = useState<StorageStats | null>(null);
@@ -127,7 +127,7 @@ function SettingsPage() {
     const [stats, usedPaths] = await Promise.all([getStorageStats(), getAllUsedImagePaths()]);
 
     setStorage(stats);
-    // Varias filas pueden compartir el mismo archivo
+    // Several rows can share the same file
     setImagesInUse(new Set(usedPaths).size);
   }
 
@@ -167,7 +167,7 @@ function SettingsPage() {
       setCleaningUp(true);
       setCleanUpMessage(null);
 
-      // Si la copia previa falla no se borra nada
+      // If the prior backup fails nothing is deleted
       try {
         await backupBeforeCleanup();
       } catch (error) {

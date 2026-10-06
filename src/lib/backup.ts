@@ -15,10 +15,10 @@ function getTimestampFolderName(): string {
 }
 
 /**
- * Hace una copia (base de datos + imágenes) en una carpeta con fecha dentro de `root`.
- * Con `keep`, deja solo las `keep` copias más recientes de `root`.
- * La base de datos se copia con VACUUM INTO (coherente aunque la app esté escribiendo);
- * las imágenes y la rotación van en Rust, que no depende de los permisos del selector de carpetas.
+ * Backs up the database and images into a dated folder inside `root`.
+ * With `keep`, only the `keep` most recent backups in `root` remain.
+ * The database is copied with VACUUM INTO (consistent while the app writes);
+ * images and rotation happen in Rust, which doesn't depend on folder-picker permissions.
  */
 export async function createBackup(root: string, keep?: number): Promise<string> {
   const backupPath = await join(root, getTimestampFolderName());
@@ -29,7 +29,7 @@ export async function createBackup(root: string, keep?: number): Promise<string>
     const database = await getDatabase();
     await database.execute("VACUUM INTO ?;", [await join(backupPath, DB_FILE_NAME)]);
   } catch (error) {
-    // finish_backup borra la carpeta a medias cuando falta la base de datos
+    // finish_backup deletes the half-made folder when the database is missing
     await invoke("finish_backup", { dir: backupPath, keep: null }).catch(() => {});
     throw error;
   }
@@ -45,7 +45,7 @@ export async function exportBackup(): Promise<string | null> {
   return destinationRoot ? await createBackup(destinationRoot) : null;
 }
 
-/** Copia automática: la primera vez que se abre la app cada día, si está activada y con carpeta. */
+/** Automatic backup: the first app open each day, if enabled and a folder is set. */
 export async function runAutoBackup(force = false): Promise<string | null> {
   const settings = appSettings();
 
@@ -68,7 +68,7 @@ export async function runAutoBackup(force = false): Promise<string | null> {
   return path;
 }
 
-/** Antes de borrar imágenes sin usar: copia completa en la carpeta de la app (se guardan las 2 últimas). */
+/** Before deleting unused images: full backup into the app folder (last 2 kept). */
 export async function backupBeforeCleanup(): Promise<void> {
   await createBackup(await join(await appDataDir(), "before-cleanup"), 2);
 }
@@ -78,25 +78,25 @@ export async function pickFolder(title: string): Promise<string | null> {
   return !folder || Array.isArray(folder) ? null : folder;
 }
 
-/** Pide la carpeta de un backup hecho con "Export backup". */
+/** Asks for the folder of a backup made with "Export backup". */
 export function pickBackupFolder(): Promise<string | null> {
   return pickFolder("Choose the backup folder to restore");
 }
 
 /**
- * Sustituye los datos actuales por los del backup y recarga la app.
- * Antes guarda una copia de los datos actuales (en la carpeta de la app, "before-restore").
+ * Replaces current data with the backup's and reloads the app.
+ * First saves a copy of the current data (in the app folder, "before-restore").
  */
 export async function restoreBackup(folder: string): Promise<void> {
   await closeDatabase();
 
-  // Si falla (por ejemplo, la carpeta no es un backup) no se ha tocado nada:
-  // el error sube y la base de datos se vuelve a abrir sola en el siguiente uso
+  // If it fails (e.g. the folder isn't a backup) nothing was touched:
+  // the error propagates and the database reopens itself on next use
   await invoke<string>("restore_backup", {
     backupDir: folder,
     stamp: getTimestampFolderName().replace("zeeboard-backup-", ""),
   });
 
-  // La app arranca de nuevo con los datos restaurados (y las migraciones los ponen al día)
+  // The app restarts with the restored data (migrations bring it up to date)
   window.location.reload();
 }

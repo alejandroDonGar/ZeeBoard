@@ -5,7 +5,7 @@ import { t } from "../lib/i18n";
 export type StatusFilter = "all" | "active" | "overdue";
 export type PaymentFilter = "all" | "unpaid" | "partial" | "paid";
 
-// Los personajes se filtran desde Clientes, no aquí
+// Characters are filtered from Clients, not here
 const HIDDEN_CATEGORIES = ["Characters"];
 
 export function Segmented<T extends string | number>({
@@ -37,7 +37,7 @@ export function Segmented<T extends string | number>({
   );
 }
 
-/** Búsqueda, etiquetas (menú), pago y estado en una sola línea; debajo, los filtros activos. */
+/** Search, tags (menu), payment and status in one row; active filters below. */
 function BoardFilters({
   tags,
   searchQuery,
@@ -115,7 +115,7 @@ function BoardFilters({
 
             {tagMenuOpen && (
               <>
-                {/* Capa invisible: un clic fuera cierra el menú */}
+                {/* Invisible layer: a click outside closes the menu */}
                 <div className="fixed inset-0 z-30" onClick={() => setTagMenuOpen(false)} />
 
                 <div className="absolute left-0 top-full z-40 mt-1 max-h-80 w-64 overflow-y-auto rounded-md border border-line bg-surface p-2 shadow-lg">

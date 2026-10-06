@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { applyTheme, getTheme } from "./lib/theme";
 
-// Antes de pintar nada, para que no haya un destello del tema equivocado
+// Before first paint, to avoid a flash of the wrong theme
 applyTheme(getTheme());
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

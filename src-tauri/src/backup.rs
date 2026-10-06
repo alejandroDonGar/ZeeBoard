@@ -1,8 +1,8 @@
-//! Restaurar una copia de seguridad hecha con "Export backup":
-//! una carpeta con `zeeboard.db` e `images/` (y `images/thumbs/`).
+//! Restore a backup made with "Export backup":
+//! a folder with `zeeboard.db` and `images/` (and `images/thumbs/`).
 //!
-//! El frontend cierra antes la base de datos (Windows no deja reemplazar un archivo abierto)
-//! y recarga la app después; al arrancar, las migraciones ponen al día los backups antiguos.
+//! The frontend closes the database first (Windows won't replace an open file)
+//! and reloads the app afterwards; on startup, migrations update old backups.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,8 +19,8 @@ fn is_sqlite_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Copia los archivos de `from` a `to` que aún no existen allí. Las imágenes se nombran por su
-/// contenido, así que un nombre repetido es la misma imagen: nunca se sobrescribe ni se borra nada.
+/// Copies files from `from` to `to` that don't exist there yet. Images are named by their
+/// content, so a repeated name is the same image: nothing is ever overwritten or deleted.
 fn copy_missing_files(from: &Path, to: &Path) -> Result<u32, String> {
     let Ok(entries) = fs::read_dir(from) else {
         return Ok(0);
@@ -41,7 +41,7 @@ fn copy_missing_files(from: &Path, to: &Path) -> Result<u32, String> {
     Ok(copied)
 }
 
-/// Devuelve la carpeta donde quedó la copia de seguridad de los datos que había antes.
+/// Returns the folder holding the safety copy of the data that was there before.
 fn restore(backup_dir: &Path, data_dir: &Path, stamp: &str) -> Result<PathBuf, String> {
     let backup_db = backup_dir.join(DB_FILE);
 
@@ -52,7 +52,7 @@ fn restore(backup_dir: &Path, data_dir: &Path, stamp: &str) -> Result<PathBuf, S
         ));
     }
 
-    // 1. Copia de seguridad de lo que hay ahora, por si el backup no era el que querías
+    // 1. Safety copy of the current data, in case the backup wasn't the one you wanted
     let safety_dir = data_dir.join("before-restore").join(stamp);
     fs::create_dir_all(&safety_dir).map_err(|error| error.to_string())?;
 
@@ -64,12 +64,12 @@ fn restore(backup_dir: &Path, data_dir: &Path, stamp: &str) -> Result<PathBuf, S
         }
     }
 
-    // 2. Restos del diario de la base de datos actual: aplicados sobre la restaurada la corromperían
+    // 2. Leftover journal of the current database: applied to the restored one it would corrupt it
     for name in ["zeeboard.db-wal", "zeeboard.db-shm", "zeeboard.db-journal"] {
         let _ = fs::remove_file(data_dir.join(name));
     }
 
-    // 3. Base de datos e imágenes del backup
+    // 3. The backup's database and images
     fs::copy(&backup_db, data_dir.join(DB_FILE)).map_err(|error| error.to_string())?;
     copy_missing_files(&backup_dir.join("images"), &data_dir.join("images"))?;
     copy_missing_files(&backup_dir.join("images").join("thumbs"), &data_dir.join("images").join("thumbs"))?;
@@ -79,8 +79,8 @@ fn restore(backup_dir: &Path, data_dir: &Path, stamp: &str) -> Result<PathBuf, S
 
 const BACKUP_PREFIX: &str = "zeeboard-backup-";
 
-/// Solo se rotan (borran) carpetas con el nombre exacto de las copias de ZeeBoard,
-/// p. ej. `zeeboard-backup-2026-10-06-1318`: nunca otra cosa que haya en esa carpeta.
+/// Only folders with the exact name of ZeeBoard backups are rotated (deleted),
+/// e.g. `zeeboard-backup-2026-10-06-1318`: never anything else in that folder.
 fn is_backup_name(name: &str) -> bool {
     let Some(stamp) = name.strip_prefix(BACKUP_PREFIX) else {
         return false;
@@ -92,7 +92,7 @@ fn is_backup_name(name: &str) -> bool {
         })
 }
 
-/// Deja solo las `keep` copias más recientes de `root` (los nombres ordenan por fecha).
+/// Keeps only the `keep` most recent backups in `root` (names sort by date).
 fn prune_backups(root: &Path, keep: usize) -> u32 {
     let Ok(entries) = fs::read_dir(root) else {
         return 0;
@@ -100,7 +100,7 @@ fn prune_backups(root: &Path, keep: usize) -> u32 {
 
     let mut backups: Vec<PathBuf> = entries
         .flatten()
-        // file_type no sigue enlaces simbólicos: un enlace nunca cuenta como carpeta
+        // file_type doesn't follow symlinks: a link never counts as a folder
         .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
         .filter(|entry| is_backup_name(&entry.file_name().to_string_lossy()))
         .map(|entry| entry.path())
@@ -118,9 +118,9 @@ fn discard_backup(dir: &Path) {
     }
 }
 
-/// Segunda mitad de una copia: la base de datos ya está en `dir` (la copia SQLite `VACUUM INTO`
-/// la hace el frontend). Añade las imágenes y, si se pide, rota las copias antiguas.
-/// Si algo falla no deja una carpeta a medias que parezca una copia buena.
+/// Second half of a backup: the database is already in `dir` (the SQLite `VACUUM INTO` copy
+/// is made by the frontend). Adds the images and, if asked, rotates old backups.
+/// On failure it leaves no half-made folder that looks like a good backup.
 fn finish(data_dir: &Path, dir: &Path, keep: Option<usize>) -> Result<u32, String> {
     if !is_sqlite_file(&dir.join(DB_FILE)) {
         discard_backup(dir);
@@ -136,13 +136,13 @@ fn finish(data_dir: &Path, dir: &Path, keep: Option<usize>) -> Result<u32, Strin
     }
 
     Ok(match (keep, dir.parent()) {
-        // Con al menos 1, la copia que acaba de hacerse nunca se borra
+        // With at least 1, the backup just made is never deleted
         (Some(keep), Some(root)) => prune_backups(root, keep.max(1)),
         _ => 0,
     })
 }
 
-/// Primera mitad de una copia: crea la carpeta (y las que falten por encima).
+/// First half of a backup: creates the folder (and any missing parents).
 #[tauri::command]
 pub fn prepare_backup(dir: String) -> Result<(), String> {
     let dir = Path::new(&dir);

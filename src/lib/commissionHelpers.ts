@@ -107,23 +107,23 @@ export function getDeadlineStatus(deadline: string | null) {
 export type PaymentStatus = "unpaid" | "partial" | "paid";
 
 export type PaymentSummary = {
-  /** Lo que han pagado los clientes */
+  /** What clients have paid */
   paid: number;
-  /** Lo que te ha llegado, de los pagos donde ya lo apuntaste */
+  /** What reached you, from payments where you entered it */
   received: number;
-  /** Lo que se quedó la plataforma, de esos mismos pagos */
+  /** What the platform kept, from those same payments */
   fees: number;
-  /** Lo que falta por cobrar del precio */
+  /** What's left to collect of the price */
   remaining: number;
-  /** Pagos de los que aún no apuntaste lo recibido */
+  /** Payments whose received amount isn't entered yet */
   pendingReceived: number;
   status: PaymentStatus;
 };
 
-/** Redondea a céntimos sin el error de coma flotante (149,985 → 149,99, no 149,98) */
+/** Rounds to cents without floating-point error (149.985 → 149.99, not 149.98) */
 export const round2 = (value: number) => Math.round(Number((value * 100).toPrecision(12))) / 100;
 
-/** Estado de pago de una comisión a partir de sus pagos: lo usan todas las pantallas. */
+/** Payment status of a commission from its payments: used by every screen. */
 export function paymentSummary(
   price: number | null,
   payments: { amount: number; received: number | null }[],
@@ -146,10 +146,10 @@ export const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; classN
   paid: { label: t("Paid"), className: "bg-green-50 text-green-700" },
 };
 
-// ponytail: tu usuario fijo en el código (es el mismo en todas tus redes); pasarlo a Ajustes si alguna vez cambia
+// ponytail: your handle is hardcoded (same on all your networks); move to Settings if it ever changes
 const ARTIST_HANDLE = "@AverageZebraBoy";
 
-/** Texto corto para la factura: "Rendered, 2 characters (Ana, Beto) - @AverageZebraBoy". */
+/** Short invoice text: "Rendered, 2 characters (Ana, Beto) - @AverageZebraBoy". */
 export function invoiceDescription(templateName: string | null, characterNames: string[]): string {
   const count = characterNames.length;
   const characters = count ? `${count} ${count === 1 ? "character" : "characters"} (${characterNames.join(", ")})` : "";
@@ -158,18 +158,18 @@ export function invoiceDescription(templateName: string | null, characterNames: 
   return detail ? `${detail} - ${ARTIST_HANDLE}` : ARTIST_HANDLE;
 }
 
-/** Full Colour a 160 con 2 personajes y rate 0.5: 160 + 50 % de 160 = 240 (el rate sale de Ajustes) */
+/** Full Colour at 160 with 2 characters and rate 0.5: 160 + 50% of 160 = 240 (rate comes from Settings) */
 export function calculateCommissionPrice(basePrice: number, characterCount: number, extraCharacterRate: number): number {
   const extraCharacters = Math.max(characterCount, 1) - 1;
   return round2(basePrice * (1 + extraCharacterRate * extraCharacters));
 }
 
-/** Lo que te llega de un pago tras la tarifa de la plataforma: importe − (importe × % + fijo) */
+/** What a payment nets after the platform fee: amount − (amount × % + fixed) */
 export function receivedAfterFees(amount: number, platform: { percent: number; fixed: number }): number {
   return round2(Math.max(amount - (amount * platform.percent) / 100 - platform.fixed, 0));
 }
 
-/** Lee un precio escrito a mano: acepta "186,84", "186.84" o "200". Vacío = sin precio. */
+/** Parses a typed price: accepts "186,84", "186.84" or "200". Empty = no price. */
 export function parsePrice(text: string): number | null {
   const clean = text.trim().replace(/\s/g, "").replace(",", ".");
 
@@ -186,7 +186,7 @@ export function parsePrice(text: string): number | null {
   return round2(value);
 }
 
-/** "200 EUR", "186,84 EUR": decimales solo cuando los hay, con el formato del sistema. */
+/** "200 EUR", "186,84 EUR": decimals only when present, in the system format. */
 export function formatMoney(amount: number, currency?: string | null): string {
   if (isPrivate()) {
     return "•••";
@@ -201,12 +201,12 @@ export function formatMoney(amount: number, currency?: string | null): string {
   })} ${currency || "EUR"}`;
 }
 
-/** Fecha local como "2026-10-06" (toISOString usaría UTC y puede salir un día corrido). */
+/** Local date as "2026-10-06" (toISOString uses UTC and can be off by a day). */
 export function isoDay(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-/** Las comisiones que aún no están terminadas (las que ocupan una plaza). */
+/** Commissions not finished yet (the ones that take a slot). */
 export async function loadOpenCommissions(): Promise<Commission[]> {
   const commissions = await getCommissions();
   const templateIds = [...new Set(commissions.map((c) => c.template_id).filter((id): id is number => id !== null))];

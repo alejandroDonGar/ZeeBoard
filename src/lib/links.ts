@@ -1,7 +1,7 @@
 /**
- * Detecta enlaces en un texto escrito por otra persona (referencias que envía un cliente).
- * Sirve cualquier enlace con https://, y también los escritos sin él, pero solo de estos servicios:
- * así "e.g." o "foto.png" no se convierten en enlaces.
+ * Detects links in text written by someone else (references a client sends).
+ * Any https:// link works, plus ones without it but only for these services,
+ * so "e.g." or "photo.png" don't become links.
  */
 const BARE_HOSTS = [
   "drive.google.com",
@@ -32,12 +32,12 @@ const BARE_HOSTS = [
 ];
 
 const BODY = String.raw`[^\s<>"')]*`;
-// Termina en una letra o número, para no llevarse el punto o la coma de la frase
+// Ends in a letter or digit, so it doesn't swallow the sentence's period or comma
 const END = String.raw`[^\s<>"')\.,;:!?]`;
 const hosts = BARE_HOSTS.map((host) => host.replace(/\./g, String.raw`\.`)).join("|");
 
-// Un solo grupo de captura: al partir el texto, los enlaces quedan en las posiciones impares.
-// (?<![\w.@/-]) evita enganchar un servicio dentro de otra palabra ("notdropbox.com/x").
+// A single capture group: when splitting the text, links land at the odd positions.
+// (?<![\w.@/-]) avoids matching a service inside another word ("notdropbox.com/x").
 const LINK = new RegExp(
   String.raw`((?:https?:\/\/|www\.)${BODY}${END}|(?<![\w.@/-])(?:${hosts})\/${BODY}${END})`,
   "gi",

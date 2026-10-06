@@ -1,13 +1,13 @@
-// Comprobación rápida de la exportación a CSV: npx tsx scripts/check-export.ts
+// Quick check of the CSV export: npx tsx scripts/check-export.ts
 import assert from "node:assert";
 import { buildCommissionsCsv, buildPaymentsCsv, buildQuarterlyCsv, quarterOf, toCsv } from "../src/lib/export";
 
-// Escapado: separador, comillas y saltos de línea van entre comillas; las fórmulas se marcan como texto
+// Escaping: separator, quotes and line breaks go in quotes; formulas are marked as text
 assert.strictEqual(
   toCsv(["a", "b"], [['Kai; "el" bueno', "línea\n2"], ["=SUM(A1)", "+34 600"]]),
   'a;b\r\n"Kai; ""el"" bueno";"línea\n2"\r\n\'=SUM(A1);\'+34 600\r\n',
 );
-// Números con coma decimal y vacíos sin nada
+// Numbers with decimal comma and empty values left blank
 assert.strictEqual(toCsv(["x"], [[186.84], [200], [null]]), "x\r\n186,84\r\n200,00\r\n\r\n");
 
 assert.strictEqual(quarterOf("2026-01-01"), "2026-Q1");
@@ -25,9 +25,9 @@ const data = {
   commissions: [commission(1, "EUR", 200), commission(2, "USD", 100)],
   payments: [
     payment(1, 1, 120, 113.78, "2026-09-30"), // Q3
-    payment(2, 1, 80, null, "2026-10-02"), //  Q4, sin "received"
+    payment(2, 1, 80, null, "2026-10-02"), //  Q4, no "received"
     payment(3, 1, 100, 96.5, "2026-10-05"), // Q4
-    payment(4, 2, 100, 95, "2026-10-03"), //   Q4 pero en dólares: no se mezcla con euros
+    payment(4, 2, 100, 95, "2026-10-03"), //   Q4 but in dollars: not mixed with euros
   ],
   templates: [{ id: 1, name: "Full Colour" }],
   stages: { 1: [{ id: 11, name: "Sketch" }, { id: 12, name: "Finished" }] } as never,
@@ -37,14 +37,14 @@ const quarterly = buildQuarterlyCsv(data).trim().split("\r\n");
 assert.strictEqual(quarterly[0], "Quarter;Currency;Payments;Client paid;Received;Fees;Payments without 'received'");
 assert.deepStrictEqual(quarterly.slice(1), [
   "2026-Q3;EUR;1;120,00;113,78;6,22;0",
-  "2026-Q4;EUR;2;180,00;96,50;3,50;1", // la comisión del pago sin "received" no se inventa
+  "2026-Q4;EUR;2;180,00;96,50;3,50;1", // the fee of a payment without "received" isn't invented
   "2026-Q4;USD;1;100,00;95,00;5,00;0",
 ]);
 
 const payments = buildPaymentsCsv(data).trim().split("\r\n");
 assert.strictEqual(payments.length, 5);
 assert.strictEqual(payments[1], "2026-09-30;C1;Client 1;EUR;120,00;113,78;6,22;");
-assert.strictEqual(payments[2], "2026-10-02;C1;Client 1;EUR;80,00;;;"); // sin lo recibido, tampoco comisión
+assert.strictEqual(payments[2], "2026-10-02;C1;Client 1;EUR;80,00;;;"); // without received, no fee either
 
 const commissions = buildCommissionsCsv(data).trim().split("\r\n");
 assert.strictEqual(commissions.length, 3);

@@ -3,7 +3,7 @@ import { importImageFromFile } from "./images";
 
 export type Account = { platform: string | null; handle: string | null };
 
-/** El usuario de Bluesky como lo espera su API ("name" → "name.bsky.social"), o null si no parece uno. */
+/** Bluesky handle as its API expects it ("name" → "name.bsky.social"), or null if invalid. */
 export function blueskyActor(handle: string): string | null {
   const actor = handle.trim().replace(/^@/, "").toLowerCase();
 
@@ -14,7 +14,7 @@ export function blueskyActor(handle: string): string | null {
   return actor.includes(".") ? actor : `${actor}.bsky.social`;
 }
 
-/** El usuario de Telegram (5 a 32 letras, números o _), o null. */
+/** Telegram username (5–32 letters, digits or _), or null. */
 export function telegramUser(handle: string): string | null {
   const user = handle.trim().replace(/^@/, "");
 
@@ -22,8 +22,8 @@ export function telegramUser(handle: string): string | null {
 }
 
 /**
- * La foto que muestra la página pública t.me/usuario (meta og:image).
- * Sin foto pública Telegram pone su propio logo, así que solo vale una dirección de su CDN de fotos.
+ * The photo shown on the public t.me/user page (og:image meta).
+ * Without a public photo Telegram shows its own logo, so only its photo CDN addresses count.
  */
 export function telegramImageFromHtml(html: string): string | null {
   const url = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.replace(/&amp;/g, "&");

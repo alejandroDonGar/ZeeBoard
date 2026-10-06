@@ -1,17 +1,17 @@
 import { t } from "./i18n";
 /**
- * Importar las respuestas del formulario de Google (CSV descargado de la hoja de respuestas).
- * Todo aquí es lógica pura: el CSV entra como texto y salen solicitudes listas para guardar.
+ * Import Google Form responses (CSV downloaded from the responses sheet).
+ * All pure logic: the CSV comes in as text and ready-to-save requests come out.
  */
 
-/** CSV estándar de Google: comillas dobles, comillas escapadas como "" y saltos de línea dentro de una celda. */
+/** Standard Google CSV: double quotes, quotes escaped as "" and line breaks inside a cell. */
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
   let quoted = false;
 
-  // Google separa con comas; un Excel en español guarda con punto y coma
+  // Google separates with commas; Spanish Excel saves with semicolons
   const body = text.replace(/^﻿/, "");
   const firstLine = body.split(/\r?\n/, 1)[0] ?? "";
   const separator = (firstLine.match(/;/g)?.length ?? 0) > (firstLine.match(/,/g)?.length ?? 0) ? ";" : ",";
@@ -53,8 +53,8 @@ export function parseCsv(text: string): string[][] {
 }
 
 /**
- * "2026/10/04 4:59:22 p. m. CET" (la de Google en español), "04/10/2026 16:59:22" o "2026-10-04 16:59".
- * Devuelve la fecha en ISO; si no la entiende, null.
+ * "2026/10/04 4:59:22 p. m. CET" (Google's Spanish format), "04/10/2026 16:59:22" or "2026-10-04 16:59".
+ * Returns the date as ISO; null if not understood.
  */
 export function parseTimestamp(text: string): string | null {
   const time = String.raw`[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(?:([ap])\.?\s*m\.?)?`;
@@ -90,15 +90,15 @@ const PLATFORM_WORDS: [RegExp, string][] = [
 
 const platformOf = (word: string) => PLATFORM_WORDS.find(([pattern]) => pattern.test(word))?.[1] ?? null;
 
-/** Para comparar usuarios: sin @ y sin mayúsculas. */
+/** To compare handles: no @, case-insensitive. */
 export function normalizeHandle(handle: string | null | undefined): string {
   return (handle ?? "").trim().replace(/^@/, "").toLowerCase();
 }
 
 /**
- * Saca la plataforma y el usuario de lo que escribió la gente:
- * "Telegram @usuario", "bsky -> @usuario", "twitter -> usuario", "usuario"…
- * Si no entiende nada, devuelve el texto tal cual como usuario y plataforma "Other".
+ * Extracts platform and handle from what people typed:
+ * "Telegram @user", "bsky -> @user", "twitter -> user", "user"…
+ * If nothing is understood, returns the text as the handle with platform "Other".
  */
 export function parseContact(raw: string): { platform: string; handle: string } {
   const text = raw.trim();
@@ -108,7 +108,7 @@ export function parseContact(raw: string): { platform: string; handle: string } 
     return { platform: "Email", handle: email };
   }
 
-  // Quita los signos sueltos de los bordes ("->", ":", comillas…), pero deja @ . _ - dentro del usuario
+  // Strips stray symbols at the edges ("->", ":", quotes…) but keeps @ . _ - inside the handle
   const tokens = text
     .split(/[\s,;|/]+/)
     .map((token) => token.replace(/^[^\w@]+|[^\w]+$/g, ""))
@@ -122,7 +122,7 @@ export function parseContact(raw: string): { platform: string; handle: string } 
     return { platform: platform ?? "Other", handle: text };
   }
 
-  // A los usuarios de redes se les pone @ para que todos queden escritos igual
+  // Social handles get an @ so they're all written the same way
   const social = platform === "Twitter / X" || platform === "Bluesky" || platform === "Telegram";
 
   return {
@@ -132,8 +132,8 @@ export function parseContact(raw: string): { platform: string; handle: string } 
 }
 
 /**
- * La cuenta que quiere que se etiquete al publicar: "Twitter @name", "bsky -> name"…
- * "none" (o vacío) = sin etiqueta; "same" = la misma del contacto. Un correo no es una cuenta que se pueda etiquetar.
+ * The account to tag when posting: "Twitter @name", "bsky -> name"…
+ * "none" (or empty) = no tag; "same" = the contact's account. An email isn't a taggable account.
  */
 export function parseTagAccount(
   text: string,

@@ -56,11 +56,11 @@ function ClientsPage({
   const [clientPlatform, setClientPlatform] = useState("Twitter / X");
   const [clientHandle, setClientHandle] = useState("");
   const [clientNotes, setClientNotes] = useState("");
-  // La cuenta que se etiqueta al publicar, como la escribirías: "Bluesky @name"
+  // The account tagged when posting, as you'd type it: "Bluesky @name"
   const [tagText, setTagText] = useState("");
   const [clientEmail, setClientEmailText] = useState("");
   const [fetchingAvatar, setFetchingAvatar] = useState(false);
-  // null = cerrado, "new" = crear, Client = editar
+  // null = closed, "new" = create, Client = edit
   const [clientForm, setClientForm] = useState<Client | "new" | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
@@ -100,7 +100,7 @@ function ClientsPage({
     setClientEmailText("");
   }
 
-  /** Guarda la cuenta de etiqueta del formulario; vacío o "none" la quita. */
+  /** Saves the form's tag account; empty or "none" removes it. */
   async function saveTag(clientId: number) {
     const tag = parseTagAccount(tagText, { platform: "Other", handle: "" });
     await setClientTag(clientId, tag?.platform ?? null, tag?.handle ?? null);
@@ -119,7 +119,7 @@ function ClientsPage({
       const newId = await createClient(clientName, clientPlatform, clientHandle, clientNotes);
       await saveTag(newId);
 
-      // La foto se busca en segundo plano para no hacerte esperar
+      // The photo is fetched in the background so you don't wait
       const tag = parseTagAccount(tagText, { platform: "Other", handle: "" });
       fetchAvatar([
         { platform: tag?.platform ?? null, handle: tag?.handle ?? null },
@@ -135,7 +135,7 @@ function ClientsPage({
 
       closeClientForm();
 
-      // El cliente nuevo es el de id más alto: se abre su ficha
+      // The new client has the highest id: open their profile
       const data = await loadClients();
       setSelectedClientId(Math.max(...data.map((client) => client.id)));
     } catch (error) {
@@ -195,7 +195,7 @@ function ClientsPage({
 
       setClients(data);
       setClientsReady(true);
-      // Se abre la ficha del primer cliente por orden alfabético
+      // Opens the first client alphabetically
       setSelectedClientId(
         [...data].sort((a, b) => a.name.localeCompare(b.name))[0]?.id ?? null,
       );
@@ -309,7 +309,7 @@ function ClientsPage({
     return colours[total % colours.length];
   }
 
-  /** Cuentas donde buscar su foto, por orden: primero la de etiqueta y luego la de contacto. */
+  /** Accounts to look up their photo, in order: tag account first, then contact. */
   function avatarAccounts(client: Client) {
     return [
       { platform: client.tag_platform, handle: client.tag_handle },
@@ -338,7 +338,7 @@ function ClientsPage({
     }
   }
 
-  /** Pone la foto a mano: sin `source` abre el selector; si no, es lo que arrastraste o pegaste. */
+  /** Sets the photo by hand: without `source` opens the picker; otherwise it's what you dropped or pasted. */
   async function handleSetAvatar(clientId: number, source?: string | File) {
     try {
       const picked = source ?? (await pickImagePaths())[0];
@@ -415,7 +415,7 @@ function ClientsPage({
     }
   }
 
-  /** Sin `sources` abre el selector; con ellas, vienen de arrastrar y soltar o de Ctrl+V. */
+  /** Without `sources` opens the picker; with them, they come from drag and drop or Ctrl+V. */
   async function handleAddCharacterReferences(characterId: number, sources?: (string | File)[]) {
     if (importingCharacterId !== null) {
       return;
@@ -457,17 +457,17 @@ function ClientsPage({
         handleAddCharacterReferences(Number(characterId), paths);
       }
 
-      // Soltar una imagen sobre la foto del cliente
+      // Dropping an image on the client's photo
       if (kind === "avatar") {
         handleSetAvatar(Number(characterId), paths[0]);
       }
     },
-    // Ctrl+V añade la imagen al personaje abierto en la ficha del cliente
+    // Ctrl+V adds the image to the character open in the client's profile
     onPaste: (files) => {
       if (selectedClient && expandedCharacterId !== null) {
         handleAddCharacterReferences(expandedCharacterId, files);
       } else if (selectedClient) {
-        // Sin personaje abierto, la imagen pegada es la foto del cliente
+        // With no character open, the pasted image is the client's photo
         handleSetAvatar(selectedClient.id, files[0]);
       }
     },
@@ -529,7 +529,7 @@ function ClientsPage({
       ).status,
   );
   const paidCommissionsCount = paymentStatuses.filter((status) => status === "paid").length;
-  // Sin pagar o con pago parcial
+  // Unpaid or partially paid
   const unpaidCommissionsCount = paymentStatuses.length - paidCommissionsCount;
 
   function handleOpenCommissionFromClient(commission: Commission) {
@@ -562,7 +562,7 @@ function ClientsPage({
   function renderAvatar(client: Client, size: "sm" | "lg") {
     const sizeClass = size === "sm" ? "h-9 w-9 text-xs" : "h-14 w-14 text-base";
 
-    // Ni la foto ni las iniciales identifican al cliente en modo privado
+    // In private mode neither the photo nor the initials identify the client
     if (isPrivate()) {
       return <div className={`${sizeClass} shrink-0 rounded-full bg-highlight`} />;
     }

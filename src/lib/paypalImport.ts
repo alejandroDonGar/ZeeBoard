@@ -1,24 +1,24 @@
 import { t } from "./i18n";
 /**
- * Importar la "Actividad" de PayPal (CSV): cada cobro se cruza con el cliente por su correo
- * y se propone como pago de su comisión con deuda. Lógica pura: el CSV entra como texto.
+ * Import PayPal "Activity" (CSV): each payment is matched to a client by email
+ * and proposed as a payment on their commission with a balance. Pure logic: the CSV comes in as text.
  */
 import { round2, paymentSummary } from "./commissionHelpers";
 import { parseCsv } from "./formImport";
 
 export type PaypalRow = {
   txId: string;
-  /** AAAA-MM-DD */
+  /** YYYY-MM-DD */
   date: string;
   currency: string;
-  /** Lo que pagó el cliente */
+  /** What the client paid */
   gross: number;
-  /** Lo que te llegó, ya sin comisión */
+  /** What reached you, after fees */
   net: number;
   email: string;
 };
 
-/** "1.234,56", "1,234.56", "-6,22" o "113.78". El último separador es el decimal. */
+/** "1.234,56", "1,234.56", "-6,22" or "113.78". The last separator is the decimal one. */
 export function parseAmount(text: string): number | null {
   const clean = text.trim().replace(/[^\d.,-]/g, "");
   const decimal = Math.max(clean.lastIndexOf(","), clean.lastIndexOf("."));
@@ -29,16 +29,16 @@ export function parseAmount(text: string): number | null {
   return clean !== "" && Number.isFinite(value) ? value : null;
 }
 
-/** "04/10/2026" (día primero, como lo exporta PayPal en español) o "2026-10-04". */
+/** "04/10/2026" (day first, as Spanish PayPal exports) or "2026-10-04". */
 export function parsePaypalDate(text: string): string | null {
   const iso = text.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
   const dayFirst = text.trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/);
 
-  // ponytail: si tu PayPal exportara mes/día/año (en inglés de EE. UU.), saldrían fechas cambiadas
+  // ponytail: if your PayPal exported month/day/year (US English), dates would come out swapped
   return iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : dayFirst ? `${dayFirst[3]}-${dayFirst[2].padStart(2, "0")}-${dayFirst[1].padStart(2, "0")}` : null;
 }
 
-/** Los cobros recibidos (importe positivo y completado) con correo del que paga. */
+/** Received payments (positive, completed) with the payer's email. */
 export function parsePaypalCsv(text: string): { rows: PaypalRow[]; error?: string } {
   const [header, ...lines] = parseCsv(text);
 
@@ -85,7 +85,7 @@ export function parsePaypalCsv(text: string): { rows: PaypalRow[]; error?: strin
 
 export type PaypalMatch = {
   row: PaypalRow;
-  /** ready: listo para importar · duplicate: ya importado · unknown: ningún cliente con ese correo · nodebt: ninguna comisión con deuda */
+  /** ready: can import · duplicate: already imported · unknown: no client with that email · nodebt: no commission with a balance */
   status: "ready" | "duplicate" | "unknown" | "nodebt";
   clientId: number | null;
   commissionId: number | null;
@@ -96,8 +96,8 @@ type MatchCommission = { id: number; client_id: number | null; price: number | n
 type MatchPayment = { commission_id: number; amount: number; received: number | null; external_id: string | null };
 
 /**
- * Cruza cada cobro con un cliente (por correo) y con su comisión con deuda en la misma divisa:
- * primero la que debe exactamente ese importe y, si no, la más antigua. Las ya importadas se saltan.
+ * Matches each payment to a client (by email) and to their commission with a balance in the same currency:
+ * first the one owing exactly that amount, else the oldest. Already imported ones are skipped.
  */
 export function matchPaypalRows(
   rows: PaypalRow[],
@@ -106,7 +106,7 @@ export function matchPaypalRows(
   payments: MatchPayment[],
 ): PaypalMatch[] {
   const imported = new Set(payments.map((payment) => payment.external_id).filter(Boolean));
-  // lo que cada comisión aún debe; baja a medida que se asignan cobros de este mismo archivo
+  // what each commission still owes; drops as payments from this same file are assigned
   const remaining = new Map(
     commissions.map((commission) => [
       commission.id,

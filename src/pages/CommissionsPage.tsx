@@ -13,6 +13,8 @@ import {
   parsePrice,
   paymentSummary,
   PAYMENT_STATUS_STYLE,
+  calculateCommissionPrice,
+  EXTRA_CHARACTER_RATE,
 } from "../lib/commissionHelpers";
 import {
   getTemplateStages,
@@ -349,6 +351,25 @@ function CommissionsPage() {
       setActiveCommissionId(null);
     }
   }
+
+  /** Precio automático: lo llaman los cambios de plantilla y personajes, nunca al abrir un formulario */
+  function applyAutoPrice(templateId: number | null, characterCount: number) {
+    const basePrice = templates.find((template) => template.id === templateId)?.base_price;
+
+    if (basePrice != null) {
+      setCommissionPrice(String(calculateCommissionPrice(basePrice, characterCount)).replace(".", ","));
+    }
+  }
+
+  const selectedTemplateBasePrice =
+    templates.find((template) => template.id === selectedTemplateId)?.base_price ?? null;
+  const extraCharacters = Math.max(selectedCharacterIds.length, 1) - 1;
+  const autoPriceHint =
+    selectedTemplateBasePrice === null
+      ? null
+      : extraCharacters === 0
+        ? `${formatMoney(selectedTemplateBasePrice)} base price`
+        : `${formatMoney(selectedTemplateBasePrice)} + ${EXTRA_CHARACTER_RATE * 100}% × ${extraCharacters} extra character${extraCharacters === 1 ? "" : "s"}`;
 
   async function loadPayments() {
     const payments = await getAllPayments();
@@ -1572,11 +1593,12 @@ function CommissionsPage() {
                                       key={character.id}
                                       type="button"
                                       onClick={() => {
-                                        setSelectedCharacterIds((current) =>
-                                          selected
-                                            ? current.filter((id) => id !== character.id)
-                                            : [...current, character.id],
-                                        );
+                                        const nextIds = selected
+                                          ? selectedCharacterIds.filter((id) => id !== character.id)
+                                          : [...selectedCharacterIds, character.id];
+
+                                        setSelectedCharacterIds(nextIds);
+                                        applyAutoPrice(selectedTemplateId, nextIds.length);
                                       }}
                                       className={
                                         selected
@@ -1665,11 +1687,11 @@ function CommissionsPage() {
 
                 <select
                   value={selectedTemplateId ?? ""}
-                  onChange={(event) =>
-                    setSelectedTemplateId(
-                      event.target.value ? Number(event.target.value) : null,
-                    )
-                  }
+                  onChange={(event) => {
+                    const templateId = event.target.value ? Number(event.target.value) : null;
+                    setSelectedTemplateId(templateId);
+                    applyAutoPrice(templateId, selectedCharacterIds.length);
+                  }}
                   className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 >
                   <option value="">Select template</option>
@@ -1680,13 +1702,16 @@ function CommissionsPage() {
                   ))}
                 </select>
 
-                <input
-                  value={commissionPrice}
-                  onChange={(event) => setCommissionPrice(event.target.value)}
-                  placeholder="Price, e.g. 186,84"
-                  inputMode="decimal"
-                  className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                />
+                <div>
+                  <input
+                    value={commissionPrice}
+                    onChange={(event) => setCommissionPrice(event.target.value)}
+                    placeholder="Price, e.g. 186,84"
+                    inputMode="decimal"
+                    className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
+                  />
+                  {autoPriceHint && <p className="mt-1 px-1 text-[11px] text-faint">{autoPriceHint}</p>}
+                </div>
 
                 <select
                   value={currency}

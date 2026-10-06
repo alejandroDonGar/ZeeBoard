@@ -1,6 +1,6 @@
-// Comprobación rápida de la lógica de pagos: npx tsx scripts/check-payments.ts
+// Comprobación rápida de pagos y precios: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { paymentSummary } from "../src/lib/commissionHelpers";
+import { calculateCommissionPrice, paymentSummary } from "../src/lib/commissionHelpers";
 
 // PayPal: el cliente paga 200, te llegan 186,84
 let s = paymentSummary(200, [{ amount: 200, received: 186.84 }]);
@@ -18,3 +18,11 @@ s = paymentSummary(0.3, [{ amount: 0.1, received: 0.1 }, { amount: 0.2, received
 assert.deepStrictEqual([s.status, s.paid, s.fees], ["paid", 0.3, 0]);
 
 console.log("payments ok");
+
+// Precio automático: base por el primer personaje, +50 % por cada extra
+assert.strictEqual(calculateCommissionPrice(160, 1), 160);
+assert.strictEqual(calculateCommissionPrice(160, 2), 240);
+assert.strictEqual(calculateCommissionPrice(160, 3), 320);
+assert.strictEqual(calculateCommissionPrice(160, 0), 160);
+assert.strictEqual(calculateCommissionPrice(99.99, 2), 149.99);
+console.log("prices ok");

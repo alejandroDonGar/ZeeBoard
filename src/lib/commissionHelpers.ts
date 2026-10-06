@@ -112,7 +112,8 @@ export type PaymentSummary = {
   status: PaymentStatus;
 };
 
-const round2 = (value: number) => Math.round(value * 100) / 100;
+/** Redondea a céntimos sin el error de coma flotante (149,985 → 149,99, no 149,98) */
+export const round2 = (value: number) => Math.round(Number((value * 100).toPrecision(12))) / 100;
 
 /** Estado de pago de una comisión a partir de sus pagos: lo usan todas las pantallas. */
 export function paymentSummary(
@@ -137,6 +138,15 @@ export const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; classN
   paid: { label: "Paid", className: "bg-green-50 text-green-700" },
 };
 
+/** Cada personaje después del primero suma este porcentaje del precio base */
+export const EXTRA_CHARACTER_RATE = 0.5;
+
+/** Full Colour a 160 con 2 personajes: 160 + 50 % de 160 = 240 */
+export function calculateCommissionPrice(basePrice: number, characterCount: number): number {
+  const extraCharacters = Math.max(characterCount, 1) - 1;
+  return round2(basePrice * (1 + EXTRA_CHARACTER_RATE * extraCharacters));
+}
+
 /** Lee un precio escrito a mano: acepta "186,84", "186.84" o "200". Vacío = sin precio. */
 export function parsePrice(text: string): number | null {
   const clean = text.trim().replace(/\s/g, "").replace(",", ".");
@@ -151,12 +161,12 @@ export function parsePrice(text: string): number | null {
     throw new Error(`"${text}" isn't a valid price. Use numbers like 186,84`);
   }
 
-  return Math.round(value * 100) / 100;
+  return round2(value);
 }
 
 /** "200 EUR", "186,84 EUR": decimales solo cuando los hay, con el formato del sistema. */
 export function formatMoney(amount: number, currency?: string | null): string {
-  const rounded = Math.round(amount * 100) / 100;
+  const rounded = round2(amount);
   const decimals = Number.isInteger(rounded) ? 0 : 2;
 
   return `${rounded.toLocaleString(undefined, {

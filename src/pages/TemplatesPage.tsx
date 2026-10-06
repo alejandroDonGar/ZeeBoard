@@ -8,10 +8,12 @@ import {
   getTemplateStages,
   getTemplates,
   saveTemplateStages,
+  updateTemplateBasePrice,
   updateTemplateName,
   type StageDraft,
   type Template,
 } from "../lib/database";
+import { EXTRA_CHARACTER_RATE, formatMoney, parsePrice } from "../lib/commissionHelpers";
 import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
@@ -82,6 +84,7 @@ function TemplatesPage() {
   const [summaries, setSummaries] = useState<Record<number, TemplateSummary>>({});
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [editBasePrice, setEditBasePrice] = useState("");
   const [editStages, setEditStages] = useState<EditableStage[]>([]);
   const [newStageName, setNewStageName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -116,12 +119,14 @@ function TemplatesPage() {
 
     if (!template) {
       setEditName("");
+      setEditBasePrice("");
       setEditStages([]);
       return;
     }
 
     const stages = await getTemplateStages(template.id);
     setEditName(template.name);
+    setEditBasePrice(template.base_price !== null ? String(template.base_price).replace(".", ",") : "");
     setEditStages(stages.map(({ id, name }) => ({ id, name, key: String(id) })));
   }
 
@@ -148,6 +153,7 @@ function TemplatesPage() {
     try {
       setSaving(true);
       await updateTemplateName(selectedTemplate.id, editName);
+      await updateTemplateBasePrice(selectedTemplate.id, parsePrice(editBasePrice));
       await saveTemplateStages(selectedTemplate.id, editStages);
       await loadTemplates(selectedTemplate.id);
       showToast("Template saved.", "success");
@@ -206,7 +212,13 @@ function TemplatesPage() {
       return "";
     }
 
-    const stages = `${summary.stages} ${summary.stages === 1 ? "stage" : "stages"}`;
+    const template = templates.find((item) => item.id === templateId);
+    const stages = [
+      template?.base_price != null ? formatMoney(template.base_price) : null,
+      `${summary.stages} ${summary.stages === 1 ? "stage" : "stages"}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
     return summary.commissions > 0 ? `${stages} · ${summary.commissions} in use` : stages;
   }
 
@@ -282,6 +294,20 @@ function TemplatesPage() {
                   Delete
                 </button>
               </div>
+
+              <label className="mt-4 flex items-center gap-3 px-2 text-sm">
+                <span className="text-muted">Base price</span>
+                <input
+                  value={editBasePrice}
+                  onChange={(event) => setEditBasePrice(event.target.value)}
+                  placeholder="160"
+                  inputMode="decimal"
+                  className="w-28 rounded-md border border-line-strong bg-paper px-2 py-1 text-sm font-bold outline-none focus:border-ink"
+                />
+                <span className="text-xs text-faint">
+                  for one character · +{EXTRA_CHARACTER_RATE * 100}% per extra character
+                </span>
+              </label>
 
               <h4 className="mb-2 mt-6 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
                 Stages · {editStages.length}

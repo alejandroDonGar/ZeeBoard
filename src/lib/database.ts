@@ -30,6 +30,8 @@ async function runSerialized<T>(
 export type Template = {
   id: number;
   name: string;
+  /** Precio por un personaje; cada personaje extra suma un porcentaje (ver calculateCommissionPrice) */
+  base_price: number | null;
 };
 
 export type TemplateStage = {
@@ -89,6 +91,8 @@ export async function initializeDatabase() {
       name TEXT NOT NULL
     );
   `);
+
+  await database.execute(`ALTER TABLE templates ADD COLUMN base_price REAL;`).catch(() => {});
 
   await database.execute(`
     CREATE TABLE IF NOT EXISTS template_stages (
@@ -220,7 +224,7 @@ export async function getTemplates(): Promise<Template[]> {
   const database = await getDatabase();
 
   return await database.select<Template[]>(`
-    SELECT id, name
+    SELECT id, name, base_price
     FROM templates
     ORDER BY id DESC;
   `);
@@ -308,7 +312,7 @@ export async function duplicateTemplate(templateId: number): Promise<void> {
 
   const templates = await database.select<Template[]>(
     `
-    SELECT id, name
+    SELECT id, name, base_price
     FROM templates
     WHERE id = ?;
     `,
@@ -324,10 +328,10 @@ export async function duplicateTemplate(templateId: number): Promise<void> {
 
   const result = await database.execute(
     `
-    INSERT INTO templates (name)
-    VALUES (?);
+    INSERT INTO templates (name, base_price)
+    VALUES (?, ?);
     `,
-    [`${sourceTemplate.name} Copy`],
+    [`${sourceTemplate.name} Copy`, sourceTemplate.base_price],
   );
 
   const newTemplateId = result.lastInsertId;
@@ -345,6 +349,12 @@ export async function duplicateTemplate(templateId: number): Promise<void> {
       [newTemplateId, stage.name, stage.stage_order],
     );
   }
+}
+
+export async function updateTemplateBasePrice(templateId: number, basePrice: number | null): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE templates SET base_price = ? WHERE id = ?;`, [basePrice, templateId]);
 }
 
 export async function updateTemplateName(

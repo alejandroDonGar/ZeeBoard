@@ -17,6 +17,8 @@ import {
   updateClientAvatar,
   getClientCharacters,
   createClientCharacter,
+  updateClientCharacter,
+  deleteClientCharacter,
   getCharacterReferences,
   createCharacterReference,
   deleteCharacterReference,
@@ -60,7 +62,11 @@ function ClientsPage({
   const [commissionCharactersById, setCommissionCharactersById] = useState<Record<number, number[]>>({});
   const [expandedCharacterId, setExpandedCharacterId] = useState<number | null>(null);
   const [newCharacterName, setNewCharacterName] = useState("");
-  const [newCharacterNotes, setNewCharacterNotes] = useState("");
+  const [addingCharacter, setAddingCharacter] = useState(false);
+  const [editingCharacter, setEditingCharacter] = useState(false);
+  const [editCharacterName, setEditCharacterName] = useState("");
+  const [editCharacterNotes, setEditCharacterNotes] = useState("");
+  const [characterToDelete, setCharacterToDelete] = useState<ClientCharacter | null>(null);
   const { showToast } = useToast();
 
   async function loadClients() {
@@ -336,22 +342,57 @@ function ClientsPage({
       return;
     }
 
-    await createClientCharacter(
-      selectedClient.id,
-      newCharacterName,
-      newCharacterNotes,
-    );
+    if (!newCharacterName.trim()) {
+      return;
+    }
 
-    const updatedCharacters =
-      await getClientCharacters(selectedClient.id);
+    await createClientCharacter(selectedClient.id, newCharacterName, "");
+    await reloadCharacters(selectedClient.id);
+
+    setNewCharacterName("");
+    setAddingCharacter(false);
+  }
+
+  async function reloadCharacters(clientId: number) {
+    const updatedCharacters = await getClientCharacters(clientId);
 
     setCharactersByClientId((current) => ({
       ...current,
-      [selectedClient.id]: updatedCharacters,
+      [clientId]: updatedCharacters,
     }));
 
-    setNewCharacterName("");
-    setNewCharacterNotes("");
+    return updatedCharacters;
+  }
+
+  async function handleSaveCharacter(characterId: number) {
+    if (!selectedClient) {
+      return;
+    }
+
+    try {
+      await updateClientCharacter(characterId, editCharacterName, editCharacterNotes);
+      await reloadCharacters(selectedClient.id);
+      setEditingCharacter(false);
+    } catch (error) {
+      console.error(error);
+      showToast("Could not save character.", "error");
+    }
+  }
+
+  async function handleDeleteCharacter(characterId: number) {
+    if (!selectedClient) {
+      return;
+    }
+
+    try {
+      await deleteClientCharacter(characterId);
+      await reloadCharacters(selectedClient.id);
+      setExpandedCharacterId(null);
+      showToast("Character deleted.", "success");
+    } catch (error) {
+      console.error(error);
+      showToast("Could not delete character.", "error");
+    }
   }
 
   /** Sin `sources` abre el selector; con ellas, vienen de arrastrar y soltar o de Ctrl+V. */
@@ -392,11 +433,11 @@ function ClientsPage({
     onDrop: (zoneId, paths) => {
       const [kind, characterId] = zoneId.split(":");
 
-      if (kind === "character") {
+      if (kind === "character" || kind === "character-detail") {
         handleAddCharacterReferences(Number(characterId), paths);
       }
     },
-    // Ctrl+V añade la imagen al personaje desplegado en la ficha del cliente
+    // Ctrl+V añade la imagen al personaje abierto en la ficha del cliente
     onPaste: (files) => {
       if (selectedClient && expandedCharacterId !== null) {
         handleAddCharacterReferences(expandedCharacterId, files);
@@ -490,6 +531,10 @@ function ClientsPage({
     return isCommissionCompletedHelper(commission, templateStagesByTemplateId);
   }
 
+  const selectedCharacters = selectedClient ? charactersByClientId[selectedClient.id] ?? [] : [];
+  const openCharacter =
+    selectedCharacters.find((character) => character.id === expandedCharacterId) ?? null;
+
   const visibleClients = [...clients]
     .filter((client) =>
       `${client.name} ${client.handle ?? ""}`.toLowerCase().includes(clientSearch.trim().toLowerCase()),
@@ -550,7 +595,11 @@ function ClientsPage({
                   <button
                     key={client.id}
                     type="button"
-                    onClick={() => setSelectedClientId(client.id)}
+                    onClick={() => {
+                      setSelectedClientId(client.id);
+                      setExpandedCharacterId(null);
+                      setAddingCharacter(false);
+                    }}
                     className={`flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition ${
                       client.id === selectedClientId ? "bg-highlight" : "hover:bg-paper"
                     }`}
@@ -726,222 +775,284 @@ function ClientsPage({
                 </div>
               )}
 
-              <div className="mt-6 rounded-3xl bg-paper p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                    Characters
-                  </p>
+              <h4 className="mb-2 mt-8 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
+                Characters · {selectedCharacters.length}
+              </h4>
 
-                  <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-muted">
-                    {(charactersByClientId[selectedClient.id] ?? []).length}
-                  </span>
-                </div>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+                {selectedCharacters.map((character) => {
+                  const references = referencesByCharacterId[character.id] ?? [];
+                  const usedIn = commissions.filter((commission) =>
+                    (commissionCharactersById[commission.id] ?? []).includes(character.id),
+                  ).length;
+                  const isOpen = expandedCharacterId === character.id;
+                  const isDropTarget = dragZoneId === `character:${character.id}`;
 
-                <div className="mt-4 flex gap-2">
-                  <input
-                    value={newCharacterName}
-                    onChange={(event) =>
-                      setNewCharacterName(event.target.value)
-                    }
-                    placeholder="Character name"
-                    className="flex-1 rounded-2xl border border-line-strong bg-surface px-4 py-2"
-                  />
+                  return (
+                    <button
+                      key={character.id}
+                      type="button"
+                      data-image-drop={`character:${character.id}`}
+                      onClick={() => {
+                        setEditingCharacter(false);
+                        setExpandedCharacterId(isOpen ? null : character.id);
+                      }}
+                      className={`rounded-md border p-3 text-left transition ${
+                        isDropTarget
+                          ? "scale-[1.02] border-ink bg-highlight"
+                          : isOpen
+                            ? "border-ink bg-paper"
+                            : "border-line bg-paper hover:border-line-strong"
+                      }`}
+                    >
+                      <p className="truncate text-sm font-bold">{character.name}</p>
+                      <p className="text-[11px] text-faint">
+                        {importingCharacterId === character.id
+                          ? "Optimizing…"
+                          : isDropTarget
+                            ? "Drop to add references"
+                            : `${references.length} refs · ${usedIn} commissions`}
+                      </p>
 
-                  <button
-                    onClick={handleCreateCharacter}
-                    className="rounded-2xl bg-primary px-4 py-2 text-sm font-black text-on-primary"
-                  >
-                    Add
-                  </button>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  {(charactersByClientId[selectedClient.id] ?? []).map((character) => {
-                    const references = referencesByCharacterId[character.id] ?? [];
-
-                    const commissionsUsingCharacter = commissions.filter((commission) =>
-                      (commissionCharactersById[commission.id] ?? []).includes(character.id),
-                    );
-
-                    const lastUsedCommission =
-                      commissionsUsingCharacter.length > 0
-                        ? [...commissionsUsingCharacter].sort(
-                            (a, b) =>
-                              new Date(b.created_at).getTime() -
-                              new Date(a.created_at).getTime(),
-                          )[0]
-                        : null;
-
-                    return (
-                      <div
-                        key={character.id}
-                        className="rounded-2xl bg-surface p-3 shadow-sm"
-                      >
-                        <button
-                          onClick={() =>
-                            setExpandedCharacterId(
-                              expandedCharacterId === character.id
-                                ? null
-                                : character.id,
-                            )
-                          }
-                          className="flex w-full items-center justify-between"
-                        >
-                          <div className="text-left">
-                            <p className="font-black">
-                              {character.name}
-                            </p>
-
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <span className="rounded-sm bg-paper px-3 py-1 text-xs font-black text-muted shadow-sm">
-                                {references.length} refs
+                      <div className="mt-2 grid grid-cols-4 gap-1">
+                        {references.slice(0, 4).map((reference, index) => (
+                          <div key={reference.id} className="relative aspect-square overflow-hidden rounded-sm bg-highlight">
+                            <img
+                              src={thumbUrl(reference.image_data_url)}
+                              loading="lazy" decoding="async"
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                            {index === 3 && references.length > 4 && (
+                              <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-bold text-white">
+                                +{references.length - 4}
                               </span>
-
-                              <span className="rounded-sm bg-paper px-3 py-1 text-xs font-black text-muted shadow-sm">
-                                {commissionsUsingCharacter.length} commissions
-                              </span>
-                            </div>
-
-                            {lastUsedCommission && (
-                              <p className="mt-2 text-xs font-semibold text-faint">
-                                Last used in{" "}
-                                <span className="font-black text-ink">
-                                  {lastUsedCommission.title}
-                                </span>
-                              </p>
                             )}
                           </div>
+                        ))}
 
-                          <span className="text-lg font-black">
-                            {expandedCharacterId === character.id ? "−" : "+"}
-                          </span>
-                        </button>
-
-                        {expandedCharacterId === character.id && (
-                          <div className="mt-4">
-                            <button
-                              type="button"
-                              data-image-drop={`character:${character.id}`}
-                              title="Click, drop images here or paste with Ctrl+V"
-                              disabled={importingCharacterId !== null}
-                              onClick={() => handleAddCharacterReferences(character.id)}
-                              className={`block w-full cursor-pointer rounded-2xl border border-dashed px-4 py-3 text-center text-xs font-black transition hover:border-ink disabled:cursor-wait disabled:opacity-60 ${
-                                dragZoneId === `character:${character.id}`
-                                  ? "scale-[1.02] border-ink bg-highlight text-ink"
-                                  : "border-line-strong bg-paper text-muted"
-                              }`}
-                            >
-                              {importingCharacterId === character.id
-                                ? "Optimizing…"
-                                : dragZoneId === `character:${character.id}`
-                                  ? "Drop to add"
-                                  : "Add reference"}
-                            </button>
-
-                            {references.length === 0 ? (
-                              <p className="mt-3 text-center text-sm text-faint">
-                                No references yet.
-                              </p>
-                            ) : (
-                              <div className="mt-4 grid grid-cols-4 gap-3">
-                                {references.map((reference) => (
-                                  <div
-                                    key={reference.id}
-                                    className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm"
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setZoomedImage(imageUrl(reference.image_data_url))
-                                      }
-                                      className="block w-full"
-                                    >
-                                      <img
-                                        src={thumbUrl(reference.image_data_url)}
-                                        loading="lazy" decoding="async"
-                                        alt={reference.label}
-                                        className="aspect-square w-full object-cover"
-                                      />
-                                    </button>
-
-                                    <div className="flex items-center justify-between px-2 py-1">
-                                      <span className="truncate text-[10px] font-black text-muted">
-                                        {reference.label}
-                                      </span>
-
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleDeleteCharacterReference(
-                                            character.id,
-                                            reference.id,
-                                          )
-                                        }
-                                        className="text-[10px] font-black text-red-500"
-                                      >
-                                        ×
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            <div className="mt-6">
-                              <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-faint">
-                                  Commission history
-                              </p>
-
-                              {commissionsUsingCharacter.length === 0 ? (
-                                  <p className="text-center text-sm text-faint">
-                                  No commissions yet.
-                                  </p>
-                              ) : (
-                                  <div className="grid grid-cols-4 gap-3">
-                                  {commissionsUsingCharacter.map((historyCommission) => {
-                                      const historyImages = stageImagesByCommissionId[historyCommission.id] ?? [];
-                                      const latestHistoryImage =
-                                      historyImages.length > 0
-                                          ? historyImages[historyImages.length - 1]
-                                          : null;
-
-                                      return (
-                                      <button
-                                          key={historyCommission.id}
-                                          type="button"
-                                          onClick={() => handleOpenCommissionFromClient(historyCommission)}
-                                          className="overflow-hidden rounded-2xl border border-line bg-surface text-left shadow-sm transition hover:scale-[1.02] hover:border-ink"
-                                      >
-                                          {latestHistoryImage ? (
-                                          <img
-                                              src={thumbUrl(latestHistoryImage.image_data_url)}
-                                              loading="lazy" decoding="async"
-                                              alt={historyCommission.title}
-                                              className="aspect-square w-full object-cover"
-                                          />
-                                          ) : (
-                                          <div className="flex aspect-square items-center justify-center bg-paper text-[10px] text-faint">
-                                              No image
-                                          </div>
-                                          )}
-
-                                          <div className="px-2 py-1">
-                                          <p className="truncate text-[10px] font-black text-muted">
-                                              {historyCommission.title}
-                                          </p>
-                                          </div>
-                                      </button>
-                                      );
-                                  })}
-                                  </div>
-                              )}
-                              </div>
+                        {references.length === 0 && (
+                          <div className="col-span-4 flex aspect-[4/1] items-center justify-center rounded-sm border border-dashed border-line-strong text-[11px] text-faint">
+                            No references
                           </div>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
+                    </button>
+                  );
+                })}
+
+                {addingCharacter ? (
+                  <div className="flex flex-col justify-center gap-2 rounded-md border border-line-strong bg-paper p-3">
+                    <input
+                      autoFocus
+                      value={newCharacterName}
+                      onChange={(event) => setNewCharacterName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") handleCreateCharacter();
+                        if (event.key === "Escape") setAddingCharacter(false);
+                      }}
+                      placeholder="Character name"
+                      className="rounded-md border border-line-strong bg-surface px-2 py-1.5 text-sm outline-none focus:border-ink"
+                    />
+                    <div className="flex justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setAddingCharacter(false)}
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-muted hover:text-ink"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateCharacter}
+                        disabled={!newCharacterName.trim()}
+                        className="rounded-md bg-primary px-2 py-1 text-xs font-bold text-on-primary disabled:opacity-50"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAddingCharacter(true)}
+                    className="flex min-h-24 items-center justify-center rounded-md border border-dashed border-line-strong text-sm font-semibold text-muted transition hover:border-ink hover:text-ink"
+                  >
+                    + Character
+                  </button>
+                )}
               </div>
+
+              {openCharacter && (() => {
+                const character = openCharacter;
+                const references = referencesByCharacterId[character.id] ?? [];
+                const commissionsUsingCharacter = commissions.filter((commission) =>
+                  (commissionCharactersById[commission.id] ?? []).includes(character.id),
+                );
+                const isDropTarget = dragZoneId === `character-detail:${character.id}`;
+
+                return (
+                  <div className="mt-4 rounded-md border border-line p-4">
+                    {editingCharacter ? (
+                      <div className="space-y-2">
+                        <input
+                          autoFocus
+                          value={editCharacterName}
+                          onChange={(event) => setEditCharacterName(event.target.value)}
+                          placeholder="Character name"
+                          className="w-full rounded-md border border-line-strong bg-paper px-3 py-2 text-sm font-bold"
+                        />
+                        <textarea
+                          value={editCharacterNotes}
+                          onChange={(event) => setEditCharacterNotes(event.target.value)}
+                          placeholder="Notes: species, colours, details to remember…"
+                          rows={3}
+                          className="w-full rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingCharacter(false)}
+                            className="rounded-md px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveCharacter(character.id)}
+                            disabled={!editCharacterName.trim()}
+                            className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-lg font-black">{character.name}</p>
+                          {character.notes ? (
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-muted">{character.notes}</p>
+                          ) : (
+                            <p className="mt-1 text-sm text-faint">No notes yet.</p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditCharacterName(character.name);
+                            setEditCharacterNotes(character.notes ?? "");
+                            setEditingCharacter(true);
+                          }}
+                          className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCharacterToDelete(character)}
+                          className="rounded-md px-3 py-1.5 text-xs font-semibold text-red-500 transition hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+
+                    <p className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.16em] text-faint">
+                      References · {references.length}
+                    </p>
+
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2">
+                      {references.map((reference) => (
+                        <div key={reference.id} className="group relative aspect-square overflow-hidden rounded-md bg-highlight">
+                          <button
+                            type="button"
+                            onClick={() => setZoomedImage(imageUrl(reference.image_data_url))}
+                            className="block h-full w-full cursor-zoom-in"
+                          >
+                            <img
+                              src={thumbUrl(reference.image_data_url)}
+                              loading="lazy" decoding="async"
+                              alt={reference.label}
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            title="Remove reference"
+                            onClick={() => handleDeleteCharacterReference(character.id, reference.id)}
+                            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-sm bg-black/60 text-sm text-white opacity-0 transition hover:bg-red-500 group-hover:opacity-100"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        data-image-drop={`character-detail:${character.id}`}
+                        title="Click, drop images here or paste with Ctrl+V"
+                        disabled={importingCharacterId !== null}
+                        onClick={() => handleAddCharacterReferences(character.id)}
+                        className={`flex aspect-square flex-col items-center justify-center rounded-md border border-dashed text-center text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
+                          isDropTarget
+                            ? "border-ink bg-highlight text-ink"
+                            : "border-line-strong text-muted hover:border-ink hover:text-ink"
+                        }`}
+                      >
+                        <span className="text-lg">+</span>
+                        {importingCharacterId === character.id
+                          ? "Optimizing…"
+                          : isDropTarget
+                            ? "Drop here"
+                            : "Add · Ctrl+V"}
+                      </button>
+                    </div>
+
+                    {commissionsUsingCharacter.length > 0 && (
+                      <>
+                        <p className="mb-2 mt-5 text-[10px] font-black uppercase tracking-[0.16em] text-faint">
+                          Appears in · {commissionsUsingCharacter.length}
+                        </p>
+
+                        <div className="flex flex-wrap gap-2">
+                          {commissionsUsingCharacter.map((historyCommission) => {
+                            const historyImages = stageImagesByCommissionId[historyCommission.id] ?? [];
+                            const latestHistoryImage = historyImages[historyImages.length - 1] ?? null;
+
+                            return (
+                              <button
+                                key={historyCommission.id}
+                                type="button"
+                                title={historyCommission.title}
+                                onClick={() => handleOpenCommissionFromClient(historyCommission)}
+                                className="w-24 text-left"
+                              >
+                                {latestHistoryImage ? (
+                                  <img
+                                    src={thumbUrl(latestHistoryImage.image_data_url)}
+                                    loading="lazy" decoding="async"
+                                    alt={historyCommission.title}
+                                    className="aspect-square w-full rounded-md object-cover transition hover:opacity-80"
+                                  />
+                                ) : (
+                                  <div className="flex aspect-square items-center justify-center rounded-md bg-paper text-[10px] text-faint">
+                                    No image
+                                  </div>
+                                )}
+                                <p className="mt-1 truncate text-[11px] font-semibold text-muted">
+                                  {historyCommission.title}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
 
               {selectedClient.notes && (
                 <>
@@ -1034,6 +1145,20 @@ function ClientsPage({
             </div>
           </div>
         </div>
+      )}
+
+      {characterToDelete && (
+        <ConfirmModal
+          eyebrow="Delete character"
+          title={characterToDelete.name}
+          message="Its references are deleted too, and it's removed from any commissions. This can't be undone."
+          confirmLabel="Delete"
+          onConfirm={async () => {
+            await handleDeleteCharacter(characterToDelete.id);
+            setCharacterToDelete(null);
+          }}
+          onCancel={() => setCharacterToDelete(null)}
+        />
       )}
 
       {clientToDelete && (

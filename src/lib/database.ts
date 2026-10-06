@@ -993,29 +993,40 @@ export async function deleteClientCharacter(
 ): Promise<void> {
   const database = await getDatabase();
 
-  await database.execute(
-    `
-    DELETE FROM character_references
-    WHERE character_id = ?;
-    `,
+  const references = await database.select<{ image_data_url: string }[]>(
+    `SELECT image_data_url FROM character_references WHERE character_id = ?;`,
     [characterId],
   );
 
-  await database.execute(
-    `
-    DELETE FROM commission_characters
-    WHERE character_id = ?;
-    `,
-    [characterId],
-  );
+  await runSerialized(async (serialized) => {
+    await serialized.execute(`DELETE FROM character_references WHERE character_id = ?;`, [characterId]);
+    await serialized.execute(`DELETE FROM commission_characters WHERE character_id = ?;`, [characterId]);
+    await serialized.execute(`DELETE FROM client_characters WHERE id = ?;`, [characterId]);
+  });
 
-  await database.execute(
-    `
-    DELETE FROM client_characters
-    WHERE id = ?;
-    `,
-    [characterId],
-  );
+  // Sus imágenes se borran del disco si ya no las usa nadie más
+  for (const reference of references) {
+    await deleteImageIfUnused(reference.image_data_url);
+  }
+}
+
+export async function updateClientCharacter(
+  characterId: number,
+  name: string,
+  notes: string,
+): Promise<void> {
+  const database = await getDatabase();
+  const cleanName = name.trim();
+
+  if (!cleanName) {
+    throw new Error("Character name is required");
+  }
+
+  await database.execute(`UPDATE client_characters SET name = ?, notes = ? WHERE id = ?;`, [
+    cleanName,
+    notes.trim() || null,
+    characterId,
+  ]);
 }
 
 export async function getCharacterReferences(

@@ -6,6 +6,8 @@ import {
   createCommission,
   deleteRequest,
   getClients,
+  getTags,
+  replaceCommissionTags,
   getRequests,
   getTemplates,
   importRequests,
@@ -19,7 +21,7 @@ import {
   type Template,
 } from "../lib/database";
 import { calculateCommissionPrice, formatMoney, loadOpenCommissions } from "../lib/commissionHelpers";
-import { normalizeHandle, parseResponses } from "../lib/formImport";
+import { autoTagIds, normalizeHandle, parseResponses } from "../lib/formImport";
 import { REQUESTS_CHANGED, syncFormResponses } from "../lib/formSync";
 import { fetchAvatar } from "../lib/avatars";
 import { hide } from "../lib/privacy";
@@ -176,6 +178,9 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
         null,
         request.details ?? "",
       );
+
+      // Etiquetas de tipo y de número de personajes, sin tocarlas a mano
+      await replaceCommissionTags(commissionId, autoTagIds(template?.name ?? null, request.characters, await getTags()));
 
       await setRequestStatus(request.id, "accepted", commissionId);
       localStorage.setItem("zeeboard-active-commission-id", String(commissionId));

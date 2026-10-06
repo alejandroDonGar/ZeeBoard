@@ -655,12 +655,6 @@ function CommissionsPage() {
   }
 
   const activeDeadlineStatus = activeCommission ? getDeadlineStatus(activeCommission.deadline) : null;
-  const activePaymentStatus =
-    PAYMENT_STATUS_STYLE[
-      activeCommission
-        ? paymentSummary(activeCommission.price, paymentsByCommissionId[activeCommission.id] ?? []).status
-        : "unpaid"
-    ];
   const activeCharacters = activeCommission
     ? Object.values(charactersByClientId)
         .flat()
@@ -919,9 +913,6 @@ function CommissionsPage() {
                     </p>
 
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className={`rounded-sm px-2 py-0.5 text-xs font-bold ${activePaymentStatus.className}`}>
-                        {activePaymentStatus.label}
-                      </span>
                       {(revisionsIncluded !== null || activeCorrections.length > 0) && (
                         <span
                           title="Each client correction counts as one revision"

@@ -3,7 +3,7 @@
 import assert from "node:assert";
 import { splitLinks } from "../src/lib/links";
 import { parseTagAccount } from "../src/lib/formImport";
-import { matchTemplate, normalizeHandle, parseContact, parseCsv, parseResponses, parseTimestamp } from "../src/lib/formImport";
+import { autoTagIds, matchTemplate, normalizeHandle, parseContact, parseCsv, parseResponses, parseTimestamp } from "../src/lib/formImport";
 
 // CSV de Google: comillas, comillas escapadas y saltos de línea dentro de una celda
 assert.deepStrictEqual(parseCsv('"a","b ""x"" c","line\n2"\n"d","e","f"\n'), [
@@ -149,5 +149,21 @@ assert.strictEqual(withoutEmail.requests[0].tag_handle, null);
 // Un archivo que no es el formulario
 assert.ok(parseResponses('"a","b"\n"1","2"', templates).error);
 assert.ok(parseResponses("", templates).error);
+
+// Etiquetas automáticas con las de verdad del usuario
+const tag = (id: number, name: string, category: string) => ({ id, name, category });
+const tags = [
+  tag(29, "Render + Complex Background", "Commission Type"), tag(30, "Render + Simple Background | Full Body", "Commission Type"),
+  tag(31, "Render + Simple Background | Half Body", "Commission Type"), tag(32, "Full Colour", "Commission Type"),
+  tag(34, "Sketch + Background", "Commission Type"), tag(35, "Sketch", "Commission Type"),
+  tag(40, "3 Characters", "Characters"), tag(41, "2 Characters", "Characters"), tag(43, "1 Characters", "Characters"),
+  tag(50, "Sketch Characters", "General"),
+];
+assert.deepStrictEqual(autoTagIds("Rendered Full Body + Complex Background", 3, tags), [29, 40]);
+assert.deepStrictEqual(autoTagIds("Rendered Full Body + Simple Background", 1, tags), [30, 43]);
+assert.deepStrictEqual(autoTagIds("Rendered Half Body + Simple Background", 2, tags), [31, 41]);
+assert.deepStrictEqual(autoTagIds("Sketch + Background", 1, tags), [34, 43]); // no también "Sketch"
+assert.deepStrictEqual(autoTagIds("Sketch", 1, tags), [35, 43]);
+assert.deepStrictEqual(autoTagIds(null, 9, tags), []); // sin plantilla ni etiqueta de 9: nada
 
 console.log("form import ok");

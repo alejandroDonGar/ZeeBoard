@@ -71,6 +71,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [x] Email del cliente e importación del CSV de PayPal (cruza cobros por email, sin duplicar)
 - [x] Botón "Copy description": texto corto para la factura de PayPal (plantilla, personajes y tu usuario)
 - [x] Recordatorio de pago: comisión fuera de la primera etapa y sin ningún pago (Dashboard + notificación)
+- [x] Etiquetas automáticas al aceptar una solicitud (tipo y número de personajes)
 - [x] Contador de revisiones incluidas (correcciones por etapa)
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real

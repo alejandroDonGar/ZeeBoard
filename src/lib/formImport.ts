@@ -160,6 +160,33 @@ export function matchTemplate<T extends { id: number; name: string }>(text: stri
   return templates.find((template) => normalize(template.name) === normalize(text)) ?? null;
 }
 
+const tagWords = (text: string) =>
+  new Set(text.toLowerCase().replace(/rendered/g, "render").split(/[^a-z0-9]+/).filter(Boolean));
+
+/**
+ * Las etiquetas que le tocan a una comisión recién aceptada:
+ * - tipo ("Commission Type"): la más específica cuyas palabras están todas en el nombre de la plantilla
+ *   ("Render + Complex Background" encaja con "Rendered Full Body + Complex Background"; "Sketch" no, si hay "Sketch + Background")
+ * - personajes ("Characters"): la que dice "3 Characters" si pidió 3.
+ */
+export function autoTagIds(
+  templateName: string | null,
+  characters: number,
+  tags: { id: number; name: string; category: string }[],
+): number[] {
+  const words = tagWords(templateName ?? "");
+  const types = tags
+    .filter((tag) => tag.category === "Commission Type")
+    .map((tag) => ({ tag, size: tagWords(tag.name).size, fits: [...tagWords(tag.name)].every((word) => words.has(word)) }))
+    .filter((item) => item.fits);
+  const best = Math.max(0, ...types.map((item) => item.size));
+  const count = tags.filter(
+    (tag) => tag.category === "Characters" && Number(tag.name.match(/^\s*(\d+)\s*characters?\s*$/i)?.[1]) === characters,
+  );
+
+  return [...types.filter((item) => item.size === best).map((item) => item.tag), ...count].map((tag) => tag.id);
+}
+
 export type ImportedRequest = {
   /** Identifica la respuesta para no importarla dos veces */
   externalId: string;

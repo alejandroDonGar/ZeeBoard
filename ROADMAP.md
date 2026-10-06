@@ -15,12 +15,12 @@ Cada fase termina con una **revisión**: ejecutar la app (`npm run tauri dev`), 
 
 ## Fase 1 · Imágenes ligeras
 Los lienzos originales pesan 40–70 MB; la app solo necesita copias ligeras (los originales se guardan aparte).
-- [ ] Procesado en Rust, en segundo plano: copia para ver (~2560 px, WebP) y miniatura (~480 px)
-- [ ] Nombres de archivo por contenido (sin duplicados)
+- [x] Procesado en Rust, en segundo plano: copia para ver (~2560 px, WebP) y miniatura (~480 px)
+- [x] Nombres de archivo por contenido (sin duplicados)
 - [ ] Añadir imágenes con el selector, arrastrando y soltando, o pegando con Ctrl+V
-- [ ] Un único sistema para imágenes de etapas, referencias de comisión y de personaje
-- [ ] Migración automática de las imágenes antiguas y compactar la base de datos
-- [ ] Miniaturas en tarjetas y listas, carga diferida (`loading="lazy"`)
+- [x] Un único sistema para imágenes de etapas, referencias de comisión y de personaje
+- [x] Migración automática de las imágenes antiguas y compactar la base de datos
+- [x] Miniaturas en tarjetas y listas, carga diferida (`loading="lazy"`)
 - [ ] En Ajustes: espacio usado y limpieza de huérfanas
 
 ## Fase 2 · Sistema de diseño

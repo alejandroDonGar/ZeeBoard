@@ -3,239 +3,418 @@ import {
   createTag,
   deleteTag,
   getTags,
+  getTagUsageCounts,
+  updateTag,
   type Tag,
 } from "../lib/database";
 import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 
+// Colores que se leen bien con texto blanco encima y combinan con la app
+const PALETTE = [
+  "#7c3aed",
+  "#4f46e5",
+  "#2563eb",
+  "#0891b2",
+  "#0d9488",
+  "#16a34a",
+  "#d97706",
+  "#ea580c",
+  "#dc2626",
+  "#db2777",
+  "#92400e",
+  "#475569",
+];
+
+// Clientes y Dashboard buscan "Paid" / "Not Paid" por nombre: esas dos solo pueden cambiar de color
+function isLockedTag(tag: Tag) {
+  return tag.category === "Payment" && ["paid", "not paid"].includes(tag.name.trim().toLowerCase());
+}
+
+type Draft = { name: string; color: string };
+
+/** Fila en modo edición: nombre, paleta y guardar/cancelar. Enter guarda, Esc cancela. */
+function TagEditor({
+  initial,
+  nameLocked = false,
+  saveLabel,
+  onSave,
+  onCancel,
+}: {
+  initial: Draft;
+  nameLocked?: boolean;
+  saveLabel: string;
+  onSave: (draft: Draft) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!draft.name.trim() || saving) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await onSave(draft);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="rounded-md border border-line-strong bg-paper p-3"
+      onKeyDown={(event) => {
+        if (event.key === "Enter") save();
+        if (event.key === "Escape") onCancel();
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className="shrink-0 rounded-sm px-3 py-1 text-xs font-bold text-white"
+          style={{ backgroundColor: draft.color }}
+        >
+          {draft.name.trim() || "Preview"}
+        </span>
+
+        <input
+          autoFocus={!nameLocked}
+          value={draft.name}
+          disabled={nameLocked}
+          onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+          placeholder="Tag name"
+          className="min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink disabled:opacity-60"
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {PALETTE.map((color) => (
+          <button
+            key={color}
+            type="button"
+            title={color}
+            onClick={() => setDraft({ ...draft, color })}
+            className={`h-6 w-6 rounded-sm transition hover:scale-110 ${
+              draft.color === color ? "ring-2 ring-ink ring-offset-2 ring-offset-paper" : ""
+            }`}
+            style={{ backgroundColor: color }}
+          />
+        ))}
+
+        <label
+          title="Custom colour"
+          className="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-sm border border-dashed border-line-strong text-xs text-muted hover:text-ink"
+        >
+          +
+          <input
+            type="color"
+            value={draft.color}
+            onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+            className="absolute inset-0 cursor-pointer opacity-0"
+          />
+        </label>
+
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={save}
+            disabled={!draft.name.trim() || saving}
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
+          >
+            {saving ? "Saving…" : saveLabel}
+          </button>
+        </div>
+      </div>
+
+      {nameLocked && (
+        <p className="mt-2 text-[11px] text-faint">
+          "Paid" and "Not Paid" are used for payment stats, so only their colour can change.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TagsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
-  const [tagName, setTagName] = useState("");
-  const [tagColor, setTagColor] = useState("#f59e0b");
-  const [tagCategory, setTagCategory] = useState("General");
-  const [creatingTag, setCreatingTag] = useState(false);
-  const [tagCreated, setTagCreated] = useState(false);
+  const [usageByTagId, setUsageByTagId] = useState<Record<number, number>>({});
+  // Categorías recién creadas que aún no tienen etiquetas
+  const [newCategories, setNewCategories] = useState<string[]>([]);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [editingTagId, setEditingTagId] = useState<number | null>(null);
+  const [addingToCategory, setAddingToCategory] = useState<string | null>(null);
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
   const { showToast } = useToast();
 
   async function loadTags() {
-    const data = await getTags();
+    const [data, usage] = await Promise.all([getTags(), getTagUsageCounts()]);
     setTags(data);
+    setUsageByTagId(usage);
   }
-
-  async function handleCreateTag() {
-    try {
-      setCreatingTag(true);
-
-      await createTag(tagName, tagColor, tagCategory);
-
-      setTagName("");
-      setTagColor("#f59e0b");
-
-      await loadTags();
-
-      setTagCreated(true);
-
-      setTimeout(() => {
-        setTagCreated(false);
-      }, 1500);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setCreatingTag(false);
-    }
-  }
-
-    async function handleDeleteTag(tagId: number) {
-    try {
-        await deleteTag(tagId);
-        await loadTags();
-        showToast("Tag deleted.", "success");
-    } catch (error) {
-        console.error(error);
-        showToast("Could not delete tag. It may still be in use.", "error");
-    }
-    }
 
   useEffect(() => {
     loadTags().catch(console.error);
   }, []);
 
-  const groupedTags = tags.reduce(
-    (groups, tag) => {
-      const category =
-        tag.category || "General";
+  const tagsByCategory = tags.reduce<Record<string, Tag[]>>((groups, tag) => {
+    (groups[tag.category || "General"] ??= []).push(tag);
+    return groups;
+  }, {});
 
-      if (!groups[category]) {
-        groups[category] = [];
-      }
+  for (const category of newCategories) {
+    tagsByCategory[category] ??= [];
+  }
 
-      groups[category].push(tag);
+  const categories = Object.keys(tagsByCategory).sort((a, b) => a.localeCompare(b));
 
-      return groups;
-    },
-    {} as Record<string, Tag[]>,
-  );
+  function nextColor(categoryTags: Tag[]) {
+    return PALETTE[categoryTags.length % PALETTE.length];
+  }
+
+  function handleCreateCategory() {
+    const name = categoryName.trim();
+
+    if (!name) {
+      return;
+    }
+
+    const existing = categories.find((category) => category.toLowerCase() === name.toLowerCase());
+
+    if (!existing) {
+      setNewCategories((current) => [...current, name]);
+    }
+
+    setAddingToCategory(existing ?? name);
+    setCreatingCategory(false);
+    setCategoryName("");
+  }
+
+  async function handleCreateTag(category: string, draft: Draft) {
+    try {
+      await createTag(draft.name, draft.color, category);
+      await loadTags();
+      setNewCategories((current) => current.filter((name) => name !== category));
+      setAddingToCategory(null);
+    } catch (error) {
+      console.error(error);
+      showToast("Could not create tag.", "error");
+    }
+  }
+
+  async function handleUpdateTag(tagId: number, draft: Draft) {
+    try {
+      await updateTag(tagId, draft.name, draft.color);
+      await loadTags();
+      setEditingTagId(null);
+    } catch (error) {
+      console.error(error);
+      showToast("Could not save tag.", "error");
+    }
+  }
+
+  async function handleDeleteTag(tagId: number) {
+    try {
+      await deleteTag(tagId);
+      await loadTags();
+      showToast("Tag deleted.", "success");
+    } catch (error) {
+      console.error(error);
+      showToast("Could not delete tag.", "error");
+    }
+  }
+
+  function usageLabel(tagId: number) {
+    const count = usageByTagId[tagId] ?? 0;
+
+    if (count === 0) {
+      return "Not used";
+    }
+
+    return count === 1 ? "1 commission" : `${count} commissions`;
+  }
 
   return (
     <>
       <PageHeader
         label="Label library"
         title="Tags"
-        description="Create reusable tags to classify commissions."
+        description="Classify commissions by type, payment or anything you need."
+        action="+ New category"
+        onAction={() => setCreatingCategory(true)}
       />
 
-      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[340px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
-        <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <div className="mb-5">
-            <h3 className="text-xl font-black">New tag</h3>
-            <p className="mt-1 text-sm text-muted">
-              Use tags like urgent, commercial or personal.
-            </p>
-          </div>
-
-          <input
-            value={tagName}
-            onChange={(event) => setTagName(event.target.value)}
-            placeholder="Tag name"
-            className="rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold outline-none transition focus:border-ink"
-          />
-
-          
-
-          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-line-strong bg-paper px-4 py-3">
-            <label
-              className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-2xl border border-line-strong bg-surface shadow-sm"
-              style={{ backgroundColor: tagColor }}
-            >
+      <section className="h-[calc(100vh-117px)] min-h-0 p-5 pb-6">
+        <div className="h-full overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-sm">
+          {creatingCategory && (
+            <div className="mb-6 flex items-center gap-2 rounded-md border border-line-strong bg-paper p-3">
               <input
-                type="color"
-                value={tagColor}
-                onChange={(event) => setTagColor(event.target.value)}
-                className="h-full w-full cursor-pointer opacity-0"
+                autoFocus
+                value={categoryName}
+                onChange={(event) => setCategoryName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") handleCreateCategory();
+                  if (event.key === "Escape") setCreatingCategory(false);
+                }}
+                placeholder="Category name, e.g. Extras"
+                className="min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink"
               />
-            </label>
 
-            <div>
-              <p className="text-sm font-bold">
-                Selected colour
-              </p>
-
-              <p className="text-xs text-faint">
-                Click to change
-              </p>
-            </div>
-            <select
-              value={tagCategory}
-              onChange={(event) =>
-                setTagCategory(event.target.value)
-              }
-              className="mt-3 rounded-2xl border border-line-strong bg-paper px-4 py-3"
-            >
-              <option>Payment</option>
-              <option>Characters</option>
-              <option>Commission Type</option>
-              <option>Reference</option>
-              <option>General</option>
-            </select>
-          </div>
-
-          <div className="mt-4 rounded-3xl border border-line bg-paper p-4">
-            <div className="mt-3">
-              <span
-                className="inline-flex rounded-sm px-4 py-2 text-sm font-black text-white shadow-sm"
-                style={{ backgroundColor: tagColor }}
+              <button
+                type="button"
+                onClick={() => setCreatingCategory(false)}
+                className="rounded-md px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink"
               >
-                {tagName || "Example tag"}
-              </span>
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCreateCategory}
+                disabled={!categoryName.trim()}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
+              >
+                Create
+              </button>
             </div>
-            
-          </div>
+          )}
 
-          <button
-            onClick={handleCreateTag}
-            disabled={creatingTag}
-            className={
-              tagCreated
-                ? "mt-3 rounded-2xl bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-md transition-all duration-300"
-                : "mt-3 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
-            }
-          >
-            {creatingTag
-              ? "Creating..."
-              : tagCreated
-                ? "✓ Created"
-                : "Create tag"}
-          </button>
-        </div>
+          {categories.length === 0 && !creatingCategory && (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <p className="text-lg font-black">Start your first category</p>
+              <p className="mt-1 text-sm text-muted">
+                Group tags like commission types, extras or payment status.
+              </p>
+              <button
+                type="button"
+                onClick={() => setCreatingCategory(true)}
+                className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary"
+              >
+                New category
+              </button>
+            </div>
+          )}
 
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="text-xl font-black">Saved tags</h3>
+          <div className="space-y-8">
+            {categories.map((category) => {
+              const categoryTags = [...tagsByCategory[category]].sort((a, b) =>
+                a.name.localeCompare(b.name),
+              );
+              return (
+                <section key={category}>
+                  <h3 className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
+                    {category} · {categoryTags.length}
+                  </h3>
 
-            <span className="rounded-sm bg-paper px-3 py-1 text-xs font-bold text-faint">
-              {tags.length} tags
-            </span>
-          </div>
+                  <div className="divide-y divide-line border-y border-line">
+                    {categoryTags.map((tag) =>
+                      editingTagId === tag.id ? (
+                        <div key={tag.id} className="py-2">
+                          <TagEditor
+                            initial={{ name: tag.name, color: tag.color }}
+                            nameLocked={isLockedTag(tag)}
+                            saveLabel="Save"
+                            onSave={(draft) => handleUpdateTag(tag.id, draft)}
+                            onCancel={() => setEditingTagId(null)}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          key={tag.id}
+                          className="group grid grid-cols-[16px_minmax(0,1fr)_auto_auto] items-center gap-4 px-2 py-2.5 transition hover:bg-paper"
+                        >
+                          <span className="h-4 w-4 rounded-sm" style={{ backgroundColor: tag.color }} />
 
-          <div className="mt-5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-2">
-            {tags.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center rounded-3xl border border-dashed border-line-strong bg-paper text-sm text-faint">
-                No tags yet
-              </div>
-            ) : (
-              <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-2">
-                {Object.entries(groupedTags).map(
-                  ([category, categoryTags]) => (
-                    <div key={category} className="pb-7">
-                      <h4 className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-faint">
-                        {category}
-                      </h4>
+                          <span className="truncate text-sm font-semibold">{tag.name}</span>
 
-                      <div className="flex flex-wrap gap-x-4 gap-y-3">
-                        {categoryTags.map((tag) => (
-                          <div
-                            key={tag.id}
-                            className="flex items-center gap-2 rounded-sm border border-line bg-paper p-1 shadow-sm"
-                          >
-                            <span
-                              className="rounded-sm px-4 py-2 text-sm font-black text-white"
-                              style={{ backgroundColor: tag.color }}
-                            >
-                              {tag.name}
-                            </span>
+                          <span className="text-xs text-faint">{usageLabel(tag.id)}</span>
 
+                          <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
                             <button
-                              onClick={() => setTagToDelete(tag)}
-                              className="rounded-sm px-2 text-xs font-black text-red-500 transition hover:bg-red-50"
+                              type="button"
+                              onClick={() => {
+                                setAddingToCategory(null);
+                                setEditingTagId(tag.id);
+                              }}
+                              className="rounded-sm px-2 py-1 text-xs font-semibold text-muted hover:bg-highlight hover:text-ink"
                             >
-                              ×
+                              Edit
                             </button>
+
+                            {!isLockedTag(tag) && (
+                              <button
+                                type="button"
+                                onClick={() => setTagToDelete(tag)}
+                                className="rounded-sm px-2 py-1 text-xs font-semibold text-red-500 hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
-                        ))}
+                        </div>
+                      ),
+                    )}
+
+                    {addingToCategory === category && (
+                      <div className="py-2">
+                        <TagEditor
+                          initial={{ name: "", color: nextColor(categoryTags) }}
+                          saveLabel="Add tag"
+                          onSave={(draft) => handleCreateTag(category, draft)}
+                          onCancel={() => setAddingToCategory(null)}
+                        />
                       </div>
-                    </div>
-                  ),
-                )}
-              </div>
-            )}
+                    )}
+                  </div>
+
+                  {addingToCategory !== category && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTagId(null);
+                        setAddingToCategory(category);
+                      }}
+                      className="mt-1 rounded-sm px-2 py-1.5 text-xs font-semibold text-muted transition hover:bg-paper hover:text-ink"
+                    >
+                      + Add tag
+                    </button>
+                  )}
+                </section>
+              );
+            })}
           </div>
         </div>
       </section>
+
       {tagToDelete && (
         <ConfirmModal
-            eyebrow="Delete tag"
-            title={tagToDelete.name}
-            message="This action cannot be undone."
-            confirmLabel="Delete"
-            onConfirm={async () => {
+          eyebrow="Delete tag"
+          title={tagToDelete.name}
+          message={
+            usageByTagId[tagToDelete.id]
+              ? `It will be removed from ${usageLabel(tagToDelete.id).toLowerCase()}. This can't be undone.`
+              : "This can't be undone."
+          }
+          confirmLabel="Delete"
+          onConfirm={async () => {
             await handleDeleteTag(tagToDelete.id);
             setTagToDelete(null);
-            }}
-            onCancel={() => setTagToDelete(null)}
+          }}
+          onCancel={() => setTagToDelete(null)}
         />
-        )}
+      )}
     </>
   );
 }

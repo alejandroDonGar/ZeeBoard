@@ -700,15 +700,36 @@ export async function createTag(
 }
 
 export async function deleteTag(tagId: number): Promise<void> {
-  const database = await getDatabase();
+  await runSerialized(async (database) => {
+    // Se quita también de las comisiones que la tenían
+    await database.execute(`DELETE FROM commission_tags WHERE tag_id = ?;`, [tagId]);
+    await database.execute(`DELETE FROM tags WHERE id = ?;`, [tagId]);
+  });
+}
 
-  await database.execute(
-    `
-    DELETE FROM tags
-    WHERE id = ?;
-    `,
-    [tagId],
+export async function updateTag(tagId: number, name: string, color: string): Promise<void> {
+  const database = await getDatabase();
+  const cleanName = name.trim();
+
+  if (!cleanName) {
+    throw new Error("Tag name is required");
+  }
+
+  await database.execute(`UPDATE tags SET name = ?, color = ? WHERE id = ?;`, [
+    cleanName,
+    color,
+    tagId,
+  ]);
+}
+
+/** Cuántas comisiones usan cada etiqueta: { tagId: número } */
+export async function getTagUsageCounts(): Promise<Record<number, number>> {
+  const database = await getDatabase();
+  const rows = await database.select<{ tag_id: number; count: number }[]>(
+    `SELECT tag_id, COUNT(*) AS count FROM commission_tags GROUP BY tag_id;`,
   );
+
+  return Object.fromEntries(rows.map((row) => [row.tag_id, row.count]));
 }
 
 export async function getCommissionTags(

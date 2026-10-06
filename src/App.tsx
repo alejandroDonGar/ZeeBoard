@@ -135,7 +135,9 @@ function App() {
         </aside>
 
         <main className="flex-1 overflow-hidden">
-          {currentPage === "dashboard" && <DashboardPage />}
+          {currentPage === "dashboard" && (
+            <DashboardPage onOpenCommissionsPage={() => setCurrentPage("commissions")} />
+          )}
           {currentPage === "commissions" && <CommissionsPage />}
           {currentPage === "clients" && (
             <ClientsPage onOpenCommissionsPage={() => setCurrentPage("commissions")} />

@@ -1,23 +1,31 @@
 import { useEffect, useState } from "react";
 import {
-  isCommissionCompleted as isCommissionCompletedHelper,
+  getCommissionCompletionPercentage,
   getDeadlineStatus,
+  getPaymentStatus,
+  isCommissionCompleted as isCommissionCompletedHelper,
+  loadStageImagesForCommissions,
+  formatMoney,
 } from "../lib/commissionHelpers";
 import {
   getCommissions,
   getCommissionTags,
   getTemplateStages,
-  getTags,
   type Commission,
+  type CommissionStageImage,
   type Tag,
   type TemplateStage,
 } from "../lib/database";
+import { thumbUrl } from "../lib/images";
 import PageHeader from "../components/PageHeader";
 
-function DashboardPage() {
+const DAY = 24 * 60 * 60 * 1000;
+
+function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => void }) {
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
   const [templateStagesByTemplateId, setTemplateStagesByTemplateId] = useState<Record<number, TemplateStage[]>>({});
+  const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
 
   useEffect(() => {
     getCommissions()
@@ -25,278 +33,245 @@ function DashboardPage() {
         setCommissions(data);
 
         const tagEntries = await Promise.all(
-          data.map(async (commission) => {
-            const tags = await getCommissionTags(commission.id);
-            return [commission.id, tags] as const;
-          }),
+          data.map(async (commission) => [commission.id, await getCommissionTags(commission.id)] as const),
         );
-
         setCommissionTagsById(Object.fromEntries(tagEntries));
 
-        const templateIds = Array.from(
-          new Set(
-            data
-              .map((commission) => commission.template_id)
-              .filter((templateId): templateId is number => templateId !== null),
-          ),
-        );
-
+        const templateIds = [
+          ...new Set(data.map((commission) => commission.template_id).filter((id): id is number => id !== null)),
+        ];
         const stageEntries = await Promise.all(
-          templateIds.map(async (templateId) => {
-            const stages = await getTemplateStages(templateId);
-            return [templateId, stages] as const;
-          }),
+          templateIds.map(async (templateId) => [templateId, await getTemplateStages(templateId)] as const),
         );
-
         setTemplateStagesByTemplateId(Object.fromEntries(stageEntries));
+
+        setStageImagesByCommissionId(await loadStageImagesForCommissions(data));
       })
       .catch(console.error);
-
-    getTags().catch(console.error);
   }, []);
 
-  function isCommissionCompleted(commission: Commission) {
-    return isCommissionCompletedHelper(commission, templateStagesByTemplateId);
+  function handleOpenCommission(commission: Commission) {
+    localStorage.setItem("zeeboard-open-commission-tabs", JSON.stringify([commission.id]));
+    localStorage.setItem("zeeboard-active-commission-id", String(commission.id));
+    onOpenCommissionsPage();
   }
 
-  const totalEarnings = commissions.reduce(
-    (sum, commission) => sum + (commission.price ?? 0),
-    0,
-  );
+  const today = new Date(new Date().toDateString()).getTime();
+  const daysUntil = (deadline: string) => (new Date(`${deadline}T00:00:00`).getTime() - today) / DAY;
 
-  const activeCount = commissions.filter(
-    (commission) => !isCommissionCompleted(commission),
+  // Las que tienen fecha primero, de la más urgente a la menos; sin fecha al final
+  const inProgress = commissions
+    .filter((commission) => !isCommissionCompletedHelper(commission, templateStagesByTemplateId))
+    .sort((a, b) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"));
+
+  const dueThisWeek = inProgress.filter(
+    (commission) => commission.deadline !== null && daysUntil(commission.deadline) <= 7,
   ).length;
 
-  const completedCount = commissions.filter(
-    (commission) => isCommissionCompleted(commission),
-  ).length;
+  const withStatus = (status: "paid" | "unpaid") =>
+    commissions.filter((commission) => getPaymentStatus(commissionTagsById[commission.id] ?? []) === status);
+  const sumPrices = (list: Commission[]) => list.reduce((sum, commission) => sum + (commission.price ?? 0), 0);
 
-  const unpaidCount = commissions.filter((commission) => {
-    const tags = commissionTagsById[commission.id] ?? [];
-    return !tags.some(
-      (tag) =>
-        tag.category === "Payment" &&
-        tag.name.toLowerCase().includes("paid"),
-    );
-  }).length;
+  const unpaid = withStatus("unpaid");
+  const paid = withStatus("paid");
 
-  const monthFormatter = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    year: "numeric",
-  });
-
+  const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
   const now = new Date();
-  const monthKeys: string[] = [];
-
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    monthKeys.push(`${date.getFullYear()}-${date.getMonth()}`);
-  }
-
-  const revenueByMonth = monthKeys.map((key) => {
-    const [year, month] = key.split("-").map(Number);
-
-    const total = commissions.reduce((sum, commission) => {
-      if (!commission.price) {
-        return sum;
-      }
-
-      const createdAt = new Date(commission.created_at);
-
-      if (
-        createdAt.getFullYear() === year &&
-        createdAt.getMonth() === month
-      ) {
-        return sum + commission.price;
-      }
-
-      return sum;
-    }, 0);
-
-    return {
-      label: monthFormatter.format(new Date(year, month, 1)),
-      total,
-    };
+  const bookedByMonth = Array.from({ length: 6 }, (_, index) => {
+    const month = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+    const total = sumPrices(
+      commissions.filter((commission) => {
+        const created = new Date(commission.created_at);
+        return created.getFullYear() === month.getFullYear() && created.getMonth() === month.getMonth();
+      }),
+    );
+    return { label: monthFormatter.format(month), total };
   });
+  const maxBooked = Math.max(...bookedByMonth.map((entry) => entry.total), 1);
 
-  const maxMonthRevenue = Math.max(...revenueByMonth.map((entry) => entry.total), 1);
-
-  const upcomingDeadlines = commissions
-    .filter(
-      (commission) =>
-        !isCommissionCompleted(commission) && commission.deadline !== null,
-    )
-    .sort((a, b) => {
-      return (
-        new Date(a.deadline as string).getTime() -
-        new Date(b.deadline as string).getTime()
-      );
-    })
-    .slice(0, 5);
-
-  const tagUsage = new Map<number, { tag: Tag; count: number }>();
-
-  Object.values(commissionTagsById).forEach((tags) => {
-    tags.forEach((tag) => {
-      if (tag.category === "Characters" || tag.category === "Payment") {
-        return;
-      }
-
-      const existing = tagUsage.get(tag.id);
-
-      if (existing) {
-        existing.count += 1;
-      } else {
-        tagUsage.set(tag.id, { tag, count: 1 });
-      }
+  const tagCounts = new Map<number, { tag: Tag; count: number }>();
+  Object.values(commissionTagsById)
+    .flat()
+    .filter((tag) => tag.category !== "Characters" && tag.category !== "Payment")
+    .forEach((tag) => {
+      const entry = tagCounts.get(tag.id) ?? { tag, count: 0 };
+      entry.count += 1;
+      tagCounts.set(tag.id, entry);
     });
-  });
+  const topTags = [...tagCounts.values()].sort((a, b) => b.count - a.count).slice(0, 6);
 
-  const topTags = Array.from(tagUsage.values())
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
+  const stats = [
+    { label: "In progress", value: inProgress.length, detail: "commissions", className: "text-ink" },
+    {
+      label: "Due within 7 days",
+      value: dueThisWeek,
+      detail: "including overdue",
+      className: dueThisWeek > 0 ? "text-amber-600" : "text-ink",
+    },
+    {
+      label: "Waiting for payment",
+      value: formatMoney(sumPrices(unpaid)),
+      detail: `${unpaid.length} tagged Not Paid`,
+      className: unpaid.length > 0 ? "text-red-500" : "text-ink",
+    },
+    { label: "Paid", value: formatMoney(sumPrices(paid)), detail: `${paid.length} tagged Paid`, className: "text-green-600" },
+  ];
+
+  const panel = "rounded-3xl border border-line bg-surface p-5 shadow-sm";
+  const heading = "mb-3 text-[11px] font-black uppercase tracking-[0.16em] text-faint";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
-      <PageHeader
-        label="Overview"
-        title="Dashboard"
-        description="A quick look at your commission workspace."
-      />
+      <PageHeader label="Overview" title="Dashboard" description="What's on your desk today." />
 
-      <section className="grid grid-cols-4 gap-4 px-5 pt-5">
-        <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.2em] text-faint">
-            Total earned
-          </p>
-          <p className="mt-2 text-2xl font-black">
-            {totalEarnings.toFixed(0)}€
-          </p>
-        </div>
+      <div className="space-y-5 p-5 pb-6">
+        <dl className="grid grid-cols-4 gap-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className={panel}>
+              <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">{stat.label}</dt>
+              <dd className={`mt-1 text-2xl font-black ${stat.className}`}>{stat.value}</dd>
+              <dd className="text-xs text-muted">{stat.detail}</dd>
+            </div>
+          ))}
+        </dl>
 
-        <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.2em] text-faint">
-            Active
-          </p>
-          <p className="mt-2 text-2xl font-black">{activeCount}</p>
-        </div>
+        <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5">
+          <section className={panel}>
+            <h3 className={heading}>In progress · {inProgress.length}</h3>
 
-        <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.2em] text-faint">
-            Completed
-          </p>
-          <p className="mt-2 text-2xl font-black text-green-600">
-            {completedCount}
-          </p>
-        </div>
+            {inProgress.length === 0 ? (
+              <p className="text-sm text-muted">Nothing on the board. Time for a break.</p>
+            ) : (
+              <div className="divide-y divide-line">
+                {inProgress.map((commission) => {
+                  const stages = commission.template_id ? templateStagesByTemplateId[commission.template_id] ?? [] : [];
+                  const stageIndex = stages.findIndex((stage) => stage.id === commission.current_stage_id);
+                  const images = stageImagesByCommissionId[commission.id] ?? [];
+                  const latestImage = images[images.length - 1] ?? null;
+                  const deadlineStatus = getDeadlineStatus(commission.deadline);
+                  const progress = getCommissionCompletionPercentage(commission, templateStagesByTemplateId);
 
-        <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.2em] text-faint">
-            Unpaid
-          </p>
-          <p className="mt-2 text-2xl font-black text-red-500">
-            {unpaidCount}
-          </p>
-        </div>
-      </section>
+                  return (
+                    <button
+                      key={commission.id}
+                      type="button"
+                      onClick={() => handleOpenCommission(commission)}
+                      className="grid w-full grid-cols-[40px_minmax(0,1fr)_96px_auto] items-center gap-4 py-2.5 text-left transition hover:bg-paper"
+                    >
+                      {latestImage ? (
+                        <img
+                          src={thumbUrl(latestImage.image_data_url)}
+                          loading="lazy" decoding="async"
+                          alt=""
+                          className="h-10 w-10 rounded-md object-cover"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-md bg-paper" />
+                      )}
 
-      <section className="grid grid-cols-2 gap-5 p-5">
-        <div className="rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <h3 className="text-lg font-black">Revenue, last 6 months</h3>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold">{commission.title}</p>
+                        <p className="truncate text-xs text-muted">
+                          {stageIndex >= 0
+                            ? `${stages[stageIndex].name} · ${stageIndex + 1}/${stages.length}`
+                            : "Not started"}
+                          {commission.client_name ? ` · ${commission.client_name}` : ""}
+                        </p>
+                      </div>
 
-          <div className="mt-5 space-y-3">
-            {revenueByMonth.map((entry) => (
-              <div key={entry.label}>
-                <div className="flex items-center justify-between text-xs font-bold text-muted">
-                  <span>{entry.label}</span>
-                  <span>{entry.total.toFixed(0)}€</span>
-                </div>
+                      <div className="h-1.5 overflow-hidden rounded-sm bg-paper">
+                        <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+                      </div>
 
-                <div className="mt-1 h-2 overflow-hidden rounded-sm bg-canvas">
-                  <div
-                    className="h-full rounded-sm bg-primary"
-                    style={{
-                      width: `${(entry.total / maxMonthRevenue) * 100}%`,
-                    }}
-                  />
-                </div>
+                      {deadlineStatus ? (
+                        <span className={`rounded-sm px-2 py-0.5 text-xs font-bold ${deadlineStatus.className}`}>
+                          {deadlineStatus.label}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-faint">No deadline</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            ))}
+            )}
+          </section>
+
+          <div className="space-y-5">
+            <section className={panel}>
+              <h3 className={heading}>Not paid yet · {unpaid.length}</h3>
+
+              {unpaid.length === 0 ? (
+                <p className="text-sm text-muted">All caught up.</p>
+              ) : (
+                <div className="divide-y divide-line">
+                  {unpaid.map((commission) => (
+                    <button
+                      key={commission.id}
+                      type="button"
+                      onClick={() => handleOpenCommission(commission)}
+                      className="flex w-full items-center justify-between gap-3 py-2 text-left text-sm transition hover:bg-paper"
+                    >
+                      <span className="truncate">{commission.title}</span>
+                      <span className="shrink-0 font-bold">
+                        {commission.price ? formatMoney(commission.price, commission.currency) : "—"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className={panel}>
+              <h3 className={heading}>Most used tags</h3>
+
+              {topTags.length === 0 ? (
+                <p className="text-sm text-muted">No tags in use yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {topTags.map(({ tag, count }) => (
+                    <span key={tag.id} className="flex items-center gap-1.5 text-xs">
+                      <span className="rounded-sm px-2 py-0.5 font-bold text-white" style={{ backgroundColor: tag.color }}>
+                        {tag.name}
+                      </span>
+                      <span className="text-faint">{count}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <h3 className="text-lg font-black">Upcoming deadlines</h3>
+        <section className={panel}>
+          <h3 className={heading}>Booked per month · by commission start date</h3>
 
-          {upcomingDeadlines.length === 0 ? (
-            <p className="mt-4 text-sm text-faint">
-              No upcoming deadlines.
-            </p>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {upcomingDeadlines.map((commission) => {
-                const deadlineStatus = getDeadlineStatus(commission.deadline);
-
-                return (
-                  <div
-                    key={commission.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl bg-paper px-4 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-ink">
-                        {commission.title}
-                      </p>
-                      <p className="mt-1 text-xs text-muted">
-                        {commission.client_name || "No client"}
-                      </p>
-                    </div>
-
-                    {deadlineStatus && (
-                      <span
-                        className={`shrink-0 rounded-sm px-3 py-1 text-xs font-black ${deadlineStatus.className}`}
-                      >
-                        {deadlineStatus.label}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="px-5 pb-6">
-        <div className="rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <h3 className="text-lg font-black">Most used tags</h3>
-
-          {topTags.length === 0 ? (
-            <p className="mt-4 text-sm text-faint">
-              No tags in use yet.
-            </p>
-          ) : (
-            <div className="mt-4 flex flex-wrap gap-3">
-              {topTags.map(({ tag, count }) => (
+          <div className="flex h-36 items-end gap-3 border-b border-line">
+            {bookedByMonth.map((entry) => (
+              // ponytail: tooltip nativo (title); uno propio si hace falta más detalle
+              <div
+                key={entry.label}
+                title={`${entry.label}: ${formatMoney(entry.total)}`}
+                className="flex h-full flex-1 flex-col justify-end"
+              >
                 <div
-                  key={tag.id}
-                  className="flex items-center gap-2 rounded-sm border border-line bg-paper py-1 pl-1 pr-3"
-                >
-                  <span
-                    className="rounded-sm px-3 py-1 text-xs font-black text-white"
-                    style={{ backgroundColor: tag.color }}
-                  >
-                    {tag.name}
-                  </span>
-                  <span className="text-xs font-bold text-faint">
-                    {count}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+                  className="min-h-px rounded-t-sm bg-primary transition hover:bg-primary-hover"
+                  style={{ height: `${(entry.total / maxBooked) * 100}%` }}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-1 flex gap-3">
+            {bookedByMonth.map((entry) => (
+              <div key={entry.label} className="flex-1 text-center text-[11px] text-faint">
+                {entry.label}
+                <span className="block font-semibold text-muted">{formatMoney(entry.total)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
   isCommissionCompleted as isCommissionCompletedHelper,
+  formatMoney,
 } from "../lib/commissionHelpers";
 import {
   getTemplateStages,
@@ -696,8 +697,8 @@ function ClientsPage({
                   },
                   {
                     label: "Spent",
-                    value: `${totalSpent} EUR`,
-                    detail: `${averagePrice} EUR average`,
+                    value: formatMoney(totalSpent),
+                    detail: `${formatMoney(averagePrice)} average`,
                     className: "text-ink",
                   },
                   { label: "Paid", value: paidCommissionsCount, detail: "commissions", className: "text-green-600" },
@@ -750,7 +751,7 @@ function ClientsPage({
                           <p className="truncate text-sm font-bold">{commission.title}</p>
                           <p className="text-xs text-muted">
                             {commission.price
-                              ? `${commission.price} ${commission.currency || "EUR"}`
+                              ? formatMoney(commission.price, commission.currency)
                               : "No price"}
                             {" · "}
                             {commission.deadline || "No deadline"}

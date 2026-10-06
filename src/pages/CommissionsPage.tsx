@@ -8,6 +8,8 @@ import {
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
   isCommissionCompleted as isCommissionCompletedHelper,
   getDeadlineStatus,
+  formatMoney,
+  parsePrice,
 } from "../lib/commissionHelpers";
 import {
   getTemplateStages,
@@ -192,7 +194,7 @@ function CommissionsPage() {
         selectedClient?.name || clientName,
         selectedClient?.platform || platform,
         selectedTemplateId,
-        commissionPrice ? Number(commissionPrice) : null,
+        parsePrice(commissionPrice),
         currency,
         hasDeadline ? commissionDeadline : null,
         commissionNotes,
@@ -233,7 +235,7 @@ function CommissionsPage() {
       }, 1500);
     } catch (error) {
     console.error(error);
-    showToast(`Commission error: ${error}`, "error");
+    showToast(error instanceof Error ? error.message : `Commission error: ${error}`, "error");
     } finally {
       setCreatingCommission(false);
     }
@@ -448,7 +450,7 @@ function CommissionsPage() {
         selectedClientId,
         selectedClient?.name || clientName,
         selectedClient?.platform || platform,
-        commissionPrice ? Number(commissionPrice) : null,
+        parsePrice(commissionPrice),
         currency,
         hasDeadline ? commissionDeadline : null,
         commissionNotes,
@@ -483,6 +485,7 @@ function CommissionsPage() {
       }, 1500);
     } catch (error) {
       console.error(error);
+      showToast(error instanceof Error ? error.message : `Commission error: ${error}`, "error");
     } finally {
       setSavingCommission(false);
     }
@@ -894,7 +897,7 @@ function CommissionsPage() {
                       </p>
                       <p className="mt-2 font-bold">
                         {activeCommission.price
-                          ? `${activeCommission.price} ${activeCommission.currency || "EUR"}`
+                          ? formatMoney(activeCommission.price, activeCommission.currency)
                           : "No price"}
                       </p>
                     </div>
@@ -1295,7 +1298,7 @@ function CommissionsPage() {
 
                         <span className="rounded-sm bg-surface px-3 py-1 text-xs font-bold text-ink shadow-sm">
                           {commission.price
-                            ? `${commission.price} ${commission.currency || "EUR"}`
+                            ? formatMoney(commission.price, commission.currency)
                             : "No price"}
                         </span>
 
@@ -1670,7 +1673,8 @@ function CommissionsPage() {
                 <input
                   value={commissionPrice}
                   onChange={(event) => setCommissionPrice(event.target.value)}
-                  placeholder="Price"
+                  placeholder="Price, e.g. 186,84"
+                  inputMode="decimal"
                   className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 />
 
@@ -1859,7 +1863,8 @@ function CommissionsPage() {
               <input
                 value={commissionPrice}
                 onChange={(event) => setCommissionPrice(event.target.value)}
-                placeholder="Price"
+                placeholder="Price, e.g. 186,84"
+                inputMode="decimal"
                 className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
               />
 

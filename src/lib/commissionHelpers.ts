@@ -96,3 +96,41 @@ export function getDeadlineStatus(deadline: string | null) {
     className: "bg-white text-[#7c7163]",
   };
 }
+/** "paid" / "unpaid" según las etiquetas de pago Paid y Not Paid (por nombre exacto, no "contiene"). */
+export function getPaymentStatus(tags: { category: string; name: string }[]): "paid" | "unpaid" | null {
+  const names = tags
+    .filter((tag) => tag.category === "Payment")
+    .map((tag) => tag.name.trim().toLowerCase());
+
+  if (names.includes("not paid")) return "unpaid";
+  if (names.includes("paid")) return "paid";
+  return null;
+}
+
+/** Lee un precio escrito a mano: acepta "186,84", "186.84" o "200". Vacío = sin precio. */
+export function parsePrice(text: string): number | null {
+  const clean = text.trim().replace(/\s/g, "").replace(",", ".");
+
+  if (clean === "") {
+    return null;
+  }
+
+  const value = Number(clean);
+
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`"${text}" isn't a valid price. Use numbers like 186,84`);
+  }
+
+  return Math.round(value * 100) / 100;
+}
+
+/** "200 EUR", "186,84 EUR": decimales solo cuando los hay, con el formato del sistema. */
+export function formatMoney(amount: number, currency?: string | null): string {
+  const rounded = Math.round(amount * 100) / 100;
+  const decimals = Number.isInteger(rounded) ? 0 : 2;
+
+  return `${rounded.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })} ${currency || "EUR"}`;
+}

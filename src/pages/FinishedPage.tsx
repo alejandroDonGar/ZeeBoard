@@ -3,6 +3,7 @@ import { imageUrl, thumbUrl } from "../lib/images";
 import {
   isCommissionCompleted as isCommissionCompletedHelper,
   loadStageImagesForCommissions,
+  formatMoney,
 } from "../lib/commissionHelpers";
 import {
   getCommissions,
@@ -217,7 +218,7 @@ function FinishedPage({
             )}
 
             <span className="ml-auto text-sm font-bold">
-              {filteredCompleted.length} finished · {totalEarnings.toFixed(0)} EUR
+              {filteredCompleted.length} finished · {formatMoney(totalEarnings)}
             </span>
           </div>
 
@@ -248,7 +249,7 @@ function FinishedPage({
                           {group.label}
                         </h3>
                         <span className="text-xs text-faint">
-                          {group.commissions.length} · {groupEarnings.toFixed(0)} EUR
+                          {group.commissions.length} · {formatMoney(groupEarnings)}
                         </span>
                       </div>
 
@@ -296,7 +297,7 @@ function FinishedPage({
                                 </span>
                                 <span className="text-right text-sm font-bold">
                                   {commission.price
-                                    ? `${commission.price} ${commission.currency || "EUR"}`
+                                    ? formatMoney(commission.price, commission.currency)
                                     : "—"}
                                 </span>
                               </div>

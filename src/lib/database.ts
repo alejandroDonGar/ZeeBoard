@@ -380,31 +380,65 @@ export async function updateTemplateName(
   );
 }
 
-export async function replaceTemplateStages(
+export type StageDraft = { id: number | null; name: string };
+
+/**
+ * Guarda las etapas de una plantilla conservando sus ids: las comisiones guardan su etapa actual
+ * y sus imágenes por id, así que renombrar o reordenar no puede crear etapas nuevas.
+ * Una etapa que alguna comisión está usando no se puede quitar.
+ */
+export async function saveTemplateStages(
   templateId: number,
-  stages: string[],
+  stages: StageDraft[],
 ): Promise<void> {
   const cleanStages = stages
-    .map((stage) => stage.trim())
-    .filter(Boolean);
+    .map((stage) => ({ ...stage, name: stage.name.trim() }))
+    .filter((stage) => stage.name);
 
   await runSerialized(async (database) => {
-    await database.execute(
-      `
-      DELETE FROM template_stages
-      WHERE template_id = ?;
-      `,
+    const existing = await database.select<{ id: number; name: string }[]>(
+      `SELECT id, name FROM template_stages WHERE template_id = ?;`,
       [templateId],
     );
 
-    for (let index = 0; index < cleanStages.length; index++) {
-      await database.execute(
+    const keptIds = new Set(cleanStages.map((stage) => stage.id));
+    const removed = existing.filter((stage) => !keptIds.has(stage.id));
+
+    for (const stage of removed) {
+      const usage = await database.select<{ count: number }[]>(
         `
-        INSERT INTO template_stages (template_id, name, stage_order)
-        VALUES (?, ?, ?);
+        SELECT
+          (SELECT COUNT(*) FROM commissions WHERE current_stage_id = ?) +
+          (SELECT COUNT(*) FROM commission_stage_images WHERE stage_id = ?) AS count;
         `,
-        [templateId, cleanStages[index], index + 1],
+        [stage.id, stage.id],
       );
+
+      if (usage[0].count > 0) {
+        throw new Error(
+          `"${stage.name}" is in use by a commission (current stage or images), so it can't be removed.`,
+        );
+      }
+    }
+
+    for (const stage of removed) {
+      await database.execute(`DELETE FROM template_stages WHERE id = ?;`, [stage.id]);
+    }
+
+    for (let index = 0; index < cleanStages.length; index++) {
+      const stage = cleanStages[index];
+
+      if (stage.id !== null) {
+        await database.execute(
+          `UPDATE template_stages SET name = ?, stage_order = ? WHERE id = ? AND template_id = ?;`,
+          [stage.name, index + 1, stage.id, templateId],
+        );
+      } else {
+        await database.execute(
+          `INSERT INTO template_stages (template_id, name, stage_order) VALUES (?, ?, ?);`,
+          [templateId, stage.name, index + 1],
+        );
+      }
     }
   });
 }

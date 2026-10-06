@@ -6,8 +6,9 @@ import {
   duplicateTemplate,
   getTemplateStages,
   getTemplates,
-  replaceTemplateStages,
+  saveTemplateStages,
   updateTemplateName,
+  type StageDraft,
   type Template,
 } from "../lib/database";
 import PageHeader from "../components/PageHeader";
@@ -23,7 +24,7 @@ function TemplatesPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
   const [editTemplateName, setEditTemplateName] = useState("");
-  const [editStages, setEditStages] = useState<string[]>([]);
+  const [editStages, setEditStages] = useState<StageDraft[]>([]);
   const [editStageName, setEditStageName] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
@@ -39,7 +40,7 @@ function TemplatesPage() {
       setSelectedTemplate(data[0]);
       const stageData = await getTemplateStages(data[0].id);
       setEditTemplateName(data[0].name);
-      setEditStages(stageData.map((stage) => stage.name));
+      setEditStages(stageData.map(({ id, name }) => ({ id, name })));
     }
   }
 
@@ -50,7 +51,7 @@ function TemplatesPage() {
       return;
     }
 
-    setEditStages((currentStages) => [...currentStages, cleanStage]);
+    setEditStages((currentStages) => [...currentStages, { id: null, name: cleanStage }]);
     setEditStageName("");
   }
 
@@ -103,7 +104,7 @@ function TemplatesPage() {
       setSavingTemplate(true);
 
       await updateTemplateName(selectedTemplate.id, editTemplateName);
-      await replaceTemplateStages(selectedTemplate.id, editStages);
+      await saveTemplateStages(selectedTemplate.id, editStages);
 
       const data = await getTemplates();
       setTemplates(data);
@@ -116,7 +117,7 @@ function TemplatesPage() {
       if (updatedTemplate) {
         const stageData = await getTemplateStages(updatedTemplate.id);
         setEditTemplateName(updatedTemplate.name);
-        setEditStages(stageData.map((stage) => stage.name));
+        setEditStages(stageData.map(({ id, name }) => ({ id, name })));
       }
 
       setTemplateSaved(true);
@@ -126,7 +127,7 @@ function TemplatesPage() {
       }, 1800);
     } catch (error) {
     console.error(error);
-    showToast(`Save error: ${error}`, "error");
+    showToast(error instanceof Error ? error.message : `Save error: ${error}`, "error");
     } finally {
       setSavingTemplate(false);
     }
@@ -141,7 +142,7 @@ function TemplatesPage() {
     console.log("Stages:", stageData);
 
     setEditTemplateName(template.name);
-    setEditStages(stageData.map((stage) => stage.name));
+    setEditStages(stageData.map(({ id, name }) => ({ id, name })));
   }
 
   async function handleCreateTemplate() {
@@ -410,7 +411,7 @@ function TemplatesPage() {
                     ) : (
                       editStages.map((stage, index) => (
                         <motion.div
-                          key={`${stage}-${index}`}
+                          key={stage.id ?? `new-${index}`}
                           layout="position"
                           transition={{
                             layout: {
@@ -425,10 +426,10 @@ function TemplatesPage() {
                           </span>
 
                           <input
-                            value={stage}
+                            value={stage.name}
                             onChange={(event) => {
                               const updatedStages = [...editStages];
-                              updatedStages[index] = event.target.value;
+                              updatedStages[index] = { ...stage, name: event.target.value };
                               setEditStages(updatedStages);
                             }}
                             className="flex-1 rounded-xl border border-line-strong bg-surface px-3 py-2 text-sm font-semibold outline-none focus:border-ink"

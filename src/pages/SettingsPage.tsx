@@ -1,9 +1,11 @@
 import PageHeader from "../components/PageHeader";
-import SettingsCard from "../components/SettingsCard";
+import { Segmented } from "../components/BoardFilters";
 import { useEffect, useState } from "react";
 import { exportBackup, pickBackupFolder, restoreBackup } from "../lib/backup";
 import { applyTheme, getTheme, type ThemeChoice } from "../lib/theme";
-import { getAllUsedImagePaths } from "../lib/database";
+import { appSettings, getAllUsedImagePaths, updateSettings } from "../lib/database";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { appDataDir, join } from "@tauri-apps/api/path";
 import { cleanUpOrphanedImages, getStorageStats, type StorageStats } from "../lib/images";
 import ConfirmModal from "../components/ConfirmModal";
 
@@ -17,6 +19,8 @@ function formatBytes(bytes: number): string {
 
 function SettingsPage() {
   const [theme, setTheme] = useState<ThemeChoice>(getTheme);
+  const [currency, setCurrency] = useState(appSettings().default_currency);
+  const [ratePercent, setRatePercent] = useState(String(Math.round(appSettings().extra_character_rate * 100)));
   const [storage, setStorage] = useState<StorageStats | null>(null);
   const [imagesInUse, setImagesInUse] = useState(0);
 
@@ -85,93 +89,160 @@ function SettingsPage() {
     }
   }
 
+  const totalBytes = storage ? storage.imagesBytes + storage.thumbsBytes + storage.databaseBytes : 0;
+  const share = (bytes: number) => `${totalBytes > 0 ? (bytes / totalBytes) * 100 : 0}%`;
+
+  const section = "mb-2 mt-8 text-[11px] font-black uppercase tracking-[0.16em] text-faint first:mt-0";
+  const panel = "divide-y divide-line rounded-3xl border border-line bg-surface shadow-sm";
+  const row = "flex items-center gap-4 px-5 py-4";
+  const ghostButton =
+    "rounded-md border border-line-strong px-3 py-1.5 text-sm font-semibold text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-60";
+
   return (
     <>
-      <PageHeader
-        label="Preferences"
-        title="Settings"
-        description="Configure language, themes, storage and default workflows."
-      />
+      <PageHeader label="Preferences" title="Settings" description="Appearance, pricing, backups and storage." />
 
-      <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-2 gap-5 p-5 pb-6">
-        <SettingsCard title="Language" description="English is the default language. Spanish will be available later." />
-        <SettingsCard title="Appearance" description="Light, dark, or follow your Windows setting.">
-          <div className="mt-4 inline-flex rounded-2xl border border-line bg-paper p-1">
-            {(["light", "dark", "system"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => {
+      <section className="h-[calc(100vh-117px)] overflow-y-auto p-5 pb-10">
+        <div className="mx-auto max-w-2xl">
+          <h3 className={section}>Appearance</h3>
+          <div className={panel}>
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">Theme</p>
+                <p className="text-sm text-muted">Light, dark, or follow your Windows setting.</p>
+              </div>
+              <Segmented<ThemeChoice>
+                options={[
+                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark" },
+                  { value: "system", label: "System" },
+                ]}
+                value={theme}
+                onChange={(option) => {
                   applyTheme(option);
                   setTheme(option);
                 }}
-                className={
-                  theme === option
-                    ? "rounded-xl bg-primary px-4 py-2 text-sm font-bold capitalize text-on-primary shadow-sm"
-                    : "rounded-xl px-4 py-2 text-sm font-semibold capitalize text-muted transition hover:text-ink"
-                }
+              />
+            </div>
+          </div>
+
+          <h3 className={section}>Pricing</h3>
+          <div className={panel}>
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">Default currency</p>
+                <p className="text-sm text-muted">New commissions start with this one.</p>
+              </div>
+              <Segmented
+                options={["EUR", "USD", "GBP"].map((code) => ({ value: code, label: code }))}
+                value={currency}
+                onChange={(code) => {
+                  setCurrency(code);
+                  updateSettings({ default_currency: code }).catch(console.error);
+                }}
+              />
+            </div>
+
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">Extra character</p>
+                <p className="text-sm text-muted">
+                  Added to the base price for each character after the first. Commissions you already
+                  created keep their price.
+                </p>
+              </div>
+              <label className="flex items-center gap-1 text-sm font-semibold">
+                <input
+                  type="number"
+                  min={0}
+                  value={ratePercent}
+                  onChange={(event) => setRatePercent(event.target.value)}
+                  onBlur={() => {
+                    const value = Math.max(0, Number(ratePercent) || 0);
+                    setRatePercent(String(value));
+                    updateSettings({ extra_character_rate: value / 100 }).catch(console.error);
+                  }}
+                  className="w-20 rounded-md border border-line-strong bg-paper px-2 py-1.5 text-right font-bold outline-none focus:border-ink"
+                />
+                %
+              </label>
+            </div>
+          </div>
+
+          <h3 className={section}>Backups</h3>
+          <div className={panel}>
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">Back up your data</p>
+                <p className="text-sm text-muted">
+                  Database and images, to any folder. Restoring saves a copy of your current data first.
+                </p>
+                {backupMessage && <p className="mt-1 text-xs text-muted">{backupMessage}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                disabled={exporting}
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-60"
               >
-                {option}
+                {exporting ? "Exporting…" : "Export"}
               </button>
-            ))}
-          </div>
-        </SettingsCard>
-        <SettingsCard
-          title="Storage"
-          description="Your data stays on this computer. Images are kept as light copies; your original canvases stay wherever you keep them."
-        >
-          {storage && (
-            <dl className="mt-4 grid grid-cols-3 gap-3">
-              {[
-                ["Images", formatBytes(storage.imagesBytes), `${imagesInUse} in use · ${storage.imageCount} files`],
-                ["Thumbnails", formatBytes(storage.thumbsBytes), "For cards and lists"],
-                ["Database", formatBytes(storage.databaseBytes), "Commissions, clients…"],
-              ].map(([label, value, detail]) => (
-                <div key={label} className="rounded-2xl bg-paper p-3">
-                  <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-faint">
-                    {label}
-                  </dt>
-                  <dd className="mt-1 text-lg font-black text-ink">{value}</dd>
-                  <dd className="text-[11px] text-muted">{detail}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-
-          <div className="mt-4 flex flex-col gap-3">
-            <button
-              onClick={handleExportBackup}
-              disabled={exporting}
-              className="rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {exporting ? "Exporting..." : "Export backup"}
-            </button>
-
-            <button
-              onClick={async () => setRestoreFolder(await pickBackupFolder())}
-              disabled={restoring}
-              className="rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {restoring ? "Restoring..." : "Restore backup"}
-            </button>
-
-            <button
-              onClick={() => setShowCleanUpConfirmModal(true)}
-              disabled={cleaningUp}
-              className="rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {cleaningUp ? "Cleaning up..." : "Clean up unused images"}
-            </button>
+              <button
+                type="button"
+                onClick={async () => setRestoreFolder(await pickBackupFolder())}
+                disabled={restoring}
+                className={ghostButton}
+              >
+                {restoring ? "Restoring…" : "Restore…"}
+              </button>
+            </div>
           </div>
 
-          {backupMessage && (
-            <p className="mt-3 text-xs text-muted">{backupMessage}</p>
-          )}
+          <h3 className={section}>Storage</h3>
+          <div className={panel}>
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">{storage ? `${formatBytes(totalBytes)} used` : "Storage"}</p>
+                {storage && (
+                  <>
+                    <div className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-sm bg-paper">
+                      <span className="bg-primary" style={{ width: share(storage.imagesBytes) }} />
+                      <span className="bg-faint" style={{ width: share(storage.thumbsBytes) }} />
+                      <span className="bg-line-strong" style={{ width: share(storage.databaseBytes) }} />
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted">
+                      Images {formatBytes(storage.imagesBytes)} ({imagesInUse} in use · {storage.imageCount} files) ·
+                      Thumbnails {formatBytes(storage.thumbsBytes)} · Database {formatBytes(storage.databaseBytes)}
+                    </p>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={async () => revealItemInDir(await join(await appDataDir(), "zeeboard.db"))}
+                className={ghostButton}
+              >
+                Open folder
+              </button>
+            </div>
 
-          {cleanUpMessage && (
-            <p className="mt-1 text-xs text-muted">{cleanUpMessage}</p>
-          )}
-        </SettingsCard>
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">Unused images</p>
+                <p className="text-sm text-muted">Files that no commission or character uses anymore.</p>
+                {cleanUpMessage && <p className="mt-1 text-xs text-muted">{cleanUpMessage}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCleanUpConfirmModal(true)}
+                disabled={cleaningUp}
+                className={ghostButton}
+              >
+                {cleaningUp ? "Cleaning up…" : "Clean up"}
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
 
       {restoreFolder && (

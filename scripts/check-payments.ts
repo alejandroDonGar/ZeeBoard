@@ -20,9 +20,11 @@ assert.deepStrictEqual([s.status, s.paid, s.fees], ["paid", 0.3, 0]);
 console.log("payments ok");
 
 // Precio automático: base por el primer personaje, +50 % por cada extra
-assert.strictEqual(calculateCommissionPrice(160, 1), 160);
-assert.strictEqual(calculateCommissionPrice(160, 2), 240);
-assert.strictEqual(calculateCommissionPrice(160, 3), 320);
-assert.strictEqual(calculateCommissionPrice(160, 0), 160);
-assert.strictEqual(calculateCommissionPrice(99.99, 2), 149.99);
+assert.strictEqual(calculateCommissionPrice(160, 1, 0.5), 160);
+assert.strictEqual(calculateCommissionPrice(160, 2, 0.5), 240);
+assert.strictEqual(calculateCommissionPrice(160, 3, 0.5), 320);
+assert.strictEqual(calculateCommissionPrice(160, 0, 0.5), 160);
+assert.strictEqual(calculateCommissionPrice(99.99, 2, 0.5), 149.99);
+// Tarifa cambiada en Ajustes
+assert.strictEqual(calculateCommissionPrice(160, 2, 0.6), 256);
 console.log("prices ok");

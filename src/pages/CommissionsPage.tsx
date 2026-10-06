@@ -13,7 +13,6 @@ import {
   paymentSummary,
   PAYMENT_STATUS_STYLE,
   calculateCommissionPrice,
-  EXTRA_CHARACTER_RATE,
 } from "../lib/commissionHelpers";
 import {
   getTemplateStages,
@@ -21,6 +20,7 @@ import {
   createCommission,
   getCommissions,
   getAllPayments,
+  appSettings,
   getAllCorrections,
   addCorrection,
   deleteCorrection,
@@ -215,7 +215,7 @@ function CommissionsPage() {
     setPlatform("Discord");
     setSelectedTemplateId(null);
     setCommissionPrice("");
-    setCurrency("EUR");
+    setCurrency(appSettings().default_currency);
     setCommissionDeadline("");
     setCommissionNotes("");
     setSelectedCharacterIds([]);
@@ -271,7 +271,9 @@ function CommissionsPage() {
     const basePrice = templates.find((template) => template.id === templateId)?.base_price;
 
     if (basePrice != null) {
-      setCommissionPrice(String(calculateCommissionPrice(basePrice, characterCount)).replace(".", ","));
+      setCommissionPrice(
+        String(calculateCommissionPrice(basePrice, characterCount, appSettings().extra_character_rate)).replace(".", ","),
+      );
     }
   }
 
@@ -1767,11 +1769,15 @@ function CommissionsPage() {
                     {extraCharacters > 0 && (
                       <p className="flex justify-between text-muted">
                         <span>
-                          + {extraCharacters} extra character{extraCharacters === 1 ? "" : "s"} ({EXTRA_CHARACTER_RATE * 100}% each)
+                          + {extraCharacters} extra character{extraCharacters === 1 ? "" : "s"} ({Math.round(appSettings().extra_character_rate * 100)}% each)
                         </span>
                         <span>
                           {formatMoney(
-                            calculateCommissionPrice(formTemplate.base_price, selectedCharacterIds.length) -
+                            calculateCommissionPrice(
+                              formTemplate.base_price,
+                              selectedCharacterIds.length,
+                              appSettings().extra_character_rate,
+                            ) -
                               formTemplate.base_price,
                             currency,
                           )}

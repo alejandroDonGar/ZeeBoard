@@ -138,13 +138,10 @@ export const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; classN
   paid: { label: "Paid", className: "bg-green-50 text-green-700" },
 };
 
-/** Cada personaje después del primero suma este porcentaje del precio base */
-export const EXTRA_CHARACTER_RATE = 0.5;
-
-/** Full Colour a 160 con 2 personajes: 160 + 50 % de 160 = 240 */
-export function calculateCommissionPrice(basePrice: number, characterCount: number): number {
+/** Full Colour a 160 con 2 personajes y rate 0.5: 160 + 50 % de 160 = 240 (el rate sale de Ajustes) */
+export function calculateCommissionPrice(basePrice: number, characterCount: number, extraCharacterRate: number): number {
   const extraCharacters = Math.max(characterCount, 1) - 1;
-  return round2(basePrice * (1 + EXTRA_CHARACTER_RATE * extraCharacters));
+  return round2(basePrice * (1 + extraCharacterRate * extraCharacters));
 }
 
 /** Lee un precio escrito a mano: acepta "186,84", "186.84" o "200". Vacío = sin precio. */

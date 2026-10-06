@@ -10,11 +10,12 @@ import {
   saveTemplateStages,
   updateTemplateBasePrice,
   updateTemplateRevisions,
+  appSettings,
   updateTemplateName,
   type StageDraft,
   type Template,
 } from "../lib/database";
-import { EXTRA_CHARACTER_RATE, formatMoney, parsePrice } from "../lib/commissionHelpers";
+import { formatMoney, parsePrice } from "../lib/commissionHelpers";
 import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
@@ -314,7 +315,7 @@ function TemplatesPage() {
                   className="w-28 rounded-md border border-line-strong bg-paper px-2 py-1 text-sm font-bold outline-none focus:border-ink"
                 />
                 <span className="text-xs text-faint">
-                  for one character · +{EXTRA_CHARACTER_RATE * 100}% per extra character
+                  for one character · +{Math.round(appSettings().extra_character_rate * 100)}% per extra character
                 </span>
               </label>
 

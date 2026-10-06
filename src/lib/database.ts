@@ -61,6 +61,41 @@ export async function closeDatabase(): Promise<void> {
   }
 }
 
+export type AppSettings = {
+  default_currency: string;
+  /** 0.5 = cada personaje extra suma el 50 % del precio base */
+  extra_character_rate: number;
+};
+
+// Se cargan una vez al arrancar para poder leerlos sin await desde cualquier pantalla
+let settings: AppSettings = { default_currency: "EUR", extra_character_rate: 0.5 };
+
+export function appSettings(): AppSettings {
+  return settings;
+}
+
+async function loadSettings(): Promise<void> {
+  const database = await getDatabase();
+  const rows = await database.select<AppSettings[]>(
+    `SELECT default_currency, extra_character_rate FROM settings WHERE id = 1;`,
+  );
+
+  if (rows[0]) {
+    settings = rows[0];
+  }
+}
+
+export async function updateSettings(changes: Partial<AppSettings>): Promise<void> {
+  const database = await getDatabase();
+  const next = { ...settings, ...changes };
+
+  await database.execute(
+    `UPDATE settings SET default_currency = ?, extra_character_rate = ? WHERE id = 1;`,
+    [next.default_currency, next.extra_character_rate],
+  );
+  settings = next;
+}
+
 export async function initializeDatabase() {
   const database = await getDatabase();
 
@@ -71,6 +106,10 @@ export async function initializeDatabase() {
       theme TEXT NOT NULL DEFAULT 'zebra-light'
     );
   `);
+  await database.execute(`ALTER TABLE settings ADD COLUMN default_currency TEXT NOT NULL DEFAULT 'EUR';`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN extra_character_rate REAL NOT NULL DEFAULT 0.5;`).catch(() => {});
+  await database.execute(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
+  await loadSettings();
 
   await database.execute(`
     CREATE TABLE IF NOT EXISTS clients (

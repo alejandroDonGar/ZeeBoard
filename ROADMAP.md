@@ -24,21 +24,22 @@ Los lienzos originales pesan 40–70 MB; la app solo necesita copias ligeras (lo
 - [x] En Ajustes: espacio usado y limpieza de huérfanas
 
 ## Fase 2 · Sistema de diseño
-- [ ] Colores, tipografía, radios y sombras como variables de Tailwind (`@theme`)
-- [ ] Modo claro y oscuro
+- [x] Colores y radios como variables de Tailwind (`@theme`); esquinas rectas, sin barras de scroll
+- [ ] Tipografía y sombras
+- [x] Modo claro y oscuro
 - [ ] Componentes base: botón, tarjeta, modal, campos de formulario, etiqueta, estado vacío
 - [ ] Iconos (lucide-react) y barra lateral rediseñada
 - [ ] Animaciones discretas
 
 ## Fase 3 · Pantalla por pantalla
 Dividir cada pantalla en componentes y aplicar el nuevo diseño.
-- [ ] Comisiones (tablero)
-- [ ] Detalle de comisión y galería
-- [ ] Clientes y personajes (incluye poder borrar personajes)
-- [ ] Plantillas
-- [ ] Etiquetas
-- [ ] Terminadas
-- [ ] Dashboard
+- [x] Comisiones (tablero)
+- [x] Detalle de comisión y galería
+- [x] Clientes y personajes (incluye poder borrar personajes)
+- [x] Plantillas
+- [x] Etiquetas
+- [x] Terminadas
+- [x] Dashboard
 - [ ] Ajustes
 - [ ] Dividir `database.ts` por entidades
 
@@ -65,8 +66,8 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [ ] Anotaciones de correcciones sobre las imágenes
 
 **Negocio**
-- [ ] Precios por plantilla con extras
-- [ ] Pagos parciales e ingreso neto (comisiones de PayPal, Ko-fi…)
+- [x] Precios por plantilla con extras (precio base + 50 % por personaje extra)
+- [x] Pagos parciales e ingreso neto (comisiones de PayPal, Ko-fi…)
 - [ ] Contador de revisiones incluidas
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real

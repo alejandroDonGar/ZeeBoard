@@ -68,7 +68,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 **Negocio**
 - [x] Precios por plantilla con extras (precio base + 50 % por personaje extra)
 - [x] Pagos parciales e ingreso neto (comisiones de PayPal, Ko-fi…)
-- [ ] Contador de revisiones incluidas
+- [x] Contador de revisiones incluidas (correcciones por etapa)
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real
 - [ ] Varias monedas

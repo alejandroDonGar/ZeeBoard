@@ -59,6 +59,11 @@ export function thumbUrl(path: string): string {
   return toAssetUrl(getThumbPath(path));
 }
 
+/** La foto de un cliente: si es un archivo nuestro, su miniatura; si es una dirección antigua (Bluesky), tal cual. */
+export function avatarSrc(avatar: string): string {
+  return isProcessedImage(avatar) ? thumbUrl(avatar) : avatar;
+}
+
 export async function importImageFromPath(path: string): Promise<StoredImage> {
   return await invoke<StoredImage>("import_image_from_path", { path });
 }

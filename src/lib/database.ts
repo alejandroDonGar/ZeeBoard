@@ -1499,9 +1499,14 @@ export async function getAllUsedImagePaths(): Promise<string[]> {
     `SELECT image_data_url FROM commission_stage_images;`,
   );
 
+  const avatars = await database.select<{ avatar_url: string }[]>(
+    `SELECT avatar_url FROM clients WHERE avatar_url IS NOT NULL AND avatar_url NOT LIKE 'http%';`,
+  );
+
   return [
     ...characterRefs.map((row) => row.image_data_url),
     ...stageImages.map((row) => row.image_data_url),
+    ...avatars.map((row) => row.avatar_url),
   ];
 }
 const IMAGE_TABLES = ["character_references", "commission_stage_images"] as const;

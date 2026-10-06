@@ -1,3 +1,4 @@
+mod avatars;
 mod backup;
 mod export;
 mod images;
@@ -17,6 +18,7 @@ pub fn run() {
             images::delete_image_files,
             images::cleanup_orphan_images,
             images::storage_stats,
+            avatars::fetch_avatar_resource,
             backup::restore_backup,
             export::write_text_file,
             export::read_text_file,

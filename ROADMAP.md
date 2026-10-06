@@ -78,6 +78,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 **Flujo de trabajo**
 - [x] Recordatorios de fechas de entrega (también aviso de comisiones paradas)
 - [x] Lista de espera y plazas abiertas (con importación del formulario de Google)
+- [x] Foto de perfil de los clientes: Bluesky → Telegram → a mano (arrastrar, pegar o clic), guardada en disco
 - [ ] Mensajes predefinidos para clientes
 - [ ] Marca de agua al exportar WIPs
 - [ ] Lista de entregables por comisión

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { hide, isPrivate } from "../lib/privacy";
 import { parseTagAccount } from "../lib/formImport";
-import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
+import { fetchAvatar } from "../lib/avatars";
+import { avatarSrc, imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
@@ -54,6 +55,7 @@ function ClientsPage({
   const [clientNotes, setClientNotes] = useState("");
   // La cuenta que se etiqueta al publicar, como la escribirías: "Bluesky @name"
   const [tagText, setTagText] = useState("");
+  const [fetchingAvatar, setFetchingAvatar] = useState(false);
   // null = cerrado, "new" = crear, Client = editar
   const [clientForm, setClientForm] = useState<Client | "new" | null>(null);
   const [clientSearch, setClientSearch] = useState("");
@@ -111,11 +113,19 @@ function ClientsPage({
       const newId = await createClient(clientName, clientPlatform, clientHandle, clientNotes);
       await saveTag(newId);
 
-      const avatarUrl = await fetchBlueskyAvatar(clientPlatform, clientHandle);
-
-      if (avatarUrl) {
-        await updateClientAvatar(newId, avatarUrl);
-      }
+      // La foto se busca en segundo plano para no hacerte esperar
+      const tag = parseTagAccount(tagText, { platform: "Other", handle: "" });
+      fetchAvatar([
+        { platform: tag?.platform ?? null, handle: tag?.handle ?? null },
+        { platform: clientPlatform, handle: clientHandle },
+      ])
+        .then(async (path) => {
+          if (path) {
+            await updateClientAvatar(newId, path);
+            await loadClients();
+          }
+        })
+        .catch(console.error);
 
       closeClientForm();
 
@@ -291,41 +301,51 @@ function ClientsPage({
     return colours[total % colours.length];
   }
 
-  function cleanBlueskyHandle(handle: string) {
-    return handle.trim().replace(/^@/, "");
-  }
-
-  async function fetchBlueskyAvatar(platform: string | null, handle: string | null) {
-    if (platform !== "Bluesky" || !handle) {
-      return null;
-    }
-
-    const cleanHandle = cleanBlueskyHandle(handle);
-
-    const response = await fetch(
-      `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(
-        cleanHandle,
-      )}`,
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const profile = await response.json();
-
-    return profile.avatar || null;
+  /** Cuentas donde buscar su foto, por orden: primero la de etiqueta y luego la de contacto. */
+  function avatarAccounts(client: Client) {
+    return [
+      { platform: client.tag_platform, handle: client.tag_handle },
+      { platform: client.platform, handle: client.handle },
+    ];
   }
 
   async function handleFetchClientAvatar(client: Client) {
     try {
-      const avatarUrl = await fetchBlueskyAvatar(client.platform, client.handle);
+      setFetchingAvatar(true);
+      const path = await fetchAvatar(avatarAccounts(client));
 
-      await updateClientAvatar(client.id, avatarUrl);
+      if (!path) {
+        showToast("No public photo found. Drop an image on the avatar to set it yourself.", "error");
+        return;
+      }
 
+      await updateClientAvatar(client.id, path);
       await loadClients();
+      showToast("Photo updated.", "success");
     } catch (error) {
       console.error(error);
+      showToast("Could not fetch the photo.", "error");
+    } finally {
+      setFetchingAvatar(false);
+    }
+  }
+
+  /** Pone la foto a mano: sin `source` abre el selector; si no, es lo que arrastraste o pegaste. */
+  async function handleSetAvatar(clientId: number, source?: string | File) {
+    try {
+      const picked = source ?? (await pickImagePaths())[0];
+
+      if (!picked) {
+        return;
+      }
+
+      const stored = await importImage(picked);
+      await updateClientAvatar(clientId, stored.path);
+      await loadClients();
+      showToast("Photo updated.", "success");
+    } catch (error) {
+      console.error(error);
+      showToast(`Could not set the photo: ${error}`, "error");
     }
   }
 
@@ -428,11 +448,19 @@ function ClientsPage({
       if (kind === "character" || kind === "character-detail") {
         handleAddCharacterReferences(Number(characterId), paths);
       }
+
+      // Soltar una imagen sobre la foto del cliente
+      if (kind === "avatar") {
+        handleSetAvatar(Number(characterId), paths[0]);
+      }
     },
     // Ctrl+V añade la imagen al personaje abierto en la ficha del cliente
     onPaste: (files) => {
       if (selectedClient && expandedCharacterId !== null) {
         handleAddCharacterReferences(expandedCharacterId, files);
+      } else if (selectedClient) {
+        // Sin personaje abierto, la imagen pegada es la foto del cliente
+        handleSetAvatar(selectedClient.id, files[0]);
       }
     },
   });
@@ -533,7 +561,7 @@ function ClientsPage({
 
     return client.avatar_url ? (
       <img
-        src={client.avatar_url}
+        src={avatarSrc(client.avatar_url)}
         alt={client.name}
         className={`${sizeClass} shrink-0 rounded-full object-cover`}
       />
@@ -634,7 +662,19 @@ function ClientsPage({
           ) : (
             <>
               <div className="flex items-center gap-4">
-                {renderAvatar(selectedClient, "lg")}
+                <button
+                  type="button"
+                  data-image-drop={`avatar:${selectedClient.id}`}
+                  title="Click, drop an image or paste one (Ctrl+V) to change the photo"
+                  onClick={() => handleSetAvatar(selectedClient.id)}
+                  className={`shrink-0 rounded-full transition ${
+                    dragZoneId === `avatar:${selectedClient.id}`
+                      ? "ring-2 ring-ink ring-offset-2 ring-offset-surface"
+                      : "hover:opacity-80"
+                  }`}
+                >
+                  {renderAvatar(selectedClient, "lg")}
+                </button>
 
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate text-2xl font-black">{hide(selectedClient.name)}</h3>
@@ -654,13 +694,16 @@ function ClientsPage({
                 </div>
 
                 <div className="flex shrink-0 gap-2">
-                  {selectedClient.platform === "Bluesky" && selectedClient.handle && (
+                  {avatarAccounts(selectedClient).some(
+                    (account) => (account.platform === "Bluesky" || account.platform === "Telegram") && account.handle,
+                  ) && (
                     <button
                       type="button"
                       onClick={() => handleFetchClientAvatar(selectedClient)}
+                      disabled={fetchingAvatar}
                       className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-ink hover:text-ink"
                     >
-                      Fetch avatar
+                      {fetchingAvatar ? "Fetching…" : "Fetch photo"}
                     </button>
                   )}
 

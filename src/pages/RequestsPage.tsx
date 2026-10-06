@@ -10,6 +10,7 @@ import {
   getTemplates,
   importRequests,
   setClientEmail,
+  updateClientAvatar,
   setClientTag,
   setRequestStatus,
   setRequestTemplate,
@@ -20,6 +21,7 @@ import {
 import { calculateCommissionPrice, formatMoney, loadOpenCommissions } from "../lib/commissionHelpers";
 import { normalizeHandle, parseResponses } from "../lib/formImport";
 import { REQUESTS_CHANGED, syncFormResponses } from "../lib/formSync";
+import { fetchAvatar } from "../lib/avatars";
 import { hide } from "../lib/privacy";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Segmented } from "../components/BoardFilters";
@@ -135,6 +137,20 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
       if (request.email) {
         await setClientEmail(clientId, request.email);
+      }
+
+      // Sin foto todavía: se busca en segundo plano (Bluesky o Telegram) y no retrasa la comisión
+      if (!existing?.avatar_url) {
+        fetchAvatar([
+          { platform: request.tag_platform, handle: request.tag_handle },
+          { platform, handle: request.contact },
+        ])
+          .then(async (path) => {
+            if (path) {
+              await updateClientAvatar(clientId, path);
+            }
+          })
+          .catch(console.error);
       }
 
       // Lo último que dice el cliente es lo que manda: sustituye a la cuenta de etiqueta anterior

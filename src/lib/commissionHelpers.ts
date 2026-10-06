@@ -141,6 +141,18 @@ export const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; classN
   paid: { label: "Paid", className: "bg-green-50 text-green-700" },
 };
 
+// ponytail: tu usuario fijo en el código (es el mismo en todas tus redes); pasarlo a Ajustes si alguna vez cambia
+const ARTIST_HANDLE = "@AverageZebraBoy";
+
+/** Texto corto para la factura: "Rendered, 2 characters (Ana, Beto) - @AverageZebraBoy". */
+export function invoiceDescription(templateName: string | null, characterNames: string[]): string {
+  const count = characterNames.length;
+  const characters = count ? `${count} ${count === 1 ? "character" : "characters"} (${characterNames.join(", ")})` : "";
+  const detail = [templateName, characters].filter(Boolean).join(", ");
+
+  return detail ? `${detail} - ${ARTIST_HANDLE}` : ARTIST_HANDLE;
+}
+
 /** Full Colour a 160 con 2 personajes y rate 0.5: 160 + 50 % de 160 = 240 (el rate sale de Ajustes) */
 export function calculateCommissionPrice(basePrice: number, characterCount: number, extraCharacterRate: number): number {
   const extraCharacters = Math.max(characterCount, 1) - 1;

@@ -69,6 +69,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [x] Precios por plantilla con extras (precio base + 50 % por personaje extra)
 - [x] Pagos parciales e ingreso neto (comisiones de PayPal, Ko-fi…)
 - [x] Email del cliente e importación del CSV de PayPal (cruza cobros por email, sin duplicar)
+- [x] Botón "Copy description": texto corto para la factura de PayPal (plantilla, personajes y tu usuario)
 - [x] Contador de revisiones incluidas (correcciones por etapa)
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real

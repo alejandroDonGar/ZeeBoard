@@ -1,6 +1,6 @@
 // Comprobación rápida de pagos y precios: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { calculateCommissionPrice, formatMoney, paymentSummary, receivedAfterFees } from "../src/lib/commissionHelpers";
+import { calculateCommissionPrice, formatMoney, invoiceDescription, paymentSummary, receivedAfterFees } from "../src/lib/commissionHelpers";
 import { HIDDEN, hide, setPrivate } from "../src/lib/privacy";
 
 // PayPal: el cliente paga 200, te llegan 186,84
@@ -45,3 +45,9 @@ setPrivate(false);
 assert.strictEqual(hide("Kai"), "Kai");
 assert.notStrictEqual(formatMoney(200, "EUR"), "•••");
 console.log("private ok");
+
+// Descripción para la factura
+assert.strictEqual(invoiceDescription("Rendered", ["Ana", "Beto"]), "Rendered, 2 characters (Ana, Beto) - @AverageZebraBoy");
+assert.strictEqual(invoiceDescription("Sketch", ["Ana"]), "Sketch, 1 character (Ana) - @AverageZebraBoy");
+assert.strictEqual(invoiceDescription(null, []), "@AverageZebraBoy");
+console.log("description ok");

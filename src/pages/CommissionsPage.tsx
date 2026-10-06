@@ -16,6 +16,7 @@ import {
   paymentSummary,
   PAYMENT_STATUS_STYLE,
   calculateCommissionPrice,
+  invoiceDescription,
 } from "../lib/commissionHelpers";
 import {
   getTemplateStages,
@@ -641,6 +642,18 @@ function CommissionsPage() {
       .catch(() => showToast("Could not copy it.", "error"));
   }
 
+  function copyInvoiceDescription() {
+    const text = invoiceDescription(
+      templates.find((template) => template.id === activeCommission?.template_id)?.name ?? null,
+      activeCharacters.map((character) => character.name),
+    );
+
+    navigator.clipboard
+      .writeText(text)
+      .then(() => showToast("Description copied.", "success"))
+      .catch(() => showToast("Could not copy it.", "error"));
+  }
+
   const activeDeadlineStatus = activeCommission ? getDeadlineStatus(activeCommission.deadline) : null;
   const activePaymentStatus =
     PAYMENT_STATUS_STYLE[
@@ -981,6 +994,17 @@ function CommissionsPage() {
                             className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-highlight"
                           >
                             {duplicatingCommission ? "Duplicating…" : "Duplicate"}
+                          </button>
+                          <button
+                            type="button"
+                            title="Short text for the PayPal invoice"
+                            onClick={() => {
+                              setCommissionMenuOpen(false);
+                              copyInvoiceDescription();
+                            }}
+                            className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-highlight"
+                          >
+                            Copy description
                           </button>
                           <button
                             type="button"

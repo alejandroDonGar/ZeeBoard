@@ -477,7 +477,7 @@ export async function createCommission(
   currency: string,
   deadline: string | null,
   notes: string,
-): Promise<void> {
+): Promise<number> {
   const database = await getDatabase();
 
   const cleanTitle = title.trim();
@@ -493,7 +493,7 @@ export async function createCommission(
     firstStageId = stages.length > 0 ? stages[0].id : null;
   }
 
-  await database.execute(
+  const result = await database.execute(
     `
     INSERT INTO commissions (
       title,
@@ -524,6 +524,8 @@ export async function createCommission(
       new Date().toISOString(),
     ],
   );
+
+  return Number(result.lastInsertId);
 }
 
 export async function updateCommissionStage(

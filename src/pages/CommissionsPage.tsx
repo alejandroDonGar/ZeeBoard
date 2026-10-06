@@ -50,7 +50,9 @@ import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 
 function CommissionsPage() {
-  const [showNewCommissionModal, setShowNewCommissionModal] = useState(false);
+  // Un solo formulario para crear y editar: null = cerrado
+  const [formMode, setFormMode] = useState<"new" | "edit" | null>(null);
+  const [characterSearch, setCharacterSearch] = useState("");
   const [commissionTitle, setCommissionTitle] = useState("");
   const [commissionPrice, setCommissionPrice] = useState("");
   const [commissionDeadline, setCommissionDeadline] = useState("");
@@ -58,27 +60,21 @@ function CommissionsPage() {
   const [clientName, setClientName] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClientIds, setSelectedClientIds] = useState<number[]>([]);
   const [charactersByClientId, setCharactersByClientId] = useState<Record<number, ClientCharacter[]>>({});
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<number[]>([]);
   const [commissionCharactersById, setCommissionCharactersById] = useState<Record<number, number[]>>({});
   const [referencesByCharacterId, setReferencesByCharacterId] = useState<Record<number, CharacterReference[]>>({});
   const [platform, setPlatform] = useState("Discord");
   const [currency, setCurrency] = useState("EUR");
-  const [hasDeadline, setHasDeadline] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [creatingCommission, setCreatingCommission] = useState(false);
-  const [commissionCreated, setCommissionCreated] = useState(false);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null);
   const [workflowStages, setWorkflowStages] = useState<TemplateStage[]>([]);
   const [templateStagesByTemplateId, setTemplateStagesByTemplateId] = useState<Record<number, TemplateStage[]>>({});
   const activeCommission = commissions.find((commission) => commission.id === activeCommissionId) ?? null;
-  const [showEditCommissionModal, setShowEditCommissionModal] = useState(false);
   const [savingCommission, setSavingCommission] = useState(false);
-  const [commissionSaved, setCommissionSaved] = useState(false);
   const [duplicatingCommission, setDuplicatingCommission] = useState(false);
   const [showDeleteCommissionModal, setShowDeleteCommissionModal] = useState(false);
   const [deletingCommission, setDeletingCommission] = useState(false);
@@ -204,63 +200,20 @@ function CommissionsPage() {
       .catch(console.error);
   }, []);
 
-  async function handleCreateCommission() {
-    try {
-      setCreatingCommission(true);
-
-      const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
-
-      await createCommission(
-        commissionTitle,
-        selectedClientId,
-        selectedClient?.name || clientName,
-        selectedClient?.platform || platform,
-        selectedTemplateId,
-        parsePrice(commissionPrice),
-        currency,
-        hasDeadline ? commissionDeadline : null,
-        commissionNotes,
-      );
-
-      const createdCommissions = await getCommissions();
-      const createdCommission = createdCommissions[0];
-
-      if (createdCommission) {
-        await replaceCommissionCharacters(
-          createdCommission.id,
-          selectedCharacterIds,
-        );
-      }
-
-      const data = await getCommissions();
-      setCommissions(data);
-      await loadTagsForCommissions(data);
-
-      setCommissionTitle("");
-      setSelectedClientId(null);
-      setClientName("");
-      setPlatform("Discord");
-      setSelectedTemplateId(null);
-      setCommissionPrice("");
-      setCurrency("EUR");
-      setHasDeadline(false);
-      setCommissionDeadline("");
-      setCommissionNotes("");
-      setSelectedClientIds([]);
-      setSelectedCharacterIds([]);
-
-      setCommissionCreated(true);
-
-      setTimeout(() => {
-        setCommissionCreated(false);
-        setShowNewCommissionModal(false);
-      }, 1500);
-    } catch (error) {
-    console.error(error);
-    showToast(error instanceof Error ? error.message : `Commission error: ${error}`, "error");
-    } finally {
-      setCreatingCommission(false);
-    }
+  function openNewCommissionForm() {
+    setCommissionTitle("");
+    setSelectedClientId(null);
+    setClientName("");
+    setPlatform("Discord");
+    setSelectedTemplateId(null);
+    setCommissionPrice("");
+    setCurrency("EUR");
+    setCommissionDeadline("");
+    setCommissionNotes("");
+    setSelectedCharacterIds([]);
+    setSelectedTagIds([]);
+    setCharacterSearch("");
+    setFormMode("new");
   }
 
   useEffect(() => {
@@ -314,15 +267,21 @@ function CommissionsPage() {
     }
   }
 
-  const selectedTemplateBasePrice =
-    templates.find((template) => template.id === selectedTemplateId)?.base_price ?? null;
+  const formTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
   const extraCharacters = Math.max(selectedCharacterIds.length, 1) - 1;
-  const autoPriceHint =
-    selectedTemplateBasePrice === null
-      ? null
-      : extraCharacters === 0
-        ? `${formatMoney(selectedTemplateBasePrice)} base price`
-        : `${formatMoney(selectedTemplateBasePrice)} + ${EXTRA_CHARACTER_RATE * 100}% × ${extraCharacters} extra character${extraCharacters === 1 ? "" : "s"}`;
+  // Chips: los personajes del cliente elegido, más los de otros clientes que ya estén elegidos
+  const formCharacterOptions = Object.values(charactersByClientId)
+    .flat()
+    .filter((character) => character.client_id === selectedClientId || selectedCharacterIds.includes(character.id));
+  const allCharacterOptions = Object.values(charactersByClientId)
+    .flat()
+    .map((character) => ({
+      id: character.id,
+      label: `${character.name} (${clients.find((client) => client.id === character.client_id)?.name ?? "?"})`,
+    }));
+  const formLabel = "mb-1.5 block text-[11px] font-black uppercase tracking-[0.16em] text-faint";
+  const formField =
+    "rounded-md border border-line-strong bg-surface px-3 py-2 text-sm outline-none focus:border-ink";
 
   async function loadPayments() {
     const payments = await getAllPayments();
@@ -411,62 +370,60 @@ function CommissionsPage() {
     setClientName(activeCommission.client_name || "");
     setSelectedClientId(activeCommission.client_id);
     setPlatform(activeCommission.platform || "Discord");
-    setCommissionPrice(
-      activeCommission.price ? String(activeCommission.price) : "",
-    );
+    setSelectedTemplateId(activeCommission.template_id);
+    setCommissionPrice(activeCommission.price !== null ? String(activeCommission.price).replace(".", ",") : "");
     setCurrency(activeCommission.currency || "EUR");
     setCommissionDeadline(activeCommission.deadline || "");
-    setHasDeadline(Boolean(activeCommission.deadline));
     setCommissionNotes(activeCommission.notes || "");
-
-    const tags = await getCommissionTags(activeCommission.id);
-
-    setSelectedTagIds(
-      tags.map((tag) => tag.id),
-    );
-    setShowEditCommissionModal(true);
+    setSelectedCharacterIds(commissionCharactersById[activeCommission.id] ?? []);
+    setSelectedTagIds((await getCommissionTags(activeCommission.id)).map((tag) => tag.id));
+    setCharacterSearch("");
+    setFormMode("edit");
   }
 
-  async function handleSaveCommissionChanges() {
-    if (!activeCommission) {
-      return;
-    }
-
+  /** Guarda el formulario: crea o actualiza, y en los dos casos guarda etiquetas y personajes */
+  async function handleSaveCommissionForm() {
     try {
       setSavingCommission(true);
 
       const selectedClient = clients.find((client) => client.id === selectedClientId) ?? null;
-
-      await updateCommission(
-        activeCommission.id,
+      const fields = [
         commissionTitle,
         selectedClientId,
         selectedClient?.name || clientName,
         selectedClient?.platform || platform,
-        parsePrice(commissionPrice),
-        currency,
-        hasDeadline ? commissionDeadline : null,
-        commissionNotes,
-      );
-      await replaceCommissionTags(
-        activeCommission.id,
-        selectedTagIds,
-      );
+      ] as const;
+      const price = parsePrice(commissionPrice);
+      const deadline = commissionDeadline || null;
+
+      let commissionId: number;
+
+      if (formMode === "edit" && activeCommission) {
+        commissionId = activeCommission.id;
+        await updateCommission(commissionId, ...fields, price, currency, deadline, commissionNotes);
+      } else {
+        commissionId = await createCommission(
+          ...fields,
+          selectedTemplateId,
+          price,
+          currency,
+          deadline,
+          commissionNotes,
+        );
+      }
+
+      await replaceCommissionTags(commissionId, selectedTagIds);
+      await replaceCommissionCharacters(commissionId, selectedCharacterIds);
 
       const data = await getCommissions();
-
       setCommissions(data);
-
       await loadTagsForCommissions(data);
-      await loadStageImagesForCommissions(data);
+      await loadCharactersForCommissions(data);
 
-
-      setCommissionSaved(true);
-
-      setTimeout(() => {
-        setCommissionSaved(false);
-        setShowEditCommissionModal(false);
-      }, 1500);
+      showToast(formMode === "edit" ? "Commission saved." : "Commission created.", "success");
+      setFormMode(null);
+      setActiveCommissionId(commissionId);
+      setViewMode("list");
     } catch (error) {
       console.error(error);
       showToast(error instanceof Error ? error.message : `Commission error: ${error}`, "error");
@@ -770,7 +727,7 @@ function CommissionsPage() {
         title="Commissions"
         description="Organize your drawings by stages, clients, dates and tags."
         action="+ New commission"
-        onAction={() => setShowNewCommissionModal(true)}
+        onAction={openNewCommissionForm}
       />
 
       <div className="flex items-start gap-3 px-5 pt-5">
@@ -1485,459 +1442,160 @@ function CommissionsPage() {
         </aside>
         )}
       </section>
-      {showNewCommissionModal && (
+      {formMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-[650px] flex-col rounded-3xl border border-line bg-surface shadow-2xl">
-            <div className="shrink-0 px-6 pt-6">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-                New commission
-              </p>
-
-              <h3 className="mt-2 text-2xl font-black text-ink">
-                Create commission
-              </h3>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-
-              <div className="mt-6 grid grid-cols-2 gap-4">
-                <input
-                  value={commissionTitle}
-                  onChange={(event) => setCommissionTitle(event.target.value)}
-                  placeholder="Commission title"
-                  className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                />
-
-                <div className="col-span-2">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                    Commissioners
-                  </p>
-
-                  <div className="flex flex-wrap gap-2">
-                    {clients.map((client) => {
-                      const selected = selectedClientIds.includes(client.id);
-
-                      return (
-                        <button
-                          key={client.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedClientIds((current) => {
-                              if (selected) {
-                                return current.filter((id) => id !== client.id);
-                              }
-
-                              return [...current, client.id];
-                            });
-
-                            if (!selectedClientId) {
-                              setSelectedClientId(client.id);
-                              setClientName(client.name);
-                              setPlatform(client.platform || "Discord");
-                            }
-                          }}
-                          className={
-                            selected
-                              ? "rounded-sm bg-primary px-4 py-2 text-sm font-black text-on-primary"
-                              : "rounded-sm border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-muted"
-                          }
-                        >
-                          {client.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="col-span-2">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                    Characters
-                  </p>
-
-                  {selectedClientIds.length === 0 ? (
-                    <p className="rounded-2xl border border-dashed border-line-strong bg-paper px-4 py-3 text-sm text-faint">
-                      Select one or more commissioners first.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {selectedClientIds.map((clientId) => {
-                        const client = clients.find((item) => item.id === clientId);
-                        const characters = charactersByClientId[clientId] ?? [];
-
-                        return (
-                          <div
-                            key={clientId}
-                            className="rounded-2xl border border-line bg-paper p-3"
-                          >
-                            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-faint">
-                              {client?.name || "Client"}
-                            </p>
-
-                            {characters.length === 0 ? (
-                              <p className="text-sm text-faint">
-                                No characters saved for this client.
-                              </p>
-                            ) : (
-                              <div className="flex flex-wrap gap-2">
-                                {characters.map((character) => {
-                                  const selected = selectedCharacterIds.includes(character.id);
-
-                                  return (
-                                    <button
-                                      key={character.id}
-                                      type="button"
-                                      onClick={() => {
-                                        const nextIds = selected
-                                          ? selectedCharacterIds.filter((id) => id !== character.id)
-                                          : [...selectedCharacterIds, character.id];
-
-                                        setSelectedCharacterIds(nextIds);
-                                        applyAutoPrice(selectedTemplateId, nextIds.length);
-                                      }}
-                                      className={
-                                        selected
-                                          ? "rounded-sm bg-primary px-4 py-2 text-sm font-black text-on-primary"
-                                          : "rounded-sm border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-muted"
-                                      }
-                                    >
-                                      {character.name}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {selectedCharacterIds.length > 0 && (
-                  <div className="col-span-2 rounded-3xl border border-line bg-paper p-4">
-                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                      Selected references
-                    </p>
-
-                    <div className="space-y-4">
-                      {selectedCharacterIds.map((characterId) => {
-                        const character = Object.values(charactersByClientId)
-                          .flat()
-                          .find((item) => item.id === characterId);
-
-                        const references =
-                          referencesByCharacterId[characterId] ?? [];
-
-                        return (
-                          <div key={characterId}>
-                            <p className="mb-2 text-sm font-black text-ink">
-                              {character?.name || "Character"}
-                            </p>
-
-                            {references.length === 0 ? (
-                              <p className="text-sm text-faint">
-                                No references saved.
-                              </p>
-                            ) : (
-                              <div className="grid grid-cols-4 gap-2">
-                                {references.map((reference) => (
-                                  <button
-                                    key={reference.id}
-                                    type="button"
-                                    onClick={() =>
-                                      setZoomedImage(imageUrl(reference.image_data_url))
-                                    }
-                                    className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm"
-                                  >
-                                    <img
-                                      src={thumbUrl(reference.image_data_url)}
-                                      loading="lazy" decoding="async"
-                                      alt={reference.label}
-                                      className="h-20 w-full object-cover"
-                                    />
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <select
-                  value={platform}
-                  onChange={(event) => setPlatform(event.target.value)}
-                  className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                >
-                  <option>Discord</option>
-                  <option>Twitter / X</option>
-                  <option>Bluesky</option>
-                  <option>Telegram</option>
-                  <option>Email</option>
-                  <option>Other</option>
-                </select>
-
-                <select
-                  value={selectedTemplateId ?? ""}
-                  onChange={(event) => {
-                    const templateId = event.target.value ? Number(event.target.value) : null;
-                    setSelectedTemplateId(templateId);
-                    applyAutoPrice(templateId, selectedCharacterIds.length);
-                  }}
-                  className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                >
-                  <option value="">Select template</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </select>
-
-                <div>
-                  <input
-                    value={commissionPrice}
-                    onChange={(event) => setCommissionPrice(event.target.value)}
-                    placeholder="Price, e.g. 186,84"
-                    inputMode="decimal"
-                    className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                  />
-                  {autoPriceHint && <p className="mt-1 px-1 text-[11px] text-faint">{autoPriceHint}</p>}
-                </div>
-
-                <select
-                  value={currency}
-                  onChange={(event) => setCurrency(event.target.value)}
-                  className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                >
-                  <option>EUR</option>
-                  <option>USD</option>
-                  <option>GBP</option>
-                </select>
-
-                <label className="col-span-2 flex items-center gap-3 rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold">
-                  <input
-                    type="checkbox"
-                    checked={hasDeadline}
-                    onChange={(event) => setHasDeadline(event.target.checked)}
-                  />
-                  This commission has a deadline
-                </label>
-
-                {hasDeadline && (
-                  <input
-                    type="date"
-                    value={commissionDeadline}
-                    onChange={(event) => setCommissionDeadline(event.target.value)}
-                    className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                  />
-                )}
-
-                <textarea
-                  value={commissionNotes}
-                  onChange={(event) => setCommissionNotes(event.target.value)}
-                  placeholder="Notes"
-                  rows={4}
-                  className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                />
-                <div className="col-span-2">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                    Tags
-                  </p>
-
-                  <div className="flex flex-wrap gap-2">
-                    {allTags.map((tag) => {
-                      const selected =
-                        selectedTagIds.includes(tag.id);
-
-                      return (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedTagIds((current) => {
-                              if (selected) {
-                                return current.filter((id) => id !== tag.id);
-                              }
-
-                              const exclusiveCategories = ["Payment", "Characters"];
-
-                              if (exclusiveCategories.includes(tag.category)) {
-                                const otherTagsInSameCategory = allTags
-                                  .filter((otherTag) => otherTag.category === tag.category)
-                                  .map((otherTag) => otherTag.id);
-
-                                return [
-                                  ...current.filter(
-                                    (id) => !otherTagsInSameCategory.includes(id),
-                                  ),
-                                  tag.id,
-                                ];
-                              }
-
-                              return [...current, tag.id];
-                            });
-                          }}
-                          className={
-                            selected
-                              ? "rounded-sm px-4 py-2 text-sm font-black text-white shadow-sm"
-                              : "rounded-sm border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-muted"
-                          }
-                          style={
-                            selected
-                              ? {
-                                  backgroundColor: tag.color,
-                                }
-                              : undefined
-                          }
-                        >
-                          {tag.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            <div className="flex shrink-0 justify-end gap-3 border-t border-line p-6">
-              <button
-                onClick={() => setShowNewCommissionModal(false)}
-                className="rounded-2xl border border-line-strong px-4 py-2 font-semibold"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleCreateCommission}
-                disabled={creatingCommission}
-                className={
-                  commissionCreated
-                    ? "rounded-2xl bg-green-600 px-4 py-2 font-bold text-white transition-all duration-300"
-                    : "rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary transition-all duration-300 hover:-translate-y-0.5"
-                }
-              >
-                {creatingCommission
-                  ? "Creating..."
-                  : commissionCreated
-                    ? "✓ Created"
-                    : "Create"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showEditCommissionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="w-[650px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-              Edit commission
-            </p>
-
-            <h3 className="mt-2 text-2xl font-black text-ink">
-              Update commission
-            </h3>
-
-            <div className="mt-6 grid grid-cols-2 gap-4">
+          <div className="grid max-h-[90vh] w-[900px] max-w-[94vw] grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl">
+            {/* Izquierda: elegir */}
+            <div className="min-h-0 space-y-5 overflow-y-auto p-6">
               <input
+                autoFocus
                 value={commissionTitle}
                 onChange={(event) => setCommissionTitle(event.target.value)}
                 placeholder="Commission title"
-                className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
+                className="w-full rounded-md border border-transparent bg-transparent px-1 text-2xl font-black outline-none hover:border-line focus:border-ink"
               />
 
-              <select
-                value={selectedClientId ?? ""}
-                onChange={(event) => {
-                  const clientId = event.target.value
-                    ? Number(event.target.value)
-                    : null;
+              <div>
+                <p className={formLabel}>Client</p>
+                <div className="flex gap-2">
+                  <input
+                    list="client-options"
+                    value={clientName}
+                    onChange={(event) => {
+                      const name = event.target.value;
+                      const match = clients.find((client) => client.name === name);
+                      setClientName(name);
+                      setSelectedClientId(match?.id ?? null);
+                      if (match?.platform) setPlatform(match.platform);
+                    }}
+                    placeholder="Search or type a name"
+                    className={`${formField} flex-1`}
+                  />
+                  <datalist id="client-options">
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.name}>
+                        {client.handle ?? client.platform ?? ""}
+                      </option>
+                    ))}
+                  </datalist>
 
-                  setSelectedClientId(clientId);
+                  {/* La plataforma sale del cliente; solo se elige a mano para alguien que no está guardado */}
+                  {!selectedClientId && (
+                    <select value={platform} onChange={(event) => setPlatform(event.target.value)} className={formField}>
+                      <option>Discord</option>
+                      <option>Twitter / X</option>
+                      <option>Bluesky</option>
+                      <option>Telegram</option>
+                      <option>Email</option>
+                      <option>Other</option>
+                    </select>
+                  )}
+                </div>
+              </div>
 
-                  const selectedClient =
-                    clients.find((client) => client.id === clientId) ?? null;
+              <div>
+                <p className={formLabel}>Characters</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {formCharacterOptions.map((character) => {
+                    const selected = selectedCharacterIds.includes(character.id);
 
-                  setClientName(selectedClient?.name || "");
-                  setPlatform(selectedClient?.platform || "Discord");
-                }}
-                className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
-              >
-                <option value="">Select client</option>
+                    return (
+                      <button
+                        key={character.id}
+                        type="button"
+                        onClick={() => {
+                          const nextIds = selected
+                            ? selectedCharacterIds.filter((id) => id !== character.id)
+                            : [...selectedCharacterIds, character.id];
+                          setSelectedCharacterIds(nextIds);
+                          applyAutoPrice(selectedTemplateId, nextIds.length);
+                        }}
+                        className={
+                          selected
+                            ? "rounded-sm bg-primary px-2.5 py-1 text-sm font-bold text-on-primary"
+                            : "rounded-sm border border-line-strong px-2.5 py-1 text-sm text-muted hover:border-ink hover:text-ink"
+                        }
+                      >
+                        {character.name}
+                        {character.client_id !== selectedClientId && (
+                          <span className="ml-1 text-[11px] opacity-70">
+                            · {clients.find((client) => client.id === character.client_id)?.name}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
 
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                    {client.handle ? ` · ${client.handle}` : ""}
-                  </option>
-                ))}
-              </select>
+                  {/* Personajes de cualquier cliente: colaboraciones, personajes de amigos… */}
+                  <input
+                    list="character-options"
+                    value={characterSearch}
+                    onChange={(event) => {
+                      const option = allCharacterOptions.find((item) => item.label === event.target.value);
 
-              <select
-                value={platform}
-                onChange={(event) => setPlatform(event.target.value)}
-                className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
-              >
-                <option>Discord</option>
-                <option>Twitter / X</option>
-                <option>Bluesky</option>
-                <option>Telegram</option>
-                <option>Email</option>
-                <option>Other</option>
-              </select>
+                      if (option) {
+                        const nextIds = selectedCharacterIds.includes(option.id)
+                          ? selectedCharacterIds
+                          : [...selectedCharacterIds, option.id];
+                        setSelectedCharacterIds(nextIds);
+                        applyAutoPrice(selectedTemplateId, nextIds.length);
+                        setCharacterSearch("");
+                      } else {
+                        setCharacterSearch(event.target.value);
+                      }
+                    }}
+                    placeholder="+ from another client"
+                    className="w-40 rounded-sm border border-dashed border-line-strong bg-transparent px-2 py-1 text-sm outline-none focus:border-ink"
+                  />
+                  <datalist id="character-options">
+                    {allCharacterOptions.map((option) => (
+                      <option key={option.id} value={option.label} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
 
-              <input
-                value={commissionPrice}
-                onChange={(event) => setCommissionPrice(event.target.value)}
-                placeholder="Price, e.g. 186,84"
-                inputMode="decimal"
-                className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
-              />
-
-              <select
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value)}
-                className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
-              >
-                <option>EUR</option>
-                <option>USD</option>
-                <option>GBP</option>
-              </select>
-
-              <label className="col-span-2 flex items-center gap-3 rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold">
-                <input
-                  type="checkbox"
-                  checked={hasDeadline}
-                  onChange={(event) => setHasDeadline(event.target.checked)}
-                />
-                This commission has a deadline
-              </label>
-
-              {hasDeadline && (
-                <input
-                  type="date"
-                  value={commissionDeadline}
-                  onChange={(event) => setCommissionDeadline(event.target.value)}
-                  className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
-                />
-              )}
-
-              <textarea
-                value={commissionNotes}
-                onChange={(event) => setCommissionNotes(event.target.value)}
-                placeholder="Notes"
-                rows={4}
-                className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
-              />
-              <div className="col-span-2">
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                  Tags
+              <div>
+                <p className={formLabel}>
+                  Type
+                  {formMode === "edit" && (
+                    <span className="ml-2 normal-case tracking-normal text-faint">
+                      · can't change after creating (stages and images depend on it)
+                    </span>
+                  )}
                 </p>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
+                  {templates.map((template) => {
+                    const selected = template.id === selectedTemplateId;
 
-                <div className="flex flex-wrap gap-2">
+                    return (
+                      <button
+                        key={template.id}
+                        type="button"
+                        disabled={formMode === "edit"}
+                        onClick={() => {
+                          setSelectedTemplateId(template.id);
+                          applyAutoPrice(template.id, selectedCharacterIds.length);
+                        }}
+                        className={`rounded-md border px-3 py-2 text-left transition disabled:cursor-default ${
+                          selected
+                            ? "border-ink bg-paper ring-1 ring-ink"
+                            : "border-line hover:border-line-strong disabled:opacity-40"
+                        }`}
+                      >
+                        <span className="block truncate text-sm font-bold">{template.name}</span>
+                        <span className="text-xs text-faint">
+                          {template.base_price != null ? formatMoney(template.base_price) : "No base price"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className={formLabel}>Tags</p>
+                <div className="flex flex-wrap gap-1.5">
                   {allTags.map((tag) => {
                     const selected = selectedTagIds.includes(tag.id);
 
@@ -1945,40 +1603,27 @@ function CommissionsPage() {
                       <button
                         key={tag.id}
                         type="button"
-                        onClick={() => {
+                        onClick={() =>
                           setSelectedTagIds((current) => {
                             if (selected) {
                               return current.filter((id) => id !== tag.id);
                             }
 
-                            const exclusiveCategories = ["Payment", "Characters"];
+                            // Solo una etiqueta de "Characters" a la vez
+                            const sameCategory =
+                              tag.category === "Characters"
+                                ? allTags.filter((other) => other.category === tag.category).map((other) => other.id)
+                                : [];
 
-                            if (exclusiveCategories.includes(tag.category)) {
-                              const otherTagsInSameCategory = allTags
-                                .filter((otherTag) => otherTag.category === tag.category)
-                                .map((otherTag) => otherTag.id);
-
-                              return [
-                                ...current.filter(
-                                  (id) => !otherTagsInSameCategory.includes(id),
-                                ),
-                                tag.id,
-                              ];
-                            }
-
-                            return [...current, tag.id];
-                          });
-                        }}
+                            return [...current.filter((id) => !sameCategory.includes(id)), tag.id];
+                          })
+                        }
                         className={
                           selected
-                            ? "rounded-sm px-4 py-2 text-sm font-black text-white shadow-sm"
-                            : "rounded-sm border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-muted"
+                            ? "rounded-sm px-2.5 py-1 text-xs font-bold text-white"
+                            : "rounded-sm border border-line-strong px-2.5 py-1 text-xs text-muted hover:border-ink hover:text-ink"
                         }
-                        style={
-                          selected
-                            ? { backgroundColor: tag.color }
-                            : undefined
-                        }
+                        style={selected ? { backgroundColor: tag.color } : undefined}
                       >
                         {tag.name}
                       </button>
@@ -1988,33 +1633,106 @@ function CommissionsPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setShowEditCommissionModal(false)}
-                className="rounded-2xl border border-line-strong px-4 py-2 font-semibold"
-              >
-                Cancel
-              </button>
+            {/* Derecha: resumen en vivo, precio, entrega y notas */}
+            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto border-l border-line bg-paper p-6">
+              <div>
+                <p className={formLabel}>Summary</p>
+                <p className="truncate text-lg font-black">{commissionTitle.trim() || "Untitled commission"}</p>
+                <p className="text-sm text-muted">
+                  {[clientName.trim() || "No client", platform, formTemplate?.name].filter(Boolean).join(" · ")}
+                </p>
+              </div>
 
-              <button
-                onClick={handleSaveCommissionChanges}
-                disabled={savingCommission}
-                className={
-                  commissionSaved
-                    ? "rounded-2xl bg-green-600 px-4 py-2 font-bold text-white transition-all duration-300"
-                    : "rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary transition-all duration-300 hover:-translate-y-0.5"
-                }
-              >
-                {savingCommission
-                  ? "Saving..."
-                  : commissionSaved
-                    ? "✓ Saved"
-                    : "Save"}
-              </button>
+              <div className="space-y-1 border-y border-line py-3 text-sm">
+                {formTemplate?.base_price != null && (
+                  <>
+                    <p className="flex justify-between">
+                      <span>{formTemplate.name}</span>
+                      <span>{formatMoney(formTemplate.base_price, currency)}</span>
+                    </p>
+                    {extraCharacters > 0 && (
+                      <p className="flex justify-between text-muted">
+                        <span>
+                          + {extraCharacters} extra character{extraCharacters === 1 ? "" : "s"} ({EXTRA_CHARACTER_RATE * 100}% each)
+                        </span>
+                        <span>
+                          {formatMoney(
+                            calculateCommissionPrice(formTemplate.base_price, selectedCharacterIds.length) -
+                              formTemplate.base_price,
+                            currency,
+                          )}
+                        </span>
+                      </p>
+                    )}
+                  </>
+                )}
+
+                <div className="flex items-center justify-between gap-2 pt-1 font-black">
+                  <span>Price</span>
+                  <span className="flex items-center gap-1">
+                    <input
+                      value={commissionPrice}
+                      onChange={(event) => setCommissionPrice(event.target.value)}
+                      placeholder="0"
+                      inputMode="decimal"
+                      title="Calculated from the type and characters; you can change it"
+                      className="w-24 rounded-md border border-line-strong bg-surface px-2 py-1 text-right font-black outline-none focus:border-ink"
+                    />
+                    <select
+                      value={currency}
+                      onChange={(event) => setCurrency(event.target.value)}
+                      className="rounded-md border border-line-strong bg-surface px-1 py-1 text-sm font-semibold"
+                    >
+                      <option>EUR</option>
+                      <option>USD</option>
+                      <option>GBP</option>
+                    </select>
+                  </span>
+                </div>
+              </div>
+
+              <label className="block">
+                <span className={formLabel}>Deadline · optional</span>
+                <input
+                  type="date"
+                  value={commissionDeadline}
+                  onChange={(event) => setCommissionDeadline(event.target.value)}
+                  className={`${formField} w-full`}
+                />
+              </label>
+
+              <label className="flex min-h-24 flex-1 flex-col">
+                <span className={formLabel}>Notes</span>
+                <textarea
+                  value={commissionNotes}
+                  onChange={(event) => setCommissionNotes(event.target.value)}
+                  placeholder="Background, pose, details to remember…"
+                  className={`${formField} w-full flex-1 resize-none`}
+                />
+              </label>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormMode(null)}
+                  className="rounded-md px-4 py-2 text-sm font-semibold text-muted hover:text-ink"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCommissionForm}
+                  disabled={savingCommission || !commissionTitle.trim()}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
+                >
+                  {savingCommission ? "Saving…" : formMode === "new" ? "Create commission" : "Save changes"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
       {showDeleteCommissionModal && (
         <ConfirmModal
             eyebrow="Delete commission"

@@ -1,8 +1,27 @@
 import Database from "@tauri-apps/plugin-sql";
+import { saveImageFile, deleteImageFile } from "./images";
 
 type ZeeDatabase = Awaited<ReturnType<typeof Database.load>>;
 
 let db: ZeeDatabase | null = null;
+let transactionQueue: Promise<unknown> = Promise.resolve();
+
+async function runSerialized<T>(
+  work: (database: ZeeDatabase) => Promise<T>,
+): Promise<T> {
+  const database = await getDatabase();
+
+  const run = () => work(database);
+
+  const resultPromise = transactionQueue.then(run, run);
+
+  transactionQueue = resultPromise.then(
+    () => undefined,
+    () => undefined,
+  );
+
+  return resultPromise;
+}
 
 export type Template = {
   id: number;
@@ -20,6 +39,9 @@ export async function getDatabase(): Promise<ZeeDatabase> {
   if (db) return db;
 
   db = await Database.load("sqlite:zeeboard.db");
+
+  await db.execute("PRAGMA busy_timeout = 5000;");
+
   return db;
 }
 
@@ -137,6 +159,16 @@ export async function initializeDatabase() {
   `);
 
   await database.execute(`
+    CREATE TABLE IF NOT EXISTS commission_references (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commission_id INTEGER NOT NULL,
+      label TEXT NOT NULL DEFAULT 'Reference',
+      image_data_url TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  await database.execute(`
     ALTER TABLE commission_stage_images
     ADD COLUMN id INTEGER;
   `).catch(() => {});
@@ -145,6 +177,34 @@ export async function initializeDatabase() {
     ALTER TABLE commission_stage_images
     ADD COLUMN label TEXT NOT NULL DEFAULT 'Alt 1';
   `).catch(() => {});
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS client_characters (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS character_references (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER NOT NULL,
+      label TEXT NOT NULL DEFAULT 'Reference',
+      image_data_url TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS commission_characters (
+      commission_id INTEGER NOT NULL,
+      character_id INTEGER NOT NULL,
+      PRIMARY KEY (commission_id, character_id)
+    );
+  `);
 }
 
 export async function getTemplates(): Promise<Template[]> {
@@ -172,8 +232,6 @@ export async function getTemplateStages(templateId: number): Promise<TemplateSta
 }
 
 export async function createTemplate(name: string, stages: string[]): Promise<void> {
-  const database = await getDatabase();
-
   const templateName = name.trim();
   const templateStages = stages
     .map((stage) => stage.trim())
@@ -183,47 +241,78 @@ export async function createTemplate(name: string, stages: string[]): Promise<vo
     throw new Error("Template name is required");
   }
 
-  const result = await database.execute(
-    `
-    INSERT INTO templates (name)
-    VALUES (?);
-    `,
-    [templateName],
-  );
-
-  const templateId = result.lastInsertId;
-
-  if (!templateId) {
-    throw new Error("Could not get created template id");
-  }
-
-  for (let index = 0; index < templateStages.length; index++) {
-    await database.execute(
+  await runSerialized(async (database) => {
+    const result = await database.execute(
       `
-      INSERT INTO template_stages (template_id, name, stage_order)
-      VALUES (?, ?, ?);
+      INSERT INTO templates (name)
+      VALUES (?);
       `,
-      [templateId, templateStages[index], index + 1],
+      [templateName],
     );
-  }
+
+    const templateId = result.lastInsertId;
+
+    if (!templateId) {
+      throw new Error("Could not get created template id");
+    }
+
+    for (let index = 0; index < templateStages.length; index++) {
+      await database.execute(
+        `
+        INSERT INTO template_stages (template_id, name, stage_order)
+        VALUES (?, ?, ?);
+        `,
+        [templateId, templateStages[index], index + 1],
+      );
+    }
+  });
 }
 
 export async function deleteTemplate(templateId: number): Promise<void> {
   const database = await getDatabase();
 
-  await database.execute(
+  const lastStages = await database.select<{ id: number }[]>(
     `
-    DELETE FROM template_stages
-    WHERE template_id = ?;
+    SELECT id
+    FROM template_stages
+    WHERE template_id = ?
+    ORDER BY stage_order DESC
+    LIMIT 1;
     `,
     [templateId],
   );
 
+  const lastStageId = lastStages.length > 0 ? lastStages[0].id : null;
+
+  const activeCommissionsUsingTemplate = await database.select<{ count: number }[]>(
+    lastStageId
+      ? `
+        SELECT COUNT(*) as count
+        FROM commissions
+        WHERE template_id = ?
+          AND (current_stage_id IS NULL OR current_stage_id != ?);
+        `
+      : `
+        SELECT COUNT(*) as count
+        FROM commissions
+        WHERE template_id = ?;
+        `,
+    lastStageId ? [templateId, lastStageId] : [templateId],
+  );
+
+  if (activeCommissionsUsingTemplate[0].count > 0) {
+    throw new Error(
+      "This template is in use by one or more active commissions and cannot be deleted.",
+    );
+  }
+
   await database.execute(
-    `
-    DELETE FROM templates
-    WHERE id = ?;
-    `,
+    `DELETE FROM template_stages WHERE template_id = ?;`,
+    [templateId],
+  );
+
+  await database.execute(
+    `DELETE FROM templates WHERE id = ?;`,
     [templateId],
   );
 }
@@ -298,29 +387,29 @@ export async function replaceTemplateStages(
   templateId: number,
   stages: string[],
 ): Promise<void> {
-  const database = await getDatabase();
-
   const cleanStages = stages
     .map((stage) => stage.trim())
     .filter(Boolean);
 
-  await database.execute(
-    `
-    DELETE FROM template_stages
-    WHERE template_id = ?;
-    `,
-    [templateId],
-  );
-
-  for (let index = 0; index < cleanStages.length; index++) {
+  await runSerialized(async (database) => {
     await database.execute(
       `
-      INSERT INTO template_stages (template_id, name, stage_order)
-      VALUES (?, ?, ?);
+      DELETE FROM template_stages
+      WHERE template_id = ?;
       `,
-      [templateId, cleanStages[index], index + 1],
+      [templateId],
     );
-  }
+
+    for (let index = 0; index < cleanStages.length; index++) {
+      await database.execute(
+        `
+        INSERT INTO template_stages (template_id, name, stage_order)
+        VALUES (?, ?, ?);
+        `,
+        [templateId, cleanStages[index], index + 1],
+      );
+    }
+  });
 }
 
 export type Commission = {
@@ -545,10 +634,27 @@ export async function deleteCommission(
   const database = await getDatabase();
 
   await database.execute(
-    `
-    DELETE FROM commissions
-    WHERE id = ?;
-    `,
+    `DELETE FROM commission_tags WHERE commission_id = ?;`,
+    [commissionId],
+  );
+
+  await database.execute(
+    `DELETE FROM commission_stage_images WHERE commission_id = ?;`,
+    [commissionId],
+  );
+
+  await database.execute(
+    `DELETE FROM commission_references WHERE commission_id = ?;`,
+    [commissionId],
+  );
+
+  await database.execute(
+    `DELETE FROM commission_characters WHERE commission_id = ?;`,
+    [commissionId],
+  );
+
+  await database.execute(
+    `DELETE FROM commissions WHERE id = ?;`,
     [commissionId],
   );
 }
@@ -626,25 +732,25 @@ export async function replaceCommissionTags(
   commissionId: number,
   tagIds: number[],
 ): Promise<void> {
-  const database = await getDatabase();
-
-  await database.execute(
-    `
-    DELETE FROM commission_tags
-    WHERE commission_id = ?;
-    `,
-    [commissionId],
-  );
-
-  for (const tagId of tagIds) {
+  await runSerialized(async (database) => {
     await database.execute(
       `
-      INSERT INTO commission_tags (commission_id, tag_id)
-      VALUES (?, ?);
+      DELETE FROM commission_tags
+      WHERE commission_id = ?;
       `,
-      [commissionId, tagId],
+      [commissionId],
     );
-  }
+
+    for (const tagId of tagIds) {
+      await database.execute(
+        `
+        INSERT INTO commission_tags (commission_id, tag_id)
+        VALUES (?, ?);
+        `,
+        [commissionId, tagId],
+      );
+    }
+  });
 }
 
 export type Client = {
@@ -654,6 +760,22 @@ export type Client = {
   handle: string | null;
   avatar_url: string | null;
   notes: string | null;
+  created_at: string;
+};
+
+export type ClientCharacter = {
+  id: number;
+  client_id: number;
+  name: string;
+  notes: string | null;
+  created_at: string;
+};
+
+export type CharacterReference = {
+  id: number;
+  character_id: number;
+  label: string;
+  image_data_url: string;
   created_at: string;
 };
 
@@ -712,11 +834,35 @@ export async function createClient(
 export async function deleteClient(clientId: number): Promise<void> {
   const database = await getDatabase();
 
+  const characters = await database.select<{ id: number }[]>(
+    `SELECT id FROM client_characters WHERE client_id = ?;`,
+    [clientId],
+  );
+
+  for (const character of characters) {
+    await database.execute(
+      `DELETE FROM character_references WHERE character_id = ?;`,
+      [character.id],
+    );
+
+    await database.execute(
+      `DELETE FROM commission_characters WHERE character_id = ?;`,
+      [character.id],
+    );
+  }
+
   await database.execute(
-    `
-    DELETE FROM clients
-    WHERE id = ?;
-    `,
+    `DELETE FROM client_characters WHERE client_id = ?;`,
+    [clientId],
+  );
+
+  await database.execute(
+    `UPDATE commissions SET client_id = NULL WHERE client_id = ?;`,
+    [clientId],
+  );
+
+  await database.execute(
+    `DELETE FROM clients WHERE id = ?;`,
     [clientId],
   );
 }
@@ -772,10 +918,221 @@ export async function updateClientAvatar(
   );
 }
 
+export async function getClientCharacters(
+  clientId: number,
+): Promise<ClientCharacter[]> {
+  const database = await getDatabase();
+
+  return await database.select<ClientCharacter[]>(
+    `
+    SELECT id, client_id, name, notes, created_at
+    FROM client_characters
+    WHERE client_id = ?
+    ORDER BY name ASC;
+    `,
+    [clientId],
+  );
+}
+
+export async function createClientCharacter(
+  clientId: number,
+  name: string,
+  notes: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const cleanName = name.trim();
+
+  if (!cleanName) {
+    throw new Error("Character name is required");
+  }
+
+  await database.execute(
+    `
+    INSERT INTO client_characters (
+      client_id,
+      name,
+      notes,
+      created_at
+    )
+    VALUES (?, ?, ?, ?);
+    `,
+    [
+      clientId,
+      cleanName,
+      notes.trim() || null,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+export async function deleteClientCharacter(
+  characterId: number,
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    DELETE FROM character_references
+    WHERE character_id = ?;
+    `,
+    [characterId],
+  );
+
+  await database.execute(
+    `
+    DELETE FROM commission_characters
+    WHERE character_id = ?;
+    `,
+    [characterId],
+  );
+
+  await database.execute(
+    `
+    DELETE FROM client_characters
+    WHERE id = ?;
+    `,
+    [characterId],
+  );
+}
+
+export async function getCharacterReferences(
+  characterId: number,
+): Promise<CharacterReference[]> {
+  const database = await getDatabase();
+
+  return await database.select<CharacterReference[]>(
+    `
+    SELECT id, character_id, label, image_data_url, created_at
+    FROM character_references
+    WHERE character_id = ?
+    ORDER BY id ASC;
+    `,
+    [characterId],
+  );
+}
+
+export async function createCharacterReference(
+  characterId: number,
+  imageDataUrl: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const existingReferences = await database.select<{ count: number }[]>(
+    `
+    SELECT COUNT(*) as count
+    FROM character_references
+    WHERE character_id = ?;
+    `,
+    [characterId],
+  );
+
+  const referenceNumber = existingReferences[0].count + 1;
+  const imagePath = await saveImageFile(imageDataUrl);
+
+  await database.execute(
+    `
+    INSERT INTO character_references (
+      character_id,
+      label,
+      image_data_url,
+      created_at
+    )
+    VALUES (?, ?, ?, ?);
+    `,
+    [
+      characterId,
+      `Reference ${referenceNumber}`,
+      imagePath,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+export async function deleteCharacterReference(
+  referenceId: number,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const references = await database.select<{ image_data_url: string }[]>(
+    `
+    SELECT image_data_url
+    FROM character_references
+    WHERE id = ?;
+    `,
+    [referenceId],
+  );
+
+  if (references.length > 0) {
+    await deleteImageFile(references[0].image_data_url);
+  }
+
+  await database.execute(
+    `
+    DELETE FROM character_references
+    WHERE id = ?;
+    `,
+    [referenceId],
+  );
+}
+
+export async function getCommissionCharacterIds(
+  commissionId: number,
+): Promise<number[]> {
+  const database = await getDatabase();
+
+  const rows = await database.select<{ character_id: number }[]>(
+    `
+    SELECT character_id
+    FROM commission_characters
+    WHERE commission_id = ?;
+    `,
+    [commissionId],
+  );
+
+  return rows.map((row) => row.character_id);
+}
+
+export async function replaceCommissionCharacters(
+  commissionId: number,
+  characterIds: number[],
+): Promise<void> {
+  await runSerialized(async (database) => {
+    await database.execute(
+      `
+      DELETE FROM commission_characters
+      WHERE commission_id = ?;
+      `,
+      [commissionId],
+    );
+
+    for (const characterId of characterIds) {
+      await database.execute(
+        `
+        INSERT INTO commission_characters (
+          commission_id,
+          character_id
+        )
+        VALUES (?, ?);
+        `,
+        [commissionId, characterId],
+      );
+    }
+  });
+}
+
 export type CommissionStageImage = {
   id: number;
   commission_id: number;
   stage_id: number;
+  label: string;
+  image_data_url: string;
+  created_at: string;
+};
+
+export type CommissionReference = {
+  id: number;
+  commission_id: number;
   label: string;
   image_data_url: string;
   created_at: string;
@@ -816,6 +1173,7 @@ export async function createCommissionStageImage(
 
   const altNumber = existingImages[0].count + 1;
   const label = `Alt ${altNumber}`;
+  const imagePath = await saveImageFile(imageDataUrl);
 
   await database.execute(
     `
@@ -832,7 +1190,7 @@ export async function createCommissionStageImage(
       commissionId,
       stageId,
       label,
-      imageDataUrl,
+      imagePath,
       new Date().toISOString(),
     ],
   );
@@ -843,6 +1201,19 @@ export async function deleteCommissionStageImage(
 ): Promise<void> {
   const database = await getDatabase();
 
+  const images = await database.select<{ image_data_url: string }[]>(
+    `
+    SELECT image_data_url
+    FROM commission_stage_images
+    WHERE id = ?;
+    `,
+    [imageId],
+  );
+
+  if (images.length > 0) {
+    await deleteImageFile(images[0].image_data_url);
+  }
+
   await database.execute(
     `
     DELETE FROM commission_stage_images
@@ -850,4 +1221,88 @@ export async function deleteCommissionStageImage(
     `,
     [imageId],
   );
+}
+
+export async function getCommissionReferences(
+  commissionId: number,
+): Promise<CommissionReference[]> {
+  const database = await getDatabase();
+
+  return await database.select<CommissionReference[]>(
+    `
+    SELECT id, commission_id, label, image_data_url, created_at
+    FROM commission_references
+    WHERE commission_id = ?
+    ORDER BY id ASC;
+    `,
+    [commissionId],
+  );
+}
+
+export async function createCommissionReference(
+  commissionId: number,
+  imageDataUrl: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  const existingReferences = await database.select<{ count: number }[]>(
+    `
+    SELECT COUNT(*) as count
+    FROM commission_references
+    WHERE commission_id = ?;
+    `,
+    [commissionId],
+  );
+
+  const referenceNumber = existingReferences[0].count + 1;
+  const label = `Reference ${referenceNumber}`;
+
+  await database.execute(
+    `
+    INSERT INTO commission_references (
+      commission_id,
+      label,
+      image_data_url,
+      created_at
+    )
+    VALUES (?, ?, ?, ?);
+    `,
+    [
+      commissionId,
+      label,
+      imageDataUrl,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+export async function deleteCommissionReference(
+  referenceId: number,
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    DELETE FROM commission_references
+    WHERE id = ?;
+    `,
+    [referenceId],
+  );
+}
+
+export async function getAllUsedImagePaths(): Promise<string[]> {
+  const database = await getDatabase();
+
+  const characterRefs = await database.select<{ image_data_url: string }[]>(
+    `SELECT image_data_url FROM character_references;`,
+  );
+
+  const stageImages = await database.select<{ image_data_url: string }[]>(
+    `SELECT image_data_url FROM commission_stage_images;`,
+  );
+
+  return [
+    ...characterRefs.map((row) => row.image_data_url),
+    ...stageImages.map((row) => row.image_data_url),
+  ];
 }

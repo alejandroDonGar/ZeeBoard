@@ -42,6 +42,7 @@ const dateFormatter = new Intl.DateTimeFormat(locale, { day: "numeric", month: "
 
 function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => void }) {
   const [requests, setRequests] = useState<CommissionRequest[]>([]);
+  const [ready, setReady] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [taken, setTaken] = useState(0);
   const [settings, setSettings] = useState(appSettings());
@@ -56,6 +57,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
     setRequests(requestList);
     setTemplates(templateList);
     setTaken(open.length);
+    setReady(true);
     window.dispatchEvent(new Event(REQUESTS_CHANGED));
   }
 
@@ -476,7 +478,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                 />
               </label>
             </div>
-            {waiting.length === 0 ? (
+            {!ready ? null : waiting.length === 0 ? (
               <p className="rounded-3xl border border-dashed border-line-strong px-5 py-6 text-center text-sm text-faint">
                 {t("No new requests. Add one with \"+ New request\".")}
               </p>

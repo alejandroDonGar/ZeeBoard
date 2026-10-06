@@ -83,6 +83,7 @@ function StageRow({
 
 function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [ready, setReady] = useState(false);
   const [summaries, setSummaries] = useState<Record<number, TemplateSummary>>({});
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
@@ -114,6 +115,7 @@ function TemplatesPage() {
 
     const nextId = selectId ?? selectedTemplateId ?? sorted[0]?.id ?? null;
     await selectTemplate(sorted.find((template) => template.id === nextId) ?? sorted[0] ?? null);
+    setReady(true);
   }
 
   async function selectTemplate(template: Template | null) {
@@ -244,7 +246,7 @@ function TemplatesPage() {
 
       <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[280px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
         <div className="min-h-0 space-y-0.5 overflow-y-auto rounded-3xl border border-line bg-surface p-3 shadow-sm">
-          {templates.length === 0 ? (
+          {!ready ? null : templates.length === 0 ? (
             <p className="p-4 text-center text-sm text-faint">No templates yet</p>
           ) : (
             templates.map((template) => (
@@ -264,7 +266,7 @@ function TemplatesPage() {
         </div>
 
         <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-6 shadow-sm">
-          {!selectedTemplate ? (
+          {!ready ? null : !selectedTemplate ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <p className="text-lg font-black">Create your first template</p>
               <p className="mt-1 text-sm text-muted">

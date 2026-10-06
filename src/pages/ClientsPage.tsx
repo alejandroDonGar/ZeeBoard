@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { hide, isPrivate } from "../lib/privacy";
 import { parseTagAccount } from "../lib/formImport";
@@ -48,6 +49,7 @@ function ClientsPage({
   onOpenCommissionsPage: () => void;
 }) {
   const [clients, setClients] = useState<Client[]>([]);
+  const [clientsReady, setClientsReady] = useState(false);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [payments, setPayments] = useState<CommissionPayment[]>([]);
   const [clientName, setClientName] = useState("");
@@ -192,6 +194,7 @@ function ClientsPage({
       const data = await getClients();
 
       setClients(data);
+      setClientsReady(true);
       // Se abre la ficha del primer cliente por orden alfabético
       setSelectedClientId(
         [...data].sort((a, b) => a.name.localeCompare(b.name))[0]?.id ?? null,
@@ -350,7 +353,7 @@ function ClientsPage({
       showToast("Photo updated.", "success");
     } catch (error) {
       console.error(error);
-      showToast(`Could not set the photo: ${error}`, "error");
+      showToast(t("Could not set the photo: {error}", { error: String(error) }), "error");
     }
   }
 
@@ -433,7 +436,7 @@ function ClientsPage({
       }
     } catch (error) {
       console.error(error);
-      showToast(`Could not add reference image: ${error}`, "error");
+      showToast(t("Could not add reference image: {error}", { error: String(error) }), "error");
     } finally {
       setImportingCharacterId(null);
     }
@@ -584,10 +587,10 @@ function ClientsPage({
   return (
     <>
       <PageHeader
-        label="Client database"
-        title="Clients"
-        description="Your clients, their characters and their commissions."
-        action="+ New client"
+        label={t("Client database")}
+        title={t("Clients")}
+        description={t("Your clients, their characters and their commissions.")}
+        action={t("+ New client")}
         onAction={handleOpenNewClient}
       />
 
@@ -596,14 +599,14 @@ function ClientsPage({
           <input
             value={clientSearch}
             onChange={(event) => setClientSearch(event.target.value)}
-            placeholder="Search clients…"
+            placeholder={t("Search clients…")}
             className="mb-2 rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
           />
 
           <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
-            {visibleClients.length === 0 ? (
+            {!clientsReady ? null : visibleClients.length === 0 ? (
               <p className="p-4 text-center text-sm text-faint">
-                {clients.length === 0 ? "No clients yet" : "No matches"}
+                {clients.length === 0 ? t("No clients yet") : t("No matches")}
               </p>
             ) : (
               visibleClients.map((client) => {
@@ -629,7 +632,7 @@ function ClientsPage({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold">{hide(client.name)}</p>
                       <p className="truncate text-xs text-faint">
-                        {hide(client.handle || client.platform || "No contact")}
+                        {hide(client.handle || client.platform || t("No contact"))}
                       </p>
                     </div>
 
@@ -644,15 +647,15 @@ function ClientsPage({
         </div>
 
         <div className="min-h-0 overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-sm">
-          {!selectedClient ? (
+          {!clientsReady ? null : !selectedClient ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <p className="text-lg font-black">
-                {clients.length === 0 ? "Add your first client" : "Pick a client"}
+                {clients.length === 0 ? t("Add your first client") : t("Pick a client")}
               </p>
               <p className="mt-1 text-sm text-muted">
                 {clients.length === 0
-                  ? "Keep their contact, characters and references in one place."
-                  : "Their profile, characters and commissions show up here."}
+                  ? t("Keep their contact, characters and references in one place.")
+                  : t("Their profile, characters and commissions show up here.")}
               </p>
               {clients.length === 0 && (
                 <button
@@ -660,7 +663,7 @@ function ClientsPage({
                   onClick={handleOpenNewClient}
                   className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary"
                 >
-                  New client
+                  {t("New client")}
                 </button>
               )}
             </div>
@@ -670,7 +673,7 @@ function ClientsPage({
                 <button
                   type="button"
                   data-image-drop={`avatar:${selectedClient.id}`}
-                  title="Click, drop an image or paste one (Ctrl+V) to change the photo"
+                  title={t("Click, drop an image or paste one (Ctrl+V) to change the photo")}
                   onClick={() => handleSetAvatar(selectedClient.id)}
                   className={`shrink-0 rounded-full transition ${
                     dragZoneId === `avatar:${selectedClient.id}`
@@ -684,13 +687,13 @@ function ClientsPage({
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate text-2xl font-black">{hide(selectedClient.name)}</h3>
                   <p className="text-sm text-muted">
-                    {selectedClient.platform || "No platform"}
+                    {selectedClient.platform || t("No platform")}
                     {selectedClient.handle ? ` · ${hide(selectedClient.handle)}` : ""}
                   </p>
                   {selectedClient.email && <p className="text-sm text-muted">{hide(selectedClient.email)}</p>}
                   {selectedClient.tag_handle && (
                     <p className="text-sm text-muted">
-                      Tag when posting:{" "}
+                      {t("Tag when posting:")}{" "}
                       {selectedClient.tag_platform && selectedClient.tag_platform !== "Other"
                         ? `${selectedClient.tag_platform} `
                         : ""}
@@ -709,7 +712,7 @@ function ClientsPage({
                       disabled={fetchingAvatar}
                       className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-ink hover:text-ink"
                     >
-                      {fetchingAvatar ? "Fetching…" : "Fetch photo"}
+                      {fetchingAvatar ? t("Fetching…") : t("Fetch photo")}
                     </button>
                   )}
 
@@ -718,7 +721,7 @@ function ClientsPage({
                     onClick={() => handleOpenEditClient(selectedClient)}
                     className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
                   >
-                    Edit
+                    {t("Edit")}
                   </button>
 
                   <button
@@ -726,7 +729,7 @@ function ClientsPage({
                     onClick={() => setClientToDelete(selectedClient)}
                     className="rounded-md px-3 py-1.5 text-xs font-semibold text-red-500 transition hover:bg-red-50"
                   >
-                    Delete
+                    {t("Delete")}
                   </button>
                 </div>
               </div>
@@ -734,19 +737,19 @@ function ClientsPage({
               <dl className="mt-6 grid grid-cols-4 gap-3">
                 {[
                   {
-                    label: "Commissions",
+                    label: t("Commissions"),
                     value: selectedClientCommissions.length,
-                    detail: `${activeCommissions.length} active · ${completedCommissions.length} done`,
+                    detail: t("{active} active · {done} done", { active: activeCommissions.length, done: completedCommissions.length }),
                     className: "text-ink",
                   },
                   {
-                    label: "Spent",
+                    label: t("Spent"),
                     value: formatMoney(totalSpent),
-                    detail: `${formatMoney(averagePrice)} average`,
+                    detail: t("{amount} average", { amount: formatMoney(averagePrice) }),
                     className: "text-ink",
                   },
-                  { label: "Paid", value: paidCommissionsCount, detail: "commissions", className: "text-green-600" },
-                  { label: "Unpaid", value: unpaidCommissionsCount, detail: "commissions", className: "text-red-500" },
+                  { label: t("Paid"), value: paidCommissionsCount, detail: t("commissions"), className: "text-green-600" },
+                  { label: t("Unpaid"), value: unpaidCommissionsCount, detail: t("commissions"), className: "text-red-500" },
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-md bg-paper p-3">
                     <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-faint">
@@ -763,7 +766,7 @@ function ClientsPage({
               </h4>
 
               {selectedClientCommissions.length === 0 ? (
-                <p className="text-sm text-muted">No commissions yet.</p>
+                <p className="text-sm text-muted">{t("No commissions yet.")}</p>
               ) : (
                 <div className="divide-y divide-line border-y border-line">
                   {selectedClientCommissions.map((commission) => {
@@ -777,7 +780,7 @@ function ClientsPage({
                         key={commission.id}
                         type="button"
                         onClick={() => handleOpenCommissionFromClient(commission)}
-                        title="Open commission"
+                        title={t("Open commission")}
                         className="flex w-full items-center gap-4 px-2 py-2.5 text-left transition hover:bg-paper"
                       >
                         {commissionPreview ? (
@@ -796,15 +799,15 @@ function ClientsPage({
                           <p className="text-xs text-muted">
                             {commission.price
                               ? formatMoney(commission.price, commission.currency)
-                              : "No price"}
+                              : t("No price")}
                             {" · "}
-                            {commission.deadline || "No deadline"}
+                            {commission.deadline || t("No deadline")}
                           </p>
                         </div>
 
                         <div className="w-32 shrink-0">
                           <div className="flex justify-between text-[10px] font-bold text-faint">
-                            <span>{isCompleted ? "Done" : "Progress"}</span>
+                            <span>{isCompleted ? t("Done") : t("Progress")}</span>
                             <span>{completionPercentage}%</span>
                           </div>
                           <div className="mt-1 h-1.5 overflow-hidden rounded-sm bg-paper">
@@ -853,10 +856,10 @@ function ClientsPage({
                       <p className="truncate text-sm font-bold">{character.name}</p>
                       <p className="text-[11px] text-faint">
                         {importingCharacterId === character.id
-                          ? "Optimizing…"
+                          ? t("Optimizing…")
                           : isDropTarget
-                            ? "Drop to add references"
-                            : `${references.length} refs · ${usedIn} commissions`}
+                            ? t("Drop to add references")
+                            : t("{refs} refs · {used} commissions", { refs: references.length, used: usedIn })}
                       </p>
 
                       <div className="mt-2 grid grid-cols-4 gap-1">
@@ -878,7 +881,7 @@ function ClientsPage({
 
                         {references.length === 0 && (
                           <div className="col-span-4 flex aspect-[4/1] items-center justify-center rounded-sm border border-dashed border-line-strong text-[11px] text-faint">
-                            No references
+                            {t("No references")}
                           </div>
                         )}
                       </div>
@@ -896,7 +899,7 @@ function ClientsPage({
                         if (event.key === "Enter") handleCreateCharacter();
                         if (event.key === "Escape") setAddingCharacter(false);
                       }}
-                      placeholder="Character name"
+                      placeholder={t("Character name")}
                       className="rounded-md border border-line-strong bg-surface px-2 py-1.5 text-sm outline-none focus:border-ink"
                     />
                     <div className="flex justify-end gap-1">
@@ -905,7 +908,7 @@ function ClientsPage({
                         onClick={() => setAddingCharacter(false)}
                         className="rounded-md px-2 py-1 text-xs font-semibold text-muted hover:text-ink"
                       >
-                        Cancel
+                        {t("Cancel")}
                       </button>
                       <button
                         type="button"
@@ -913,7 +916,7 @@ function ClientsPage({
                         disabled={!newCharacterName.trim()}
                         className="rounded-md bg-primary px-2 py-1 text-xs font-bold text-on-primary disabled:opacity-50"
                       >
-                        Add
+                        {t("Add")}
                       </button>
                     </div>
                   </div>
@@ -923,7 +926,7 @@ function ClientsPage({
                     onClick={() => setAddingCharacter(true)}
                     className="flex min-h-24 items-center justify-center rounded-md border border-dashed border-line-strong text-sm font-semibold text-muted transition hover:border-ink hover:text-ink"
                   >
-                    + Character
+                    {t("+ Character")}
                   </button>
                 )}
               </div>
@@ -944,13 +947,13 @@ function ClientsPage({
                           autoFocus
                           value={editCharacterName}
                           onChange={(event) => setEditCharacterName(event.target.value)}
-                          placeholder="Character name"
+                          placeholder={t("Character name")}
                           className="w-full rounded-md border border-line-strong bg-paper px-3 py-2 text-sm font-bold"
                         />
                         <textarea
                           value={editCharacterNotes}
                           onChange={(event) => setEditCharacterNotes(event.target.value)}
-                          placeholder="Notes: species, colours, details to remember…"
+                          placeholder={t("Notes: species, colours, details to remember…")}
                           rows={3}
                           className="w-full rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
                         />
@@ -960,7 +963,7 @@ function ClientsPage({
                             onClick={() => setEditingCharacter(false)}
                             className="rounded-md px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink"
                           >
-                            Cancel
+                            {t("Cancel")}
                           </button>
                           <button
                             type="button"
@@ -968,7 +971,7 @@ function ClientsPage({
                             disabled={!editCharacterName.trim()}
                             className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary disabled:opacity-50"
                           >
-                            Save
+                            {t("Save")}
                           </button>
                         </div>
                       </div>
@@ -979,7 +982,7 @@ function ClientsPage({
                           {character.notes ? (
                             <p className="mt-1 whitespace-pre-wrap text-sm text-muted">{character.notes}</p>
                           ) : (
-                            <p className="mt-1 text-sm text-faint">No notes yet.</p>
+                            <p className="mt-1 text-sm text-faint">{t("No notes yet.")}</p>
                           )}
                         </div>
 
@@ -992,14 +995,14 @@ function ClientsPage({
                           }}
                           className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
                         >
-                          Edit
+                          {t("Edit")}
                         </button>
                         <button
                           type="button"
                           onClick={() => setCharacterToDelete(character)}
                           className="rounded-md px-3 py-1.5 text-xs font-semibold text-red-500 transition hover:bg-red-50"
                         >
-                          Delete
+                          {t("Delete")}
                         </button>
                       </div>
                     )}
@@ -1025,7 +1028,7 @@ function ClientsPage({
                           </button>
                           <button
                             type="button"
-                            title="Remove reference"
+                            title={t("Remove reference")}
                             onClick={() => handleDeleteCharacterReference(character.id, reference.id)}
                             className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-sm bg-black/60 text-sm text-white opacity-0 transition hover:bg-red-500 group-hover:opacity-100"
                           >
@@ -1037,7 +1040,7 @@ function ClientsPage({
                       <button
                         type="button"
                         data-image-drop={`character-detail:${character.id}`}
-                        title="Click, drop images here or paste with Ctrl+V"
+                        title={t("Click, drop images here or paste with Ctrl+V")}
                         disabled={importingCharacterId !== null}
                         onClick={() => handleAddCharacterReferences(character.id)}
                         className={`flex aspect-square flex-col items-center justify-center rounded-md border border-dashed text-center text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
@@ -1048,10 +1051,10 @@ function ClientsPage({
                       >
                         <span className="text-lg">+</span>
                         {importingCharacterId === character.id
-                          ? "Optimizing…"
+                          ? t("Optimizing…")
                           : isDropTarget
-                            ? "Drop here"
-                            : "Add · Ctrl+V"}
+                            ? t("Drop here")
+                            : t("Add · Ctrl+V")}
                       </button>
                     </div>
 
@@ -1083,7 +1086,7 @@ function ClientsPage({
                                   />
                                 ) : (
                                   <div className="flex aspect-square items-center justify-center rounded-md bg-paper text-[10px] text-faint">
-                                    No image
+                                    {t("No image")}
                                   </div>
                                 )}
                                 <p className="mt-1 truncate text-[11px] font-semibold text-muted">
@@ -1102,7 +1105,7 @@ function ClientsPage({
               {selectedClient.notes && (
                 <>
                   <h4 className="mb-2 mt-8 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
-                    Notes
+                    {t("Notes")}
                   </h4>
                   <p className="whitespace-pre-wrap text-sm text-muted">{selectedClient.notes}</p>
                 </>
@@ -1128,7 +1131,7 @@ function ClientsPage({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="w-[480px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
             <h3 className="text-xl font-black text-ink">
-              {clientForm === "new" ? "New client" : "Edit client"}
+              {clientForm === "new" ? t("New client") : t("Edit client")}
             </h3>
 
             <div className="mt-5 space-y-3">
@@ -1136,7 +1139,7 @@ function ClientsPage({
                 autoFocus
                 value={clientName}
                 onChange={(event) => setClientName(event.target.value)}
-                placeholder="Client name"
+                placeholder={t("Client name")}
                 data-private
                 className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
               />
@@ -1157,7 +1160,7 @@ function ClientsPage({
                 <input
                   value={clientHandle}
                   onChange={(event) => setClientHandle(event.target.value)}
-                  placeholder="@username"
+                  placeholder={t("@username")}
                 data-private
                   className="rounded-md border border-line-strong bg-paper px-3 py-2.5"
                 />
@@ -1166,7 +1169,7 @@ function ClientsPage({
               <input
                 value={tagText}
                 onChange={(event) => setTagText(event.target.value)}
-                placeholder="Account to tag when posting, e.g. Bluesky @name"
+                placeholder={t("Account to tag when posting, e.g. Bluesky @name")}
                 data-private
                 className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
               />
@@ -1175,7 +1178,7 @@ function ClientsPage({
                 type="email"
                 value={clientEmail}
                 onChange={(event) => setClientEmailText(event.target.value)}
-                placeholder="Email (PayPal), to match their payments"
+                placeholder={t("Email (PayPal), to match their payments")}
                 data-private
                 className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
               />
@@ -1183,7 +1186,7 @@ function ClientsPage({
               <textarea
                 value={clientNotes}
                 onChange={(event) => setClientNotes(event.target.value)}
-                placeholder="Notes"
+                placeholder={t("Notes")}
                 data-private
                 rows={4}
                 className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
@@ -1196,7 +1199,7 @@ function ClientsPage({
                 onClick={closeClientForm}
                 className="rounded-md px-4 py-2 text-sm font-semibold text-muted hover:text-ink"
               >
-                Cancel
+                {t("Cancel")}
               </button>
 
               <button
@@ -1205,7 +1208,7 @@ function ClientsPage({
                 disabled={savingClient || !clientName.trim()}
                 className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
               >
-                {savingClient ? "Saving…" : clientForm === "new" ? "Create client" : "Save"}
+                {savingClient ? t("Saving…") : clientForm === "new" ? t("Create client") : t("Save")}
               </button>
             </div>
           </div>
@@ -1214,10 +1217,10 @@ function ClientsPage({
 
       {characterToDelete && (
         <ConfirmModal
-          eyebrow="Delete character"
+          eyebrow={t("Delete character")}
           title={characterToDelete.name}
-          message="Its references are deleted too, and it's removed from any commissions. This can't be undone."
-          confirmLabel="Delete"
+          message={t("Its references are deleted too, and it's removed from any commissions. This can't be undone.")}
+          confirmLabel={t("Delete")}
           onConfirm={async () => {
             await handleDeleteCharacter(characterToDelete.id);
             setCharacterToDelete(null);
@@ -1228,10 +1231,10 @@ function ClientsPage({
 
       {clientToDelete && (
         <ConfirmModal
-            eyebrow="Delete client"
+            eyebrow={t("Delete client")}
             title={clientToDelete.name}
-            message="This action cannot be undone."
-            confirmLabel="Delete"
+            message={t("This action cannot be undone.")}
+            confirmLabel={t("Delete")}
             onConfirm={async () => {
             await handleDeleteClient(clientToDelete.id);
             setClientToDelete(null);

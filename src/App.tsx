@@ -94,7 +94,14 @@ function AutoBackup() {
 }
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>("dashboard");
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    const saved = sessionStorage.getItem("zeeboard-page");
+    return navigationItems.some((item) => item.id === saved) ? (saved as Page) : "dashboard";
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem("zeeboard-page", currentPage);
+  }, [currentPage]);
   // Al cambiar, toda la app se vuelve a pintar con los datos ocultos o visibles
   const privateMode = usePrivacy();
   const [newRequests, setNewRequests] = useState(0);

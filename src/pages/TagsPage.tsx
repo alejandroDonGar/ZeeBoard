@@ -135,6 +135,7 @@ function TagEditor({
 
 function TagsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
+  const [ready, setReady] = useState(false);
   const [usageByTagId, setUsageByTagId] = useState<Record<number, number>>({});
   // Categorías recién creadas que aún no tienen etiquetas
   const [newCategories, setNewCategories] = useState<string[]>([]);
@@ -149,6 +150,7 @@ function TagsPage() {
     const [data, usage] = await Promise.all([getTags(), getTagUsageCounts()]);
     setTags(data);
     setUsageByTagId(usage);
+    setReady(true);
   }
 
   useEffect(() => {
@@ -277,7 +279,7 @@ function TagsPage() {
             </div>
           )}
 
-          {categories.length === 0 && !creatingCategory && (
+          {ready && categories.length === 0 && !creatingCategory && (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <p className="text-lg font-black">Start your first category</p>
               <p className="mt-1 text-sm text-muted">

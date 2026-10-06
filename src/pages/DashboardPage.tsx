@@ -28,6 +28,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => void }) {
   const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [ready, setReady] = useState(false);
   const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
   const [templateStagesByTemplateId, setTemplateStagesByTemplateId] = useState<Record<number, TemplateStage[]>>({});
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
@@ -58,6 +59,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
 
         setStageImagesByCommissionId(await loadStageImagesForCommissions(data));
         setPayments(await getAllPayments());
+        setReady(true);
       })
       .catch(console.error);
   }, []);
@@ -192,7 +194,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
           <section className={panel}>
             <h3 className={heading}>{t("In progress · {n}", { n: inProgress.length })}</h3>
 
-            {inProgress.length === 0 ? (
+            {!ready ? null : inProgress.length === 0 ? (
               <p className="text-sm text-muted">{t("Nothing on the board. Time for a break.")}</p>
             ) : (
               <div className="divide-y divide-line">
@@ -254,7 +256,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
             <section className={panel}>
               <h3 className={heading}>{t("Not paid yet · {n}", { n: unpaid.length })}</h3>
 
-              {unpaid.length === 0 ? (
+              {!ready ? null : unpaid.length === 0 ? (
                 <p className="text-sm text-muted">{t("All caught up.")}</p>
               ) : (
                 <div className="divide-y divide-line">
@@ -278,7 +280,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
             <section className={panel}>
               <h3 className={heading}>{t("Most used tags")}</h3>
 
-              {topTags.length === 0 ? (
+              {!ready ? null : topTags.length === 0 ? (
                 <p className="text-sm text-muted">{t("No tags in use yet.")}</p>
               ) : (
                 <div className="flex flex-wrap gap-2">

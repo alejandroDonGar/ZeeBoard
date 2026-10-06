@@ -79,6 +79,7 @@ function CommissionsPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [ready, setReady] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null);
   const [workflowStages, setWorkflowStages] = useState<TemplateStage[]>([]);
@@ -181,6 +182,7 @@ function CommissionsPage() {
     getCommissions()
       .then(async (data) => {
         setCommissions(data);
+        setReady(true);
         await loadTagsForCommissions(data);
         await loadStageImagesForCommissions(data);
         await loadCharactersForCommissions(data);
@@ -819,7 +821,7 @@ function CommissionsPage() {
       >
         {viewMode === "list" && (
           <nav className="min-h-0 overflow-y-auto rounded-3xl border border-line bg-surface p-3 shadow-sm">
-            {inboxGroups.every((group) => group.items.length === 0) ? (
+            {!ready ? null : inboxGroups.every((group) => group.items.length === 0) ? (
               <p className="p-4 text-center text-sm text-faint">
                 {commissions.length === 0 ? t("No commissions yet") : t("No matches")}
               </p>

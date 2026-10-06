@@ -35,6 +35,7 @@ function FinishedPage({
   const [dateTo, setDateTo] = useState("");
   const [groupMode, setGroupMode] = useState<"month" | "client">("month");
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     getCommissions()
@@ -57,6 +58,7 @@ function FinishedPage({
         );
 
         setTemplateStagesByTemplateId(Object.fromEntries(stageEntries));
+        setReady(true);
 
         setStageImagesByCommissionId(await loadStageImagesForCommissions(data));
       })
@@ -219,7 +221,7 @@ function FinishedPage({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {filteredCompleted.length === 0 ? (
+            {!ready ? null : filteredCompleted.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <p className="text-lg font-black">
                   {completedCommissions.length === 0 ? "Nothing finished yet" : "No matches"}

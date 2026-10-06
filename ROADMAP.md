@@ -40,7 +40,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [x] Etiquetas
 - [x] Terminadas
 - [x] Dashboard
-- [ ] Ajustes
+- [x] Ajustes
 - [ ] Dividir `database.ts` por entidades
 
 ## Fase 4 · Pulido y calidad

@@ -1628,6 +1628,16 @@ export async function importPayments(
   });
 }
 
+/** El día del último cobro importado de PayPal (AAAA-MM-DD), o null si aún no importaste ninguno. */
+export async function getLastImportedPaymentDate(): Promise<string | null> {
+  const database = await getDatabase();
+  const rows = await database.select<{ day: string | null }[]>(
+    `SELECT MAX(paid_at) AS day FROM commission_payments WHERE external_id IS NOT NULL;`,
+  );
+
+  return rows[0]?.day ?? null;
+}
+
 export async function updatePaymentReceived(paymentId: number, received: number | null): Promise<void> {
   const database = await getDatabase();
 

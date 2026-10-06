@@ -73,6 +73,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [x] Recordatorio de pago: comisión fuera de la primera etapa y sin ningún pago (Dashboard + notificación)
 - [x] Etiquetas automáticas al aceptar una solicitud (tipo y número de personajes)
 - [x] Etiquetas automáticas también en el formulario de nueva comisión
+- [x] Aviso en Ajustes del último cobro de PayPal importado y desde qué fecha descargar
 - [x] Contador de revisiones incluidas (correcciones por etapa)
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real

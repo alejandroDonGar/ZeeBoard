@@ -6,12 +6,13 @@ import { applyTheme, getTheme, type ThemeChoice } from "../lib/theme";
 import {
   appSettings,
   getAllUsedImagePaths,
+  getLastImportedPaymentDate,
   getPaymentPlatforms,
   savePaymentPlatforms,
   updateSettings,
   type PaymentPlatform,
 } from "../lib/database";
-import { formatMoney, receivedAfterFees } from "../lib/commissionHelpers";
+import { formatMoney, isoDay, receivedAfterFees } from "../lib/commissionHelpers";
 import { exportCsv, type ExportKind } from "../lib/export";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { appDataDir, join } from "@tauri-apps/api/path";
@@ -36,6 +37,14 @@ function SettingsPage() {
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [auto, setAuto] = useState(appSettings());
   const [paypal, setPaypal] = useState<PaypalPreview | null>(null);
+  const [lastImport, setLastImport] = useState<string | null>(null);
+
+  useEffect(() => {
+    getLastImportedPaymentDate().then(setLastImport).catch(console.error);
+  }, []);
+
+  // Descarga desde 2 días antes del último cobro: los repetidos se saltan solos y no se escapa ninguno por el borde
+  const downloadFrom = lastImport ? isoDay(new Date(new Date(`${lastImport}T12:00:00`).getTime() - 2 * 86400000)) : null;
 
   async function handleImportPaypal() {
     try {
@@ -523,6 +532,9 @@ function SettingsPage() {
                 <p className="text-sm text-muted">
                   Matches each payment with a client by their email and adds it to their commission, with what you
                   actually received. Payments already imported are skipped.
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  {lastImport ? `Last imported payment: ${lastImport}. Download from ${downloadFrom}.` : "Nothing imported yet."}
                 </p>
               </div>
               <button type="button" onClick={handleImportPaypal} className={ghostButton}>

@@ -2,6 +2,7 @@
 // Todos los usuarios y correos de aquí son inventados.
 import assert from "node:assert";
 import { splitLinks } from "../src/lib/links";
+import { parseTagAccount } from "../src/lib/formImport";
 import { matchTemplate, normalizeHandle, parseContact, parseCsv, parseResponses, parseTimestamp } from "../src/lib/formImport";
 
 // CSV de Google: comillas, comillas escapadas y saltos de línea dentro de una celda
@@ -117,6 +118,33 @@ assert.deepStrictEqual(links("www.example.com/a and (https://imgur.com/z)"), ["h
 assert.deepStrictEqual(links("x.com/someone"), ["https://x.com/someone"]);
 assert.deepStrictEqual(links("notdropbox.com/x, e.g. foto.png, name@x.com/y, box.com/z"), []);
 assert.strictEqual(splitLinks("a toyhou.se/1 b").map((part) => part.text).join(""), "a toyhou.se/1 b"); // el texto no se pierde
+
+// Cuenta que se etiqueta al publicar
+const telegram = { platform: "Telegram", handle: "@contact_demo" };
+assert.deepStrictEqual(parseTagAccount("Twitter @name_demo", telegram), { platform: "Twitter / X", handle: "@name_demo" });
+assert.deepStrictEqual(parseTagAccount("bsky -> demo.bsky.social", telegram), { platform: "Bluesky", handle: "@demo.bsky.social" });
+assert.deepStrictEqual(parseTagAccount("same", telegram), telegram);
+assert.strictEqual(parseTagAccount("same", { platform: "Other", handle: "x" }), null); // no hay red de la que copiar
+for (const text of ["none", "None", "no", "don't tag me", "N/A", "", "-"]) {
+  assert.strictEqual(parseTagAccount(text, telegram), null, text);
+}
+assert.strictEqual(parseTagAccount("demo@example.com", telegram), null); // un correo no se etiqueta
+
+const tagTitle = "Which account should I tag when I post your commission?";
+const withTag = parseResponses(
+  `${header},"${tagTitle}"
+"2026/10/06 10:00:00 a. m. CET","Full Colour","tg @contact_demo","Bluesky @name_demo"
+"2026/10/06 10:05:00 a. m. CET","Full Colour","tg @other_demo","none"
+"2026/10/06 10:10:00 a. m. CET","Full Colour","tg @third_demo","same"
+`,
+  templates,
+);
+assert.deepStrictEqual(
+  withTag.requests.map((request) => [request.contact, request.tag_platform, request.tag_handle]),
+  [["@contact_demo", "Bluesky", "@name_demo"], ["@other_demo", null, null], ["@third_demo", "Telegram", "@third_demo"]],
+);
+// El título del contacto, que también habla de "handle", no se confunde con el de la etiqueta
+assert.strictEqual(withoutEmail.requests[0].tag_handle, null);
 
 // Un archivo que no es el formulario
 assert.ok(parseResponses('"a","b"\n"1","2"', templates).error);

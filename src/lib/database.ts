@@ -213,6 +213,11 @@ export async function initializeDatabase() {
   // De dónde viene una solicitud importada (para no importarla dos veces) y su correo
   await database.execute(`ALTER TABLE commission_requests ADD COLUMN external_id TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE commission_requests ADD COLUMN email TEXT;`).catch(() => {});
+  // A quién etiquetar al publicar: en la solicitud, y en el cliente una vez aceptada
+  await database.execute(`ALTER TABLE commission_requests ADD COLUMN tag_platform TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE commission_requests ADD COLUMN tag_handle TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE clients ADD COLUMN tag_platform TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE clients ADD COLUMN tag_handle TEXT;`).catch(() => {});
   // Cuándo cambió una comisión de etapa por última vez: cuenta como movimiento para el aviso de comisión parada
   await database.execute(`ALTER TABLE commissions ADD COLUMN stage_changed_at TEXT;`).catch(() => {});
   await database.execute(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
@@ -1013,6 +1018,9 @@ export type Client = {
   avatar_url: string | null;
   notes: string | null;
   created_at: string;
+  /** La cuenta que se etiqueta al publicar sus comisiones (puede ser distinta de la de contacto) */
+  tag_platform: string | null;
+  tag_handle: string | null;
 };
 
 export type ClientCharacter = {
@@ -1042,7 +1050,9 @@ export async function getClients(): Promise<Client[]> {
       handle,
       avatar_url,
       notes,
-      created_at
+      created_at,
+      tag_platform,
+      tag_handle
     FROM clients
     ORDER BY name ASC;
   `);
@@ -1733,6 +1743,8 @@ export type CommissionRequest = {
   created_at: string;
   external_id: string | null;
   email: string | null;
+  tag_platform: string | null;
+  tag_handle: string | null;
 };
 
 export async function getRequests(): Promise<CommissionRequest[]> {
@@ -1740,7 +1752,7 @@ export async function getRequests(): Promise<CommissionRequest[]> {
 
   return await database.select<CommissionRequest[]>(
     `SELECT id, name, platform, contact, template_id, characters, details, status, commission_id, created_at,
-       external_id, email
+       external_id, email, tag_platform, tag_handle
      FROM commission_requests ORDER BY created_at ASC, id ASC;`,
   );
 }
@@ -1807,9 +1819,22 @@ export async function importRequests(items: ImportedRequest[]): Promise<{ added:
 
       await database.execute(
         `INSERT INTO commission_requests
-           (name, platform, contact, template_id, characters, details, status, created_at, external_id, email)
-         VALUES (?, ?, ?, ?, ?, ?, 'new', ?, ?, ?);`,
-        [item.name, item.platform, item.contact, item.template_id, item.characters, item.details, item.created_at, item.externalId, item.email],
+           (name, platform, contact, template_id, characters, details, status, created_at, external_id, email,
+            tag_platform, tag_handle)
+         VALUES (?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?);`,
+        [
+          item.name,
+          item.platform,
+          item.contact,
+          item.template_id,
+          item.characters,
+          item.details,
+          item.created_at,
+          item.externalId,
+          item.email,
+          item.tag_platform,
+          item.tag_handle,
+        ],
       );
       known.add(item.externalId);
       added += 1;
@@ -1823,6 +1848,13 @@ export async function setRequestTemplate(requestId: number, templateId: number |
   const database = await getDatabase();
 
   await database.execute(`UPDATE commission_requests SET template_id = ? WHERE id = ?;`, [templateId, requestId]);
+}
+
+/** Guarda a quién etiquetar al publicar (null en los dos = a nadie). */
+export async function setClientTag(clientId: number, platform: string | null, handle: string | null): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE clients SET tag_platform = ?, tag_handle = ? WHERE id = ?;`, [platform, handle, clientId]);
 }
 
 /** Guarda el correo del cliente solo si aún no tenía uno. */

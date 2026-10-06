@@ -631,6 +631,16 @@ function CommissionsPage() {
     templates.find((template) => template.id === activeCommission?.template_id)?.revisions_included ?? null;
   const correctionsStage = workflowStages.find((stage) => stage.id === correctionsStageId) ?? null;
 
+  const activeClient = clients.find((client) => client.id === activeCommission?.client_id) ?? null;
+
+  function copyTag(handle: string) {
+    // El aviso no repite el usuario: así no se ve en un directo con el modo privado
+    navigator.clipboard
+      .writeText(handle)
+      .then(() => showToast("Tag copied.", "success"))
+      .catch(() => showToast("Could not copy it.", "error"));
+  }
+
   const activeDeadlineStatus = activeCommission ? getDeadlineStatus(activeCommission.deadline) : null;
   const activePaymentStatus =
     PAYMENT_STATUS_STYLE[
@@ -916,6 +926,17 @@ function CommissionsPage() {
                           {revisionsIncluded !== null && ` / ${revisionsIncluded}`}
                           {revisionsIncluded !== null && activeCorrections.length > revisionsIncluded && " · extra"}
                         </span>
+                      )}
+                      {activeClient?.tag_handle && (
+                        <button
+                          type="button"
+                          title="Copy the account to tag when you post"
+                          onClick={() => copyTag(activeClient.tag_handle!)}
+                          className="rounded-sm border border-line-strong px-2 py-0.5 text-xs font-bold text-muted transition hover:border-ink hover:text-ink"
+                        >
+                          Tag {hide(activeClient.tag_handle)}
+                          {activeClient.tag_platform && activeClient.tag_platform !== "Other" ? ` · ${activeClient.tag_platform}` : ""} ⧉
+                        </button>
                       )}
                       {activeNormalTags.map((tag) => (
                         <span

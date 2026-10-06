@@ -10,6 +10,7 @@ import {
   getTemplates,
   importRequests,
   setClientEmail,
+  setClientTag,
   setRequestStatus,
   setRequestTemplate,
   updateSettings,
@@ -134,6 +135,11 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
       if (request.email) {
         await setClientEmail(clientId, request.email);
+      }
+
+      // Lo último que dice el cliente es lo que manda: sustituye a la cuenta de etiqueta anterior
+      if (request.tag_handle) {
+        await setClientTag(clientId, request.tag_platform, request.tag_handle);
       }
 
       const template = templates.find((item) => item.id === request.template_id);
@@ -263,6 +269,13 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
             {estimate && <span className="text-muted"> · ≈ {estimate}</span>}
             {request.email && <span className="text-muted"> · {hide(request.email)}</span>}
           </p>
+
+          {request.tag_handle && (
+            <p className="mt-0.5 text-xs text-muted">
+              Tag when posting: {request.tag_platform && request.tag_platform !== "Other" ? `${request.tag_platform} ` : ""}
+              {hide(request.tag_handle)}
+            </p>
+          )}
 
           {request.details && (
             <p className="mt-1 whitespace-pre-wrap text-sm text-muted">

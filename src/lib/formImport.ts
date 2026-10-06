@@ -130,6 +130,29 @@ export function parseContact(raw: string): { platform: string; handle: string } 
   };
 }
 
+/**
+ * La cuenta que quiere que se etiquete al publicar: "Twitter @name", "bsky -> name"…
+ * "none" (o vacío) = sin etiqueta; "same" = la misma del contacto. Un correo no es una cuenta que se pueda etiquetar.
+ */
+export function parseTagAccount(
+  text: string,
+  contact: { platform: string; handle: string },
+): { platform: string; handle: string } | null {
+  const clean = text.trim();
+
+  if (clean === "" || /^(none|no|nobody|n\/a|na|no tag|don'?t tag( me)?|-+)$/i.test(clean)) {
+    return null;
+  }
+
+  if (/^(same|same as above|the same|igual|el mismo)$/i.test(clean)) {
+    return contact.platform === "Email" || contact.platform === "Other" ? null : contact;
+  }
+
+  const account = parseContact(clean);
+
+  return account.platform === "Email" ? null : account;
+}
+
 /** "Render Full Body + Simple Background" encaja con la plantilla "Rendered Full Body + Simple Background". */
 export function matchTemplate<T extends { id: number; name: string }>(text: string, templates: T[]): T | null {
   const normalize = (value: string) => value.toLowerCase().replace(/rendered/g, "render").replace(/[^a-z0-9]/g, "");
@@ -147,6 +170,9 @@ export type ImportedRequest = {
   template_id: number | null;
   characters: number;
   email: string | null;
+  /** A quién etiquetar al publicar (null = a nadie) */
+  tag_platform: string | null;
+  tag_handle: string | null;
   details: string | null;
 };
 
@@ -165,6 +191,7 @@ export function parseResponses<T extends { id: number; name: string }>(
   const typeColumn = find(/type of commission|tipo de comisi/i);
   const contactColumn = find(/handle|communication|contact|usuario/i);
   const emailColumn = find(/e-?mail|correo/i);
+  const tagColumn = find(/\btag\b|posting|etiquet/i);
   const referencesColumn = find(/reference|referencia/i);
   const charactersColumn = find(/how many characters|number of characters|cu[aá]ntos personajes/i);
   const timeColumn = Math.max(find(/marca temporal|timestamp/i), 0);
@@ -185,6 +212,7 @@ export function parseResponses<T extends { id: number; name: string }>(
       const emailText = emailColumn >= 0 ? (row[emailColumn] ?? "").trim() : "";
       // Solo se guarda como correo si lo parece (y en minúsculas, para poder emparejarlo luego); si no, queda en los detalles
       const email = /^\S+@\S+\.\S+$/.test(emailText) ? emailText.toLowerCase() : null;
+      const tag = tagColumn >= 0 ? parseTagAccount(row[tagColumn] ?? "", contact) : null;
       const referencesText = referencesColumn >= 0 ? (row[referencesColumn] ?? "").trim() : "";
       const notes = [
         template || !typeText ? null : `Type in the form: ${typeText}`,
@@ -202,6 +230,8 @@ export function parseResponses<T extends { id: number; name: string }>(
         // "3 Characters" → 3; sin esa pregunta (o sin número), 1
         characters: Math.max(1, Number((charactersColumn >= 0 ? row[charactersColumn] ?? "" : "").match(/\d+/)?.[0]) || 1),
         email,
+        tag_platform: tag?.platform ?? null,
+        tag_handle: tag?.handle ?? null,
         // Lo que no encaja (un tipo desconocido, un correo raro) se conserva tal cual para revisarlo a mano
         details: notes.length > 0 ? notes.join("\n") : null,
       };

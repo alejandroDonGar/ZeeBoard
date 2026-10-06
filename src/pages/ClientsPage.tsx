@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { hide, isPrivate } from "../lib/privacy";
+import { parseTagAccount } from "../lib/formImport";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
 import {
@@ -18,6 +19,7 @@ import {
   deleteClient,
   updateClient,
   updateClientAvatar,
+  setClientTag,
   getClientCharacters,
   createClientCharacter,
   updateClientCharacter,
@@ -50,6 +52,8 @@ function ClientsPage({
   const [clientPlatform, setClientPlatform] = useState("Twitter / X");
   const [clientHandle, setClientHandle] = useState("");
   const [clientNotes, setClientNotes] = useState("");
+  // La cuenta que se etiqueta al publicar, como la escribirías: "Bluesky @name"
+  const [tagText, setTagText] = useState("");
   // null = cerrado, "new" = crear, Client = editar
   const [clientForm, setClientForm] = useState<Client | "new" | null>(null);
   const [clientSearch, setClientSearch] = useState("");
@@ -86,6 +90,13 @@ function ClientsPage({
     setClientPlatform("Twitter / X");
     setClientHandle("");
     setClientNotes("");
+    setTagText("");
+  }
+
+  /** Guarda la cuenta de etiqueta del formulario; vacío o "none" la quita. */
+  async function saveTag(clientId: number) {
+    const tag = parseTagAccount(tagText, { platform: "Other", handle: "" });
+    await setClientTag(clientId, tag?.platform ?? null, tag?.handle ?? null);
   }
 
   function handleOpenNewClient() {
@@ -97,26 +108,13 @@ function ClientsPage({
     try {
       setSavingClient(true);
 
-      await createClient(
-        clientName,
-        clientPlatform,
-        clientHandle,
-        clientNotes,
-      );
+      const newId = await createClient(clientName, clientPlatform, clientHandle, clientNotes);
+      await saveTag(newId);
 
       const avatarUrl = await fetchBlueskyAvatar(clientPlatform, clientHandle);
 
       if (avatarUrl) {
-        const data = await getClients();
-        const createdClient = data.find(
-          (client) =>
-            client.name === clientName.trim() &&
-            client.handle === clientHandle.trim(),
-        );
-
-        if (createdClient) {
-          await updateClientAvatar(createdClient.id, avatarUrl);
-        }
+        await updateClientAvatar(newId, avatarUrl);
       }
 
       closeClientForm();
@@ -232,6 +230,7 @@ function ClientsPage({
     setClientPlatform(client.platform || "Twitter / X");
     setClientHandle(client.handle || "");
     setClientNotes(client.notes || "");
+    setTagText(client.tag_handle ? [client.tag_platform, client.tag_handle].filter(Boolean).join(" ") : "");
   }
 
   async function handleSaveClientChanges() {
@@ -249,6 +248,7 @@ function ClientsPage({
         clientHandle,
         clientNotes,
       );
+      await saveTag(clientForm.id);
 
       closeClientForm();
       await loadClients();
@@ -642,6 +642,15 @@ function ClientsPage({
                     {selectedClient.platform || "No platform"}
                     {selectedClient.handle ? ` · ${hide(selectedClient.handle)}` : ""}
                   </p>
+                  {selectedClient.tag_handle && (
+                    <p className="text-sm text-muted">
+                      Tag when posting:{" "}
+                      {selectedClient.tag_platform && selectedClient.tag_platform !== "Other"
+                        ? `${selectedClient.tag_platform} `
+                        : ""}
+                      {hide(selectedClient.tag_handle)}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex shrink-0 gap-2">
@@ -1104,6 +1113,14 @@ function ClientsPage({
                   className="rounded-md border border-line-strong bg-paper px-3 py-2.5"
                 />
               </div>
+
+              <input
+                value={tagText}
+                onChange={(event) => setTagText(event.target.value)}
+                placeholder="Account to tag when posting, e.g. Bluesky @name"
+                data-private
+                className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
+              />
 
               <textarea
                 value={clientNotes}

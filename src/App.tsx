@@ -9,16 +9,18 @@ import TemplatesPage from "./pages/TemplatesPage";
 import FinishedPage from "./pages/FinishedPage";
 import SettingsPage from "./pages/SettingsPage";
 import DashboardPage from "./pages/DashboardPage";
+import RequestsPage from "./pages/RequestsPage";
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { runAutoBackup } from "./lib/backup";
 import { setPrivate, usePrivacy } from "./lib/privacy";
 import { loadAttention, notifyNew } from "./lib/reminders";
 
-type Page = "dashboard" | "commissions" | "clients" | "tags" | "templates" | "finished" | "settings";
+type Page = "dashboard" | "commissions" | "requests" | "clients" | "tags" | "templates" | "finished" | "settings";
 
 const navigationItems: { id: Page; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "commissions", label: "Commissions" },
+  { id: "requests", label: "Requests" },
   { id: "clients", label: "Clients" },
   { id: "tags", label: "Tags" },
   { id: "templates", label: "Templates" },
@@ -216,6 +218,9 @@ function App() {
           {currentPage === "templates" && <TemplatesPage />}
           {currentPage === "finished" && (
             <FinishedPage onOpenCommissionsPage={() => setCurrentPage("commissions")} />
+          )}
+          {currentPage === "requests" && (
+            <RequestsPage onOpenCommissionsPage={() => setCurrentPage("commissions")} />
           )}
           {currentPage === "settings" && <SettingsPage />}
         </main>

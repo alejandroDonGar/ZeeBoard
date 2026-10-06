@@ -1,5 +1,7 @@
 import { isPrivate } from "./privacy";
 import {
+  getCommissions,
+  getTemplateStages,
   getCommissionStageImages,
   type Commission,
   type CommissionStageImage,
@@ -185,4 +187,15 @@ export function formatMoney(amount: number, currency?: string | null): string {
 /** Fecha local como "2026-10-06" (toISOString usaría UTC y puede salir un día corrido). */
 export function isoDay(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/** Las comisiones que aún no están terminadas (las que ocupan una plaza). */
+export async function loadOpenCommissions(): Promise<Commission[]> {
+  const commissions = await getCommissions();
+  const templateIds = [...new Set(commissions.map((c) => c.template_id).filter((id): id is number => id !== null))];
+  const stages = Object.fromEntries(
+    await Promise.all(templateIds.map(async (id) => [id, await getTemplateStages(id)] as const)),
+  );
+
+  return commissions.filter((commission) => !isCommissionCompleted(commission, stages));
 }

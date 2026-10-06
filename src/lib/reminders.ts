@@ -1,10 +1,8 @@
 import { sendNotification } from "@tauri-apps/plugin-notification";
-import { isCommissionCompleted, isoDay } from "./commissionHelpers";
+import { isoDay, loadOpenCommissions } from "./commissionHelpers";
 import {
   appSettings,
-  getCommissions,
   getDatabase,
-  getTemplateStages,
   type AppSettings,
   type Commission,
 } from "./database";
@@ -120,13 +118,7 @@ export function computeAttention<T extends Reminderable>(
 
 /** Lee la base de datos y devuelve lo que pide atención ahora mismo. */
 export async function loadAttention(now = new Date()): Promise<Attention<Commission>[]> {
-  const commissions = await getCommissions();
-  const templateIds = [...new Set(commissions.map((c) => c.template_id).filter((id): id is number => id !== null))];
-  const stages = Object.fromEntries(
-    await Promise.all(templateIds.map(async (id) => [id, await getTemplateStages(id)] as const)),
-  );
-
-  const open = commissions.filter((commission) => !isCommissionCompleted(commission, stages));
+  const open = await loadOpenCommissions();
 
   // Movimiento = imagen nueva, corrección, pago o cambio de etapa (las fechas ISO ordenan como texto)
   const database = await getDatabase();

@@ -79,6 +79,10 @@ export type AppSettings = {
   stalled_enabled: boolean;
   /** Aviso de comisión parada: días sin cambios */
   stalled_days: number;
+  /** ¿Estás aceptando comisiones ahora? (el formulario externo lo abres y cierras tú) */
+  slots_open: boolean;
+  /** Cuántas comisiones abiertas aceptas a la vez */
+  slots_total: number;
 };
 
 // Se cargan una vez al arrancar para poder leerlos sin await desde cualquier pantalla
@@ -94,6 +98,8 @@ let settings: AppSettings = {
   reminder_days_before: 3,
   stalled_enabled: true,
   stalled_days: 21,
+  slots_open: false,
+  slots_total: 5,
 };
 
 export function appSettings(): AppSettings {
@@ -102,15 +108,17 @@ export function appSettings(): AppSettings {
 
 async function loadSettings(): Promise<void> {
   const database = await getDatabase();
-  type Row = Omit<AppSettings, "auto_backup_enabled" | "reminders_enabled" | "stalled_enabled"> & {
+  type Row = Omit<AppSettings, "auto_backup_enabled" | "reminders_enabled" | "stalled_enabled" | "slots_open"> & {
     auto_backup_enabled: number;
     reminders_enabled: number;
     stalled_enabled: number;
+    slots_open: number;
   };
 
   const rows = await database.select<Row[]>(
     `SELECT default_currency, extra_character_rate, auto_backup_enabled, auto_backup_folder, auto_backup_keep,
-       last_auto_backup, promise_max_days, reminders_enabled, reminder_days_before, stalled_enabled, stalled_days
+       last_auto_backup, promise_max_days, reminders_enabled, reminder_days_before, stalled_enabled, stalled_days,
+       slots_open, slots_total
      FROM settings WHERE id = 1;`,
   );
 
@@ -120,6 +128,7 @@ async function loadSettings(): Promise<void> {
       auto_backup_enabled: Boolean(rows[0].auto_backup_enabled),
       reminders_enabled: Boolean(rows[0].reminders_enabled),
       stalled_enabled: Boolean(rows[0].stalled_enabled),
+      slots_open: Boolean(rows[0].slots_open),
     };
   }
 }
@@ -131,7 +140,8 @@ export async function updateSettings(changes: Partial<AppSettings>): Promise<voi
   await database.execute(
     `UPDATE settings SET default_currency = ?, extra_character_rate = ?, auto_backup_enabled = ?,
        auto_backup_folder = ?, auto_backup_keep = ?, last_auto_backup = ?, promise_max_days = ?,
-       reminders_enabled = ?, reminder_days_before = ?, stalled_enabled = ?, stalled_days = ? WHERE id = 1;`,
+       reminders_enabled = ?, reminder_days_before = ?, stalled_enabled = ?, stalled_days = ?,
+       slots_open = ?, slots_total = ? WHERE id = 1;`,
     [
       next.default_currency,
       next.extra_character_rate,
@@ -144,6 +154,8 @@ export async function updateSettings(changes: Partial<AppSettings>): Promise<voi
       next.reminder_days_before,
       next.stalled_enabled ? 1 : 0,
       next.stalled_days,
+      next.slots_open ? 1 : 0,
+      next.slots_total,
     ],
   );
   settings = next;
@@ -170,6 +182,24 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE settings ADD COLUMN reminder_days_before INTEGER NOT NULL DEFAULT 3;`).catch(() => {});
   await database.execute(`ALTER TABLE settings ADD COLUMN stalled_enabled INTEGER NOT NULL DEFAULT 1;`).catch(() => {});
   await database.execute(`ALTER TABLE settings ADD COLUMN stalled_days INTEGER NOT NULL DEFAULT 21;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN slots_open INTEGER NOT NULL DEFAULT 0;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN slots_total INTEGER NOT NULL DEFAULT 5;`).catch(() => {});
+
+  // Solicitudes de comisión que aún no son comisión: nuevas, en lista de espera, aceptadas o rechazadas
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS commission_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      platform TEXT,
+      contact TEXT,
+      template_id INTEGER,
+      characters INTEGER NOT NULL DEFAULT 1,
+      details TEXT,
+      status TEXT NOT NULL DEFAULT 'new',
+      commission_id INTEGER,
+      created_at TEXT NOT NULL
+    );
+  `);
   // Cuándo cambió una comisión de etapa por última vez: cuenta como movimiento para el aviso de comisión parada
   await database.execute(`ALTER TABLE commissions ADD COLUMN stage_changed_at TEXT;`).catch(() => {});
   await database.execute(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
@@ -1010,7 +1040,7 @@ export async function createClient(
   platform: string,
   handle: string,
   notes: string,
-): Promise<void> {
+): Promise<number> {
   const database = await getDatabase();
 
   const cleanName = name.trim();
@@ -1019,7 +1049,7 @@ export async function createClient(
     throw new Error("Client name is required");
   }
 
-  await database.execute(
+  const result = await database.execute(
     `
     INSERT INTO clients (
       name,
@@ -1038,6 +1068,8 @@ export async function createClient(
       new Date().toISOString(),
     ],
   );
+
+  return Number(result.lastInsertId);
 }
 
 export async function deleteClient(clientId: number): Promise<void> {
@@ -1670,4 +1702,74 @@ export async function savePaymentPlatforms(platforms: Omit<PaymentPlatform, "id"
       ]);
     }
   });
+}
+
+export type RequestStatus = "new" | "waitlist" | "accepted" | "declined";
+
+export type CommissionRequest = {
+  id: number;
+  name: string;
+  platform: string | null;
+  contact: string | null;
+  template_id: number | null;
+  characters: number;
+  details: string | null;
+  status: RequestStatus;
+  /** La comisión creada al aceptarla */
+  commission_id: number | null;
+  created_at: string;
+};
+
+export async function getRequests(): Promise<CommissionRequest[]> {
+  const database = await getDatabase();
+
+  return await database.select<CommissionRequest[]>(
+    `SELECT id, name, platform, contact, template_id, characters, details, status, commission_id, created_at
+     FROM commission_requests ORDER BY created_at ASC, id ASC;`,
+  );
+}
+
+export async function addRequest(
+  request: Pick<CommissionRequest, "name" | "platform" | "contact" | "template_id" | "characters" | "details">,
+): Promise<void> {
+  const database = await getDatabase();
+  const name = request.name.trim();
+
+  if (!name) {
+    throw new Error("The request needs a name");
+  }
+
+  await database.execute(
+    `INSERT INTO commission_requests (name, platform, contact, template_id, characters, details, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'new', ?);`,
+    [
+      name,
+      request.platform,
+      request.contact?.trim() || null,
+      request.template_id,
+      Math.max(1, request.characters),
+      request.details?.trim() || null,
+      new Date().toISOString(),
+    ],
+  );
+}
+
+export async function setRequestStatus(
+  requestId: number,
+  status: RequestStatus,
+  commissionId: number | null = null,
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE commission_requests SET status = ?, commission_id = ? WHERE id = ?;`, [
+    status,
+    commissionId,
+    requestId,
+  ]);
+}
+
+export async function deleteRequest(requestId: number): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`DELETE FROM commission_requests WHERE id = ?;`, [requestId]);
 }

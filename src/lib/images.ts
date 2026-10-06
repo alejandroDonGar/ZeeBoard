@@ -63,6 +63,13 @@ export async function importImageFromPath(path: string): Promise<StoredImage> {
   return await invoke<StoredImage>("import_image_from_path", { path });
 }
 
+/** Ruta del disco (selector, arrastrar) o archivo en memoria (Ctrl+V). */
+export async function importImage(source: string | Blob): Promise<StoredImage> {
+  return typeof source === "string"
+    ? await importImageFromPath(source)
+    : await importImageFromFile(source);
+}
+
 /** Para imágenes pegadas con Ctrl+V: los bytes viajan en binario, sin base64. */
 export async function importImageFromFile(file: Blob): Promise<StoredImage> {
   const bytes = new Uint8Array(await file.arrayBuffer());

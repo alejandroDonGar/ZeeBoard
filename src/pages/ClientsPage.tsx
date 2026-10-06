@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { imageUrl, thumbUrl, importImageFromPath, pickImagePaths } from "../lib/images";
+import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
+import { useImageInput } from "../lib/useImageInput";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
@@ -332,18 +333,23 @@ function ClientsPage({
     setNewCharacterNotes("");
   }
 
-  async function handleAddCharacterReferences(characterId: number) {
-    const paths = await pickImagePaths();
+  /** Sin `sources` abre el selector; con ellas, vienen de arrastrar y soltar o de Ctrl+V. */
+  async function handleAddCharacterReferences(characterId: number, sources?: (string | File)[]) {
+    if (importingCharacterId !== null) {
+      return;
+    }
 
-    if (paths.length === 0) {
+    const items = sources ?? (await pickImagePaths());
+
+    if (items.length === 0) {
       return;
     }
 
     setImportingCharacterId(characterId);
 
     try {
-      for (const path of paths) {
-        const stored = await importImageFromPath(path);
+      for (const item of items) {
+        const stored = await importImage(item);
         await createCharacterReference(characterId, stored.path);
       }
     } catch (error) {
@@ -360,6 +366,22 @@ function ClientsPage({
       [characterId]: updatedReferences,
     }));
   }
+
+  const dragZoneId = useImageInput({
+    onDrop: (zoneId, paths) => {
+      const [kind, characterId] = zoneId.split(":");
+
+      if (kind === "character") {
+        handleAddCharacterReferences(Number(characterId), paths);
+      }
+    },
+    // Ctrl+V añade la imagen al personaje desplegado en la ficha del cliente
+    onPaste: (files) => {
+      if (selectedClient && expandedCharacterId !== null) {
+        handleAddCharacterReferences(expandedCharacterId, files);
+      }
+    },
+  });
 
   async function handleDeleteCharacterReference(
     characterId: number,
@@ -963,11 +985,21 @@ function ClientsPage({
                         <div className="mt-4">
                           <button
                             type="button"
+                            data-image-drop={`character:${character.id}`}
+                            title="Click, drop images here or paste with Ctrl+V"
                             disabled={importingCharacterId !== null}
                             onClick={() => handleAddCharacterReferences(character.id)}
-                            className="block w-full cursor-pointer rounded-2xl border border-dashed border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-center text-xs font-black text-[#7c7163] transition hover:border-[#1f2933] disabled:cursor-wait disabled:opacity-60"
+                            className={`block w-full cursor-pointer rounded-2xl border border-dashed px-4 py-3 text-center text-xs font-black transition hover:border-[#1f2933] disabled:cursor-wait disabled:opacity-60 ${
+                              dragZoneId === `character:${character.id}`
+                                ? "scale-[1.02] border-[#1f2933] bg-[#f1e8da] text-[#1f2933]"
+                                : "border-[#d8cec0] bg-[#fffaf2] text-[#7c7163]"
+                            }`}
                           >
-                            {importingCharacterId === character.id ? "Optimizing…" : "Add reference"}
+                            {importingCharacterId === character.id
+                              ? "Optimizing…"
+                              : dragZoneId === `character:${character.id}`
+                                ? "Drop to add"
+                                : "Add reference"}
                           </button>
 
                           {references.length === 0 ? (

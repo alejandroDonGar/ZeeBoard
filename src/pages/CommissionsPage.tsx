@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { imageUrl, thumbUrl, importImageFromPath, pickImagePaths } from "../lib/images";
+import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
+import { useImageInput } from "../lib/useImageInput";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
@@ -550,23 +551,23 @@ function CommissionsPage() {
     }
     }
 
-  async function handleAddStageImages(stageId: number) {
-    if (!activeCommission) {
-      console.error("No active commission");
+  /** Sin `sources` abre el selector; con ellas, vienen de arrastrar y soltar o de Ctrl+V. */
+  async function handleAddStageImages(stageId: number, sources?: (string | File)[]) {
+    if (!activeCommission || importingStageId !== null) {
       return;
     }
 
-    const paths = await pickImagePaths();
+    const items = sources ?? (await pickImagePaths());
 
-    if (paths.length === 0) {
+    if (items.length === 0) {
       return;
     }
 
     setImportingStageId(stageId);
 
     try {
-      for (const path of paths) {
-        const stored = await importImageFromPath(path);
+      for (const item of items) {
+        const stored = await importImage(item);
         await createCommissionStageImage(activeCommission.id, stageId, stored.path);
       }
     } catch (error) {
@@ -580,6 +581,22 @@ function CommissionsPage() {
     setCommissions(data);
     await loadStageImagesForCommissions(data);
   }
+
+  const dragZoneId = useImageInput({
+    onDrop: (zoneId, paths) => {
+      const [kind, stageId] = zoneId.split(":");
+
+      if (kind === "stage") {
+        handleAddStageImages(Number(stageId), paths);
+      }
+    },
+    // Ctrl+V añade la imagen a la etapa actual de la comisión abierta
+    onPaste: (files) => {
+      if (activeCommission?.current_stage_id) {
+        handleAddStageImages(activeCommission.current_stage_id, files);
+      }
+    },
+  });
 
   async function handleDeleteStageImage(imageId: number) {
     await deleteCommissionStageImage(imageId);
@@ -1189,15 +1206,27 @@ function CommissionsPage() {
 
                             <button
                               type="button"
+                              data-image-drop={`stage:${stage.id}`}
+                              title={
+                                stage.id === activeCommission?.current_stage_id
+                                  ? "Click, drop images here or paste with Ctrl+V"
+                                  : "Click or drop images here"
+                              }
                               disabled={importingStageId !== null}
                               onClick={() => handleAddStageImages(stage.id)}
-                              className="mt-4 block w-full cursor-pointer rounded-2xl border border-dashed border-[#d8cec0] bg-white px-3 py-3 text-center text-xs font-black text-[#7c7163] transition hover:border-[#1f2933] disabled:cursor-wait disabled:opacity-60"
+                              className={`mt-4 block w-full cursor-pointer rounded-2xl border border-dashed px-3 py-3 text-center text-xs font-black transition hover:border-[#1f2933] disabled:cursor-wait disabled:opacity-60 ${
+                                dragZoneId === `stage:${stage.id}`
+                                  ? "scale-[1.02] border-[#1f2933] bg-[#f1e8da] text-[#1f2933]"
+                                  : "border-[#d8cec0] bg-white text-[#7c7163]"
+                              }`}
                             >
                               {importingStageId === stage.id
                                 ? "Optimizing…"
-                                : stageImages.length === 0
-                                  ? "Add image"
-                                  : "Add alt"}
+                                : dragZoneId === `stage:${stage.id}`
+                                  ? "Drop to add"
+                                  : stageImages.length === 0
+                                    ? "Add image"
+                                    : "Add alt"}
                             </button>
                           </div>
                         );

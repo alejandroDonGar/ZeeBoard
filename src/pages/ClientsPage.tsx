@@ -21,6 +21,7 @@ import {
   updateClient,
   updateClientAvatar,
   setClientTag,
+  saveClientEmail,
   getClientCharacters,
   createClientCharacter,
   updateClientCharacter,
@@ -55,6 +56,7 @@ function ClientsPage({
   const [clientNotes, setClientNotes] = useState("");
   // La cuenta que se etiqueta al publicar, como la escribirías: "Bluesky @name"
   const [tagText, setTagText] = useState("");
+  const [clientEmail, setClientEmailText] = useState("");
   const [fetchingAvatar, setFetchingAvatar] = useState(false);
   // null = cerrado, "new" = crear, Client = editar
   const [clientForm, setClientForm] = useState<Client | "new" | null>(null);
@@ -93,12 +95,14 @@ function ClientsPage({
     setClientHandle("");
     setClientNotes("");
     setTagText("");
+    setClientEmailText("");
   }
 
   /** Guarda la cuenta de etiqueta del formulario; vacío o "none" la quita. */
   async function saveTag(clientId: number) {
     const tag = parseTagAccount(tagText, { platform: "Other", handle: "" });
     await setClientTag(clientId, tag?.platform ?? null, tag?.handle ?? null);
+    await saveClientEmail(clientId, clientEmail);
   }
 
   function handleOpenNewClient() {
@@ -241,6 +245,7 @@ function ClientsPage({
     setClientHandle(client.handle || "");
     setClientNotes(client.notes || "");
     setTagText(client.tag_handle ? [client.tag_platform, client.tag_handle].filter(Boolean).join(" ") : "");
+    setClientEmailText(client.email || "");
   }
 
   async function handleSaveClientChanges() {
@@ -682,6 +687,7 @@ function ClientsPage({
                     {selectedClient.platform || "No platform"}
                     {selectedClient.handle ? ` · ${hide(selectedClient.handle)}` : ""}
                   </p>
+                  {selectedClient.email && <p className="text-sm text-muted">{hide(selectedClient.email)}</p>}
                   {selectedClient.tag_handle && (
                     <p className="text-sm text-muted">
                       Tag when posting:{" "}
@@ -1161,6 +1167,15 @@ function ClientsPage({
                 value={tagText}
                 onChange={(event) => setTagText(event.target.value)}
                 placeholder="Account to tag when posting, e.g. Bluesky @name"
+                data-private
+                className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
+              />
+
+              <input
+                type="email"
+                value={clientEmail}
+                onChange={(event) => setClientEmailText(event.target.value)}
+                placeholder="Email (PayPal), to match their payments"
                 data-private
                 className="w-full rounded-md border border-line-strong bg-paper px-3 py-2.5"
               />

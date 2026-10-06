@@ -217,6 +217,8 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE commission_requests ADD COLUMN tag_platform TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE commission_requests ADD COLUMN tag_handle TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE clients ADD COLUMN tag_platform TEXT;`).catch(() => {});
+  // El id de la transacción de PayPal: evita importar dos veces el mismo cobro
+  await database.execute(`ALTER TABLE commission_payments ADD COLUMN external_id TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE clients ADD COLUMN tag_handle TEXT;`).catch(() => {});
   // Cuándo cambió una comisión de etapa por última vez: cuenta como movimiento para el aviso de comisión parada
   await database.execute(`ALTER TABLE commissions ADD COLUMN stage_changed_at TEXT;`).catch(() => {});
@@ -1021,6 +1023,8 @@ export type Client = {
   /** La cuenta que se etiqueta al publicar sus comisiones (puede ser distinta de la de contacto) */
   tag_platform: string | null;
   tag_handle: string | null;
+  /** El correo con el que paga (PayPal): sirve para cruzar sus pagos al importar el CSV */
+  email: string | null;
 };
 
 export type ClientCharacter = {
@@ -1052,7 +1056,8 @@ export async function getClients(): Promise<Client[]> {
       notes,
       created_at,
       tag_platform,
-      tag_handle
+      tag_handle,
+      email
     FROM clients
     ORDER BY name ASC;
   `);
@@ -1580,13 +1585,14 @@ export type CommissionPayment = {
   received: number | null;
   paid_at: string;
   note: string | null;
+  external_id: string | null;
 };
 
 export async function getAllPayments(): Promise<CommissionPayment[]> {
   const database = await getDatabase();
 
   return await database.select<CommissionPayment[]>(
-    `SELECT id, commission_id, amount, received, paid_at, note FROM commission_payments ORDER BY paid_at ASC, id ASC;`,
+    `SELECT id, commission_id, amount, received, paid_at, note, external_id FROM commission_payments ORDER BY paid_at ASC, id ASC;`,
   );
 }
 
@@ -1603,6 +1609,23 @@ export async function addPayment(
     `INSERT INTO commission_payments (commission_id, amount, received, paid_at, note) VALUES (?, ?, ?, ?, ?);`,
     [commissionId, amount, received, paidAt, note.trim() || null],
   );
+}
+
+/**
+ * Guarda los cobros importados de PayPal. Sin transacción (el pool de SQLite no garantiza la misma conexión):
+ * si falla a medias, volver a importar salta los ya guardados por su id de transacción.
+ */
+export async function importPayments(
+  items: { commissionId: number; amount: number; received: number; paidAt: string; externalId: string }[],
+): Promise<void> {
+  await runSerialized(async (database) => {
+    for (const item of items) {
+      await database.execute(
+        `INSERT INTO commission_payments (commission_id, amount, received, paid_at, note, external_id) VALUES (?, ?, ?, ?, 'PayPal', ?);`,
+        [item.commissionId, item.amount, item.received, item.paidAt, item.externalId],
+      );
+    }
+  });
 }
 
 export async function updatePaymentReceived(paymentId: number, received: number | null): Promise<void> {
@@ -1860,6 +1883,13 @@ export async function setClientTag(clientId: number, platform: string | null, ha
   const database = await getDatabase();
 
   await database.execute(`UPDATE clients SET tag_platform = ?, tag_handle = ? WHERE id = ?;`, [platform, handle, clientId]);
+}
+
+/** Cambia el correo del cliente desde su ficha (vacío lo quita). */
+export async function saveClientEmail(clientId: number, email: string): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE clients SET email = ? WHERE id = ?;`, [email.trim() || null, clientId]);
 }
 
 /** Guarda el correo del cliente solo si aún no tenía uno. */

@@ -1,0 +1,130 @@
+import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { formatMoney } from "../lib/commissionHelpers";
+import { getAllPayments, getClients, getCommissions, importPayments, type Client, type Commission } from "../lib/database";
+import { matchPaypalRows, parsePaypalCsv, type PaypalMatch } from "../lib/paypalImport";
+import { hide } from "../lib/privacy";
+
+export type PaypalPreview = { matches: PaypalMatch[]; clients: Client[]; commissions: Commission[] };
+
+/** Elige el CSV de actividad de PayPal y lo cruza con tus clientes y comisiones; null si cancelas. */
+export async function pickPaypalFile(): Promise<PaypalPreview | null> {
+  const file = await open({ title: "Choose the PayPal activity CSV", filters: [{ name: "CSV", extensions: ["csv"] }] });
+
+  if (typeof file !== "string") {
+    return null;
+  }
+
+  const { rows, error } = parsePaypalCsv(await invoke<string>("read_text_file", { path: file }));
+
+  if (error) {
+    throw new Error(error);
+  }
+
+  const [clients, commissions, payments] = await Promise.all([getClients(), getCommissions(), getAllPayments()]);
+
+  return { matches: matchPaypalRows(rows, clients, commissions, payments), clients, commissions };
+}
+
+const STATUS_TEXT: Record<PaypalMatch["status"], string> = {
+  ready: "",
+  duplicate: "Already imported",
+  unknown: "No client with this email",
+  nodebt: "This client has nothing left to pay",
+};
+
+function PaypalImport({ preview, onClose }: { preview: PaypalPreview; onClose: () => void }) {
+  const { matches, clients, commissions } = preview;
+  // la comisión elegida para cada cobro (se puede cambiar antes de importar)
+  const [choice, setChoice] = useState<Record<string, number>>(
+    Object.fromEntries(matches.filter((item) => item.commissionId).map((item) => [item.row.txId, item.commissionId!])),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ready = matches.filter((item) => item.status === "ready");
+  const clientName = (id: number | null) => clients.find((client) => client.id === id)?.name ?? "";
+
+  async function handleImport() {
+    try {
+      setSaving(true);
+      await importPayments(
+        ready.map(({ row }) => ({
+          commissionId: choice[row.txId],
+          amount: row.gross,
+          received: row.net,
+          paidAt: row.date,
+          externalId: row.txId,
+        })),
+      );
+      onClose();
+      // las pantallas cargan sus pagos al abrirse; se recarga para que muestren lo importado
+      window.location.reload();
+    } catch (importError) {
+      console.error(importError);
+      setError(`Could not import: ${importError}`);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div className="flex max-h-[80vh] w-[720px] flex-col rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">PayPal</p>
+        <h3 className="mt-2 text-2xl font-black text-ink">
+          {ready.length} of {matches.length} payments ready
+        </h3>
+
+        <div className="mt-4 min-h-0 flex-1 divide-y divide-line overflow-y-auto rounded-md border border-line">
+          {matches.length === 0 && <p className="p-4 text-sm text-muted">No incoming payments found in this file.</p>}
+
+          {matches.map((item) => (
+            <div key={item.row.txId} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <span className="w-20 shrink-0 text-muted">{item.row.date}</span>
+              <span className="w-24 shrink-0 font-semibold">{formatMoney(item.row.gross, item.row.currency)}</span>
+              <span className="min-w-0 flex-1 truncate" data-private>
+                {item.clientId ? hide(clientName(item.clientId)) : hide(item.row.email)}
+              </span>
+
+              {item.status === "ready" ? (
+                <select
+                  value={choice[item.row.txId]}
+                  onChange={(event) => setChoice({ ...choice, [item.row.txId]: Number(event.target.value) })}
+                  className="w-52 shrink-0 rounded-md border border-line-strong bg-paper px-2 py-1"
+                >
+                  {commissions
+                    .filter((commission) => commission.client_id === item.clientId)
+                    .map((commission) => (
+                      <option key={commission.id} value={commission.id}>
+                        {hide(commission.title)}
+                      </option>
+                    ))}
+                </select>
+              ) : (
+                <span className="w-52 shrink-0 text-faint">{STATUS_TEXT[item.status]}</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={onClose} className="rounded-md border border-line-strong px-4 py-2 font-semibold">
+            Cancel
+          </button>
+          <button
+            onClick={handleImport}
+            disabled={saving || ready.length === 0}
+            className="rounded-md bg-primary px-4 py-2 font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? "Importing…" : `Import ${ready.length}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default PaypalImport;

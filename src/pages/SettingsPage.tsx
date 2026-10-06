@@ -17,6 +17,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { cleanUpOrphanedImages, getStorageStats, type StorageStats } from "../lib/images";
 import ConfirmModal from "../components/ConfirmModal";
+import PaypalImport, { pickPaypalFile, type PaypalPreview } from "../components/PaypalImport";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) {
@@ -34,6 +35,17 @@ function SettingsPage() {
   const [exportingKind, setExportingKind] = useState<ExportKind | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [auto, setAuto] = useState(appSettings());
+  const [paypal, setPaypal] = useState<PaypalPreview | null>(null);
+
+  async function handleImportPaypal() {
+    try {
+      setExportMessage(null);
+      setPaypal(await pickPaypalFile());
+    } catch (error) {
+      console.error(error);
+      setExportMessage(`${error}`);
+    }
+  }
 
   async function handleExport(kind: ExportKind) {
     try {
@@ -503,6 +515,22 @@ function SettingsPage() {
             </div>
           </div>
 
+          <h3 className={section}>Import payments</h3>
+          <div className={panel}>
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">PayPal activity (CSV)</p>
+                <p className="text-sm text-muted">
+                  Matches each payment with a client by their email and adds it to their commission, with what you
+                  actually received. Payments already imported are skipped.
+                </p>
+              </div>
+              <button type="button" onClick={handleImportPaypal} className={ghostButton}>
+                Choose CSV
+              </button>
+            </div>
+          </div>
+
           <h3 className={section}>Export data</h3>
           <div className={panel}>
             {(
@@ -580,6 +608,8 @@ function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {paypal && <PaypalImport preview={paypal} onClose={() => setPaypal(null)} />}
 
       {restoreFolder && (
         <ConfirmModal

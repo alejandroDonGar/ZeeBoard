@@ -1,3 +1,4 @@
+import { locale, t } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { imageUrl, thumbUrl } from "../lib/images";
 import {
@@ -104,7 +105,7 @@ function FinishedPage({
     0,
   );
 
-  const monthFormatter = new Intl.DateTimeFormat("en-US", {
+  const monthFormatter = new Intl.DateTimeFormat(locale, {
     month: "long",
     year: "numeric",
   });
@@ -135,7 +136,7 @@ function FinishedPage({
     const groupsMap = new Map<string, FinishedGroup>();
 
     filteredCompleted.forEach((commission) => {
-      const label = commission.client_name || "No client";
+      const label = commission.client_name || t("No client");
 
       if (!groupsMap.has(label)) {
         groupsMap.set(label, {
@@ -158,14 +159,14 @@ function FinishedPage({
 
   const hasActiveFilters = searchQuery.trim() !== "" || dateFrom !== "" || dateTo !== "";
 
-  const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+  const dateFormatter = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
 
   return (
     <>
       <PageHeader
-        label="Archive"
-        title="Finished commissions"
-        description="Everything you've delivered, grouped by month or by client."
+        label={t("Archive")}
+        title={t("Finished commissions")}
+        description={t("Everything you've delivered, grouped by month or by client.")}
       />
 
       <section className="h-[calc(100vh-117px)] min-h-0 p-5 pb-6">
@@ -183,7 +184,7 @@ function FinishedPage({
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search title or client…"
+              placeholder={t("Search title or client…")}
               className="min-w-48 flex-1 rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
             />
 
@@ -193,7 +194,7 @@ function FinishedPage({
               onChange={(event) => setDateFrom(event.target.value)}
               className="rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
             />
-            <span className="text-xs text-faint">to</span>
+            <span className="text-xs text-faint">{t("to")}</span>
             <input
               type="date"
               value={dateTo}
@@ -211,12 +212,12 @@ function FinishedPage({
                 }}
                 className="px-1 text-xs font-semibold text-muted underline-offset-2 hover:text-ink hover:underline"
               >
-                Clear
+                {t("Clear")}
               </button>
             )}
 
             <span className="ml-auto text-sm font-bold">
-              {filteredCompleted.length} finished · {formatMoney(totalEarnings)}
+              {t("{n} finished · {amount}", { n: filteredCompleted.length, amount: formatMoney(totalEarnings) })}
             </span>
           </div>
 
@@ -224,12 +225,12 @@ function FinishedPage({
             {!ready ? null : filteredCompleted.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <p className="text-lg font-black">
-                  {completedCommissions.length === 0 ? "Nothing finished yet" : "No matches"}
+                  {completedCommissions.length === 0 ? t("Nothing finished yet") : t("No matches")}
                 </p>
                 <p className="mt-1 text-sm text-muted">
                   {completedCommissions.length === 0
-                    ? "Commissions land here when they reach their last stage."
-                    : "Try another search or date range."}
+                    ? t("Commissions land here when they reach their last stage.")
+                    : t("Try another search or date range.")}
                 </p>
               </div>
             ) : (
@@ -262,13 +263,13 @@ function FinishedPage({
                               <div
                                 key={commission.id}
                                 onClick={() => handleOpenCommission(commission)}
-                                title="Open commission"
+                                title={t("Open commission")}
                                 className="grid cursor-pointer grid-cols-[48px_minmax(0,1fr)_160px_80px_100px] items-center gap-4 px-2 py-2 transition hover:bg-paper"
                               >
                                 {latestImage ? (
                                   <button
                                     type="button"
-                                    title="View image"
+                                    title={t("View image")}
                                     onClick={(event) => {
                                       event.stopPropagation();
                                       setZoomedImage(imageUrl(latestImage.image_data_url));
@@ -288,7 +289,7 @@ function FinishedPage({
 
                                 <span className="truncate text-sm font-bold">{commission.title}</span>
                                 <span className="truncate text-sm text-muted">
-                                  {hide(commission.client_name || "No client")}
+                                  {hide(commission.client_name || t("No client"))}
                                 </span>
                                 <span className="text-sm text-faint">
                                   {dateFormatter.format(new Date(commission.created_at))}

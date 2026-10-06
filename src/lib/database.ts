@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import Database from "@tauri-apps/plugin-sql";
 import type { ImportedRequest } from "./formImport";
 import {
@@ -436,7 +437,7 @@ export async function createTemplate(name: string, stages: string[]): Promise<vo
     .filter(Boolean);
 
   if (!templateName) {
-    throw new Error("Template name is required");
+    throw new Error(t("Template name is required"));
   }
 
   await runSerialized(async (database) => {
@@ -477,7 +478,7 @@ export async function deleteTemplate(templateId: number): Promise<void> {
 
   if (commissionsUsingTemplate[0].count > 0) {
     throw new Error(
-      "This template is used by one or more commissions (active or finished), so it can't be deleted. Duplicate it if you want a variation.",
+      t("This template is used by one or more commissions (active or finished), so it can't be deleted. Duplicate it if you want a variation."),
     );
   }
 
@@ -557,7 +558,7 @@ export async function updateTemplateName(
   const cleanName = name.trim();
 
   if (!cleanName) {
-    throw new Error("Template name is required");
+    throw new Error(t("Template name is required"));
   }
 
   await database.execute(
@@ -607,7 +608,7 @@ export async function saveTemplateStages(
 
       if (usage[0].count > 0) {
         throw new Error(
-          `"${stage.name}" is in use by a commission (current stage, images or corrections), so it can't be removed.`,
+          t("\"{name}\" is in use by a commission (current stage, images or corrections), so it can't be removed.", { name: stage.name }),
         );
       }
     }
@@ -675,7 +676,7 @@ export async function createCommission(
   const cleanTitle = title.trim();
 
   if (!cleanTitle) {
-    throw new Error("Commission title is required");
+    throw new Error(t("Commission title is required"));
   }
 
   let firstStageId: number | null = null;
@@ -752,7 +753,7 @@ export async function updateCommission(
   const cleanTitle = title.trim();
 
   if (!cleanTitle) {
-    throw new Error("Commission title is required");
+    throw new Error(t("Commission title is required"));
   }
 
   await database.execute(
@@ -924,7 +925,7 @@ export async function createTag(
   const cleanName = name.trim();
 
   if (!cleanName) {
-    throw new Error("Tag name is required");
+    throw new Error(t("Tag name is required"));
   }
 
   await database.execute(
@@ -949,7 +950,7 @@ export async function updateTag(tagId: number, name: string, color: string): Pro
   const cleanName = name.trim();
 
   if (!cleanName) {
-    throw new Error("Tag name is required");
+    throw new Error(t("Tag name is required"));
   }
 
   await database.execute(`UPDATE tags SET name = ?, color = ? WHERE id = ?;`, [
@@ -1074,7 +1075,7 @@ export async function createClient(
   const cleanName = name.trim();
 
   if (!cleanName) {
-    throw new Error("Client name is required");
+    throw new Error(t("Client name is required"));
   }
 
   const result = await database.execute(
@@ -1148,7 +1149,7 @@ export async function updateClient(
   const cleanName = name.trim();
 
   if (!cleanName) {
-    throw new Error("Client name is required");
+    throw new Error(t("Client name is required"));
   }
 
   await database.execute(
@@ -1213,7 +1214,7 @@ export async function createClientCharacter(
   const cleanName = name.trim();
 
   if (!cleanName) {
-    throw new Error("Character name is required");
+    throw new Error(t("Character name is required"));
   }
 
   await database.execute(
@@ -1266,7 +1267,7 @@ export async function updateClientCharacter(
   const cleanName = name.trim();
 
   if (!cleanName) {
-    throw new Error("Character name is required");
+    throw new Error(t("Character name is required"));
   }
 
   await database.execute(`UPDATE client_characters SET name = ?, notes = ? WHERE id = ?;`, [
@@ -1718,7 +1719,7 @@ export async function addCorrection(commissionId: number, stageId: number, text:
   const cleanText = text.trim();
 
   if (!cleanText) {
-    throw new Error("Write what the client asked to change");
+    throw new Error(t("Write what the client asked to change"));
   }
 
   await database.execute(
@@ -1802,7 +1803,7 @@ export async function addRequest(
   const name = request.name.trim();
 
   if (!name) {
-    throw new Error("The request needs a name");
+    throw new Error(t("The request needs a name"));
   }
 
   await database.execute(

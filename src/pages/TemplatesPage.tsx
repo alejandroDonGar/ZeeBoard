@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import {
@@ -48,7 +49,7 @@ function StageRow({
       className="flex items-center gap-3 border-b border-line bg-surface px-2 py-2"
     >
       <span
-        title="Drag to reorder"
+        title={t("Drag to reorder")}
         onPointerDown={(event) => dragControls.start(event)}
         className="cursor-grab touch-none select-none px-1 text-faint active:cursor-grabbing"
       >
@@ -71,7 +72,7 @@ function StageRow({
 
       <button
         type="button"
-        title="Remove stage"
+        title={t("Remove stage")}
         onClick={onRemove}
         className="rounded-sm px-2 py-1 text-sm text-faint transition hover:bg-red-50 hover:text-red-500"
       >
@@ -227,27 +228,27 @@ function TemplatesPage() {
     const template = templates.find((item) => item.id === templateId);
     const stages = [
       template?.base_price != null ? formatMoney(template.base_price) : null,
-      `${summary.stages} ${summary.stages === 1 ? "stage" : "stages"}`,
+      t(summary.stages === 1 ? "{n} stage" : "{n} stages", { n: summary.stages }),
     ]
       .filter(Boolean)
       .join(" · ");
-    return summary.commissions > 0 ? `${stages} · ${summary.commissions} in use` : stages;
+    return summary.commissions > 0 ? `${stages} · ${t("{n} in use", { n: summary.commissions })}` : stages;
   }
 
   return (
     <>
       <PageHeader
-        label="Workflow library"
-        title="Templates"
-        description="Reusable workflows: the stages a commission goes through."
-        action="+ New template"
+        label={t("Workflow library")}
+        title={t("Templates")}
+        description={t("Reusable workflows: the stages a commission goes through.")}
+        action={t("+ New template")}
         onAction={handleNewTemplate}
       />
 
       <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[280px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
         <div className="min-h-0 space-y-0.5 overflow-y-auto rounded-3xl border border-line bg-surface p-3 shadow-sm">
           {!ready ? null : templates.length === 0 ? (
-            <p className="p-4 text-center text-sm text-faint">No templates yet</p>
+            <p className="p-4 text-center text-sm text-faint">{t("No templates yet")}</p>
           ) : (
             templates.map((template) => (
               <button
@@ -268,16 +269,16 @@ function TemplatesPage() {
         <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-6 shadow-sm">
           {!ready ? null : !selectedTemplate ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <p className="text-lg font-black">Create your first template</p>
+              <p className="text-lg font-black">{t("Create your first template")}</p>
               <p className="mt-1 text-sm text-muted">
-                A template is the list of stages a commission moves through.
+                {t("A template is the list of stages a commission moves through.")}
               </p>
               <button
                 type="button"
                 onClick={handleNewTemplate}
                 className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary"
               >
-                New template
+                {t("New template")}
               </button>
             </div>
           ) : (
@@ -286,7 +287,7 @@ function TemplatesPage() {
                 <input
                   value={editName}
                   onChange={(event) => setEditName(event.target.value)}
-                  placeholder="Template name"
+                  placeholder={t("Template name")}
                   className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-2xl font-black outline-none hover:border-line focus:border-ink"
                 />
 
@@ -295,7 +296,7 @@ function TemplatesPage() {
                   onClick={() => handleDuplicate(selectedTemplate.id)}
                   className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
                 >
-                  Duplicate
+                  {t("Duplicate")}
                 </button>
 
                 <button
@@ -303,12 +304,12 @@ function TemplatesPage() {
                   onClick={() => setTemplateToDelete(selectedTemplate)}
                   className="rounded-md px-3 py-1.5 text-xs font-semibold text-red-500 transition hover:bg-red-50"
                 >
-                  Delete
+                  {t("Delete")}
                 </button>
               </div>
 
               <label className="mt-4 flex items-center gap-3 px-2 text-sm">
-                <span className="text-muted">Base price</span>
+                <span className="text-muted">{t("Base price")}</span>
                 <input
                   value={editBasePrice}
                   onChange={(event) => setEditBasePrice(event.target.value)}
@@ -322,7 +323,7 @@ function TemplatesPage() {
               </label>
 
               <label className="mt-2 flex items-center gap-3 px-2 text-sm">
-                <span className="text-muted">Revisions included</span>
+                <span className="text-muted">{t("Revisions included")}</span>
                 <input
                   type="number"
                   min={0}
@@ -371,14 +372,14 @@ function TemplatesPage() {
                     onKeyDown={(event) => {
                       if (event.key === "Enter") handleAddStage();
                     }}
-                    placeholder="Add a stage and press Enter"
+                    placeholder={t("Add a stage and press Enter")}
                     className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm outline-none hover:border-line focus:border-ink focus:bg-paper"
                   />
                 </div>
               </div>
 
               <div className="mt-4 flex items-center justify-end gap-3">
-                <p className="text-xs text-faint">The last stage marks the commission as finished.</p>
+                <p className="text-xs text-faint">{t("The last stage marks the commission as finished.")}</p>
                 <button
                   type="button"
                   onClick={handleSave}
@@ -395,10 +396,10 @@ function TemplatesPage() {
 
       {templateToDelete && (
         <ConfirmModal
-          eyebrow="Delete template"
+          eyebrow={t("Delete template")}
           title={templateToDelete.name}
-          message="Its stages are deleted too. This can't be undone."
-          confirmLabel="Delete"
+          message={t("Its stages are deleted too. This can't be undone.")}
+          confirmLabel={t("Delete")}
           onConfirm={confirmDelete}
           onCancel={() => setTemplateToDelete(null)}
         />
@@ -406,11 +407,11 @@ function TemplatesPage() {
 
       {errorMessage && (
         <ConfirmModal
-          eyebrow="Action not allowed"
+          eyebrow={t("Action not allowed")}
           eyebrowTone="danger"
-          title="Can't delete template"
+          title={t("Can't delete template")}
           message={errorMessage}
-          confirmLabel="Understood"
+          confirmLabel={t("Understood")}
           confirmVariant="primary"
           onConfirm={() => setErrorMessage(null)}
         />

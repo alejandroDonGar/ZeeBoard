@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import {
   createTag,
@@ -78,7 +79,7 @@ function TagEditor({
           autoFocus
           value={draft.name}
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-          placeholder="Tag name"
+          placeholder={t("Tag name")}
           className="min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink disabled:opacity-60"
         />
       </div>
@@ -98,7 +99,7 @@ function TagEditor({
         ))}
 
         <label
-          title="Custom colour"
+          title={t("Custom colour")}
           className="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-sm border border-dashed border-line-strong text-xs text-muted hover:text-ink"
         >
           +
@@ -116,7 +117,7 @@ function TagEditor({
             onClick={onCancel}
             className="rounded-md px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink"
           >
-            Cancel
+            {t("Cancel")}
           </button>
 
           <button
@@ -228,19 +229,19 @@ function TagsPage() {
     const count = usageByTagId[tagId] ?? 0;
 
     if (count === 0) {
-      return "Not used";
+      return t("Not used");
     }
 
-    return count === 1 ? "1 commission" : `${count} commissions`;
+    return t(count === 1 ? "{n} commission" : "{n} commissions", { n: count });
   }
 
   return (
     <>
       <PageHeader
-        label="Label library"
-        title="Tags"
-        description="Classify commissions by type, payment or anything you need."
-        action="+ New category"
+        label={t("Label library")}
+        title={t("Tags")}
+        description={t("Classify commissions by type, payment or anything you need.")}
+        action={t("+ New category")}
         onAction={() => setCreatingCategory(true)}
       />
 
@@ -256,7 +257,7 @@ function TagsPage() {
                   if (event.key === "Enter") handleCreateCategory();
                   if (event.key === "Escape") setCreatingCategory(false);
                 }}
-                placeholder="Category name, e.g. Extras"
+                placeholder={t("Category name, e.g. Extras")}
                 className="min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink"
               />
 
@@ -265,7 +266,7 @@ function TagsPage() {
                 onClick={() => setCreatingCategory(false)}
                 className="rounded-md px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink"
               >
-                Cancel
+                {t("Cancel")}
               </button>
 
               <button
@@ -274,23 +275,23 @@ function TagsPage() {
                 disabled={!categoryName.trim()}
                 className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
               >
-                Create
+                {t("Create")}
               </button>
             </div>
           )}
 
           {ready && categories.length === 0 && !creatingCategory && (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <p className="text-lg font-black">Start your first category</p>
+              <p className="text-lg font-black">{t("Start your first category")}</p>
               <p className="mt-1 text-sm text-muted">
-                Group tags like commission types, extras or payment status.
+                {t("Group tags like commission types, extras or payment status.")}
               </p>
               <button
                 type="button"
                 onClick={() => setCreatingCategory(true)}
                 className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary"
               >
-                New category
+                {t("New category")}
               </button>
             </div>
           )}
@@ -337,7 +338,7 @@ function TagsPage() {
                               }}
                               className="rounded-sm px-2 py-1 text-xs font-semibold text-muted hover:bg-highlight hover:text-ink"
                             >
-                              Edit
+                              {t("Edit")}
                             </button>
 
                             <button
@@ -345,7 +346,7 @@ function TagsPage() {
                               onClick={() => setTagToDelete(tag)}
                               className="rounded-sm px-2 py-1 text-xs font-semibold text-red-500 hover:bg-red-50"
                             >
-                              Delete
+                              {t("Delete")}
                             </button>
                           </div>
                         </div>
@@ -373,7 +374,7 @@ function TagsPage() {
                       }}
                       className="mt-1 rounded-sm px-2 py-1.5 text-xs font-semibold text-muted transition hover:bg-paper hover:text-ink"
                     >
-                      + Add tag
+                      {t("+ Add tag")}
                     </button>
                   )}
                 </section>
@@ -385,14 +386,14 @@ function TagsPage() {
 
       {tagToDelete && (
         <ConfirmModal
-          eyebrow="Delete tag"
+          eyebrow={t("Delete tag")}
           title={tagToDelete.name}
           message={
             usageByTagId[tagToDelete.id]
-              ? `It will be removed from ${usageLabel(tagToDelete.id).toLowerCase()}. This can't be undone.`
-              : "This can't be undone."
+              ? t("It will be removed from {usage}. This can't be undone.", { usage: usageLabel(tagToDelete.id).toLowerCase() })
+              : t("This can't be undone.")
           }
-          confirmLabel="Delete"
+          confirmLabel={t("Delete")}
           onConfirm={async () => {
             await handleDeleteTag(tagToDelete.id);
             setTagToDelete(null);

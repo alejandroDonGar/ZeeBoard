@@ -68,11 +68,6 @@ function FinishedPage({
 
   function handleOpenCommission(commission: Commission) {
     localStorage.setItem(
-      "zeeboard-open-commission-tabs",
-      JSON.stringify([commission.id]),
-    );
-
-    localStorage.setItem(
       "zeeboard-active-commission-id",
       String(commission.id),
     );

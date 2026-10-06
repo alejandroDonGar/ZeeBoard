@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
-import BoardFilters, { type PaymentFilter } from "../components/BoardFilters";
+import BoardFilters, { Segmented, type PaymentFilter } from "../components/BoardFilters";
 import CommissionPayments from "../components/CommissionPayments";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
@@ -46,7 +46,6 @@ import {
   type TemplateStage,
 } from "../lib/database";
 import PageHeader from "../components/PageHeader";
-import OpenTabs from "../components/OpenTabs";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 
@@ -72,9 +71,8 @@ function CommissionsPage() {
   const [creatingCommission, setCreatingCommission] = useState(false);
   const [commissionCreated, setCommissionCreated] = useState(false);
   const [commissions, setCommissions] = useState<Commission[]>([]);
-  const [openCommissionTabs, setOpenCommissionTabs] = useState<Commission[]>([]);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [activeCommissionId, setActiveCommissionId] = useState<number | null>(null);
-  const [tabsRestored, setTabsRestored] = useState(false);
   const [workflowStages, setWorkflowStages] = useState<TemplateStage[]>([]);
   const [templateStagesByTemplateId, setTemplateStagesByTemplateId] = useState<Record<number, TemplateStage[]>>({});
   const activeCommission = commissions.find((commission) => commission.id === activeCommissionId) ?? null;
@@ -256,55 +254,20 @@ function CommissionsPage() {
   }
 
   useEffect(() => {
-    const savedTabs = localStorage.getItem("zeeboard-open-commission-tabs");
     const savedActiveId = localStorage.getItem("zeeboard-active-commission-id");
 
-    getCommissions()
-      .then((data) => {
-        if (savedTabs) {
-          const tabIds = JSON.parse(savedTabs) as number[];
-
-          const restoredTabs = data.filter((commission) =>
-            tabIds.includes(commission.id),
-          );
-
-          setOpenCommissionTabs(restoredTabs);
-
-          if (savedActiveId) {
-            const activeId = Number(savedActiveId);
-            const activeExists = restoredTabs.some((tab) => tab.id === activeId);
-
-            setActiveCommissionId(activeExists ? activeId : null);
-          }
-        }
-
-        setTabsRestored(true);
-      })
-      .catch((error) => {
-        console.error(error);
-        setTabsRestored(true);
-      });
+    if (savedActiveId) {
+      setActiveCommissionId(Number(savedActiveId));
+    }
   }, []);
 
   useEffect(() => {
-    if (!tabsRestored) {
-      return;
-    }
-
-    localStorage.setItem(
-      "zeeboard-open-commission-tabs",
-      JSON.stringify(openCommissionTabs.map((commission) => commission.id)),
-    );
-
     if (activeCommissionId !== null) {
-      localStorage.setItem(
-        "zeeboard-active-commission-id",
-        String(activeCommissionId),
-      );
+      localStorage.setItem("zeeboard-active-commission-id", String(activeCommissionId));
     } else {
       localStorage.removeItem("zeeboard-active-commission-id");
     }
-  }, [openCommissionTabs, activeCommissionId, tabsRestored]);
+  }, [activeCommissionId]);
 
   useEffect(() => {
     async function loadWorkflowStages() {
@@ -328,29 +291,8 @@ function CommissionsPage() {
   }, [activeCommission]);
 
   function handleOpenCommission(commission: Commission) {
-    setOpenCommissionTabs((currentTabs: Commission[]) => {
-      const alreadyOpen = currentTabs.some(
-        (tab: Commission) => tab.id === commission.id,
-      );
-
-      if (alreadyOpen) {
-        return currentTabs;
-      }
-
-      return [...currentTabs, commission];
-    });
-
     setActiveCommissionId(commission.id);
-  }
-
-  function handleCloseCommissionTab(commissionId: number) {
-    setOpenCommissionTabs((currentTabs: Commission[]) =>
-      currentTabs.filter((tab: Commission) => tab.id !== commissionId),
-    );
-
-    if (activeCommissionId === commissionId) {
-      setActiveCommissionId(null);
-    }
+    setViewMode("list");
   }
 
   /** Precio automático: lo llaman los cambios de plantilla y personajes, nunca al abrir un formulario */
@@ -450,13 +392,6 @@ function CommissionsPage() {
     const data = await getCommissions();
     setCommissions(data);
 
-    setOpenCommissionTabs((currentTabs) =>
-      currentTabs.map((tab) =>
-        tab.id === activeCommission.id
-          ? { ...tab, current_stage_id: nextStage.id }
-          : tab,
-      ),
-    );
   }
 
   async function handleOpenEditCommission() {
@@ -517,15 +452,6 @@ function CommissionsPage() {
       await loadTagsForCommissions(data);
       await loadStageImagesForCommissions(data);
 
-      setOpenCommissionTabs((currentTabs) =>
-        currentTabs.map((tab) => {
-          const updatedCommission = data.find(
-            (commission) => commission.id === tab.id,
-          );
-
-          return updatedCommission ?? tab;
-        }),
-      );
 
       setCommissionSaved(true);
 
@@ -559,10 +485,6 @@ function CommissionsPage() {
         data.find((commission) => commission.id === newCommissionId) ?? null;
 
         if (duplicatedCommission) {
-        setOpenCommissionTabs((currentTabs) => [
-            ...currentTabs,
-            duplicatedCommission,
-        ]);
 
         setActiveCommissionId(duplicatedCommission.id);
         }
@@ -591,9 +513,6 @@ function CommissionsPage() {
         setCommissions(data);
         await loadTagsForCommissions(data);
 
-        setOpenCommissionTabs((currentTabs) =>
-        currentTabs.filter((tab) => tab.id !== activeCommission.id),
-        );
 
         setActiveCommissionId(null);
         showToast("Commission deleted.", "success");
@@ -685,6 +604,45 @@ function CommissionsPage() {
   const isLastStage =
     workflowStages.length > 0 &&
     currentStageIndex === workflowStages.length - 1;
+
+  // Bandeja: las que ya están en una etapa, y en cola las que aún no han empezado; la entrega más cercana primero
+  const byDeadline = (a: Commission, b: Commission) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999");
+  const inboxGroups = [
+    {
+      label: "In progress",
+      items: filteredCommissions.filter((commission) => commission.current_stage_id !== null).sort(byDeadline),
+    },
+    {
+      label: "Queue",
+      items: filteredCommissions.filter((commission) => commission.current_stage_id === null).sort(byDeadline),
+    },
+  ];
+  const inboxOrder = inboxGroups.flatMap((group) => group.items);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement;
+
+      if (
+        viewMode !== "list" ||
+        (event.key !== "ArrowDown" && event.key !== "ArrowUp") ||
+        target.closest("input, textarea, select, [contenteditable]")
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      const index = inboxOrder.findIndex((commission) => commission.id === activeCommissionId);
+      const next = inboxOrder[index + (event.key === "ArrowDown" ? 1 : -1)] ?? (index === -1 ? inboxOrder[0] : null);
+
+      if (next) {
+        setActiveCommissionId(next.id);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
 
   const activeDeadlineStatus = activeCommission ? getDeadlineStatus(activeCommission.deadline) : null;
   const activePaymentStatus =
@@ -778,40 +736,110 @@ function CommissionsPage() {
         onAction={() => setShowNewCommissionModal(true)}
       />
 
-      <OpenTabs
-        openCommissionTabs={openCommissionTabs}
-        activeCommissionId={activeCommissionId}
-        clients={clients}
-        getPaymentStatus={(commission: Commission) =>
-          paymentSummary(commission.price, paymentsByCommissionId[commission.id] ?? []).status
-        }
-        onSelectCommission={(commissionId) => setActiveCommissionId(commissionId)}
-        onShowAllCommissions={() => setActiveCommissionId(null)}
-        onCloseCommission={handleCloseCommissionTab}
-      />
+      <div className="flex items-start gap-3 px-5 pt-5">
+        <div className="min-w-0 flex-1">
+          <BoardFilters
+            tags={allTags}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            filterTagIds={filterTagIds}
+            onFilterTagIdsChange={setFilterTagIds}
+            filterStatus={filterStatus}
+            onFilterStatusChange={setFilterStatus}
+            filterPayment={filterPayment}
+            onFilterPaymentChange={setFilterPayment}
+          />
+        </div>
+
+        <Segmented
+          options={[
+            { value: "list", label: "List" },
+            { value: "grid", label: "Grid" },
+          ]}
+          value={viewMode}
+          onChange={setViewMode}
+        />
+      </div>
 
       <section
-        className={`grid min-h-0 flex-1 gap-5 p-5 pb-6 ${
-          activeCommission ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_320px]"
+        className={`grid min-h-0 flex-1 gap-5 px-5 pb-6 ${
+          viewMode === "list" ? "grid-cols-[280px_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)_320px]"
         }`}
       >
+        {viewMode === "list" && (
+          <nav className="min-h-0 overflow-y-auto rounded-3xl border border-line bg-surface p-3 shadow-sm">
+            {inboxGroups.every((group) => group.items.length === 0) ? (
+              <p className="p-4 text-center text-sm text-faint">
+                {commissions.length === 0 ? "No commissions yet" : "No matches"}
+              </p>
+            ) : (
+              inboxGroups
+                .filter((group) => group.items.length > 0)
+                .map((group) => (
+                  <div key={group.label} className="mb-3 last:mb-0">
+                    <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-[0.16em] text-faint">
+                      {group.label} · {group.items.length}
+                    </p>
+
+                    {group.items.map((commission) => {
+                      const images = stageImagesByCommissionId[commission.id] ?? [];
+                      const latestImage = images[images.length - 1] ?? null;
+                      const stages = commission.template_id
+                        ? templateStagesByTemplateId[commission.template_id] ?? []
+                        : [];
+                      const stageName = stages.find((stage) => stage.id === commission.current_stage_id)?.name;
+                      const deadlineStatus = getDeadlineStatus(commission.deadline);
+
+                      return (
+                        <button
+                          key={commission.id}
+                          type="button"
+                          onClick={() => handleOpenCommission(commission)}
+                          className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition ${
+                            commission.id === activeCommissionId ? "bg-highlight" : "hover:bg-paper"
+                          }`}
+                        >
+                          {latestImage ? (
+                            <img
+                              src={thumbUrl(latestImage.image_data_url)}
+                              loading="lazy" decoding="async"
+                              alt=""
+                              className="h-9 w-9 shrink-0 rounded-sm object-cover"
+                            />
+                          ) : (
+                            <span className="h-9 w-9 shrink-0 rounded-sm bg-paper" />
+                          )}
+
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-bold">{commission.title}</span>
+                            <span className="block truncate text-[11px] text-faint">
+                              {[commission.client_name, stageName].filter(Boolean).join(" · ") || "No client"}
+                            </span>
+                          </span>
+
+                          {deadlineStatus && (
+                            <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold ${deadlineStatus.className}`}>
+                              {deadlineStatus.label.replace(" days left", "d").replace(" days overdue", "d late")}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
+            )}
+          </nav>
+        )}
+
+
         <div className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="min-h-0 flex-1 overflow-y-auto px-1">
-            {!activeCommission && commissions.length > 0 && (
-              <BoardFilters
-                tags={allTags}
-                searchQuery={searchQuery}
-                onSearchQueryChange={setSearchQuery}
-                filterTagIds={filterTagIds}
-                onFilterTagIdsChange={setFilterTagIds}
-                filterStatus={filterStatus}
-                onFilterStatusChange={setFilterStatus}
-                filterPayment={filterPayment}
-                onFilterPaymentChange={setFilterPayment}
-              />
-            )}
-
-            {activeCommission ? (
+            {viewMode === "list" && !activeCommission ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <p className="text-lg font-black">Pick a commission</p>
+                <p className="mt-1 text-sm text-muted">Choose one from the list, or use ↑ ↓ to move between them.</p>
+              </div>
+            ) : viewMode === "list" && activeCommission ? (
               <div className="flex h-full min-h-0 flex-col gap-5">
                 {/* Cabecera: todo lo importante en una línea */}
                 <div className="flex items-start gap-4">
@@ -1332,7 +1360,7 @@ function CommissionsPage() {
           </div>
         </div>
 
-        {!activeCommission && (
+        {viewMode === "grid" && (
         <aside className="h-full min-h-0 overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="max-h-full overflow-y-auto rounded-3xl border border-line bg-paper p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { imageUrl, thumbUrl } from "../lib/images";
 import {
   isCommissionCompleted as isCommissionCompletedHelper,
@@ -13,17 +12,12 @@ import {
   type TemplateStage,
 } from "../lib/database";
 import PageHeader from "../components/PageHeader";
-
-type FinishedImageItem = {
-  commission: Commission;
-  image: CommissionStageImage;
-};
+import { Segmented } from "../components/BoardFilters";
 
 type FinishedGroup = {
   key: string;
   label: string;
   commissions: Commission[];
-  images: FinishedImageItem[];
 };
 
 function FinishedPage({
@@ -38,7 +32,7 @@ function FinishedPage({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [groupMode, setGroupMode] = useState<"month" | "client">("month");
-  const [activeSlideIndexByGroupKey, setActiveSlideIndexByGroupKey] = useState<Record<string, number>>({});
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   useEffect(() => {
     getCommissions()
@@ -111,18 +105,6 @@ function FinishedPage({
     0,
   );
 
-  const allImageItems: FinishedImageItem[] = filteredCompleted
-    .map((commission) => {
-      const images = stageImagesByCommissionId[commission.id] ?? [];
-
-      if (images.length === 0) {
-        return null;
-      }
-
-      return { commission, image: images[images.length - 1] };
-    })
-    .filter((item): item is FinishedImageItem => item !== null);
-
   const monthFormatter = new Intl.DateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
@@ -140,19 +122,12 @@ function FinishedPage({
           key,
           label: monthFormatter.format(new Date(date.getFullYear(), date.getMonth(), 1)),
           commissions: [],
-          images: [],
         });
       }
 
       groupsMap.get(key)!.commissions.push(commission);
     });
 
-    allImageItems.forEach((item) => {
-      const date = new Date(item.commission.created_at);
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-
-      groupsMap.get(key)?.images.push(item);
-    });
 
     return Array.from(groupsMap.values()).sort((a, b) => b.key.localeCompare(a.key));
   }
@@ -168,17 +143,12 @@ function FinishedPage({
           key: label,
           label,
           commissions: [],
-          images: [],
         });
       }
 
       groupsMap.get(label)!.commissions.push(commission);
     });
 
-    allImageItems.forEach((item) => {
-      const label = item.commission.client_name || "No client";
-      groupsMap.get(label)?.images.push(item);
-    });
 
     return Array.from(groupsMap.values()).sort((a, b) =>
       a.label.localeCompare(b.label),
@@ -187,273 +157,169 @@ function FinishedPage({
 
   const groups = groupMode === "month" ? buildMonthGroups() : buildClientGroups();
 
-  function getActiveSlideIndex(groupKey: string, images: FinishedImageItem[]) {
-    const index = activeSlideIndexByGroupKey[groupKey] ?? 0;
-
-    if (images.length === 0) {
-      return 0;
-    }
-
-    return Math.min(index, images.length - 1);
-  }
-
-  function handlePreviousSlide(groupKey: string, images: FinishedImageItem[]) {
-    setActiveSlideIndexByGroupKey((current) => {
-      const currentIndex = getActiveSlideIndex(groupKey, images);
-      const nextIndex = currentIndex === 0 ? images.length - 1 : currentIndex - 1;
-
-      return { ...current, [groupKey]: nextIndex };
-    });
-  }
-
-  function handleNextSlide(groupKey: string, images: FinishedImageItem[]) {
-    setActiveSlideIndexByGroupKey((current) => {
-      const currentIndex = getActiveSlideIndex(groupKey, images);
-      const nextIndex = currentIndex === images.length - 1 ? 0 : currentIndex + 1;
-
-      return { ...current, [groupKey]: nextIndex };
-    });
-  }
-
   const hasActiveFilters = searchQuery.trim() !== "" || dateFrom !== "" || dateTo !== "";
+
+  const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 
   return (
     <>
       <PageHeader
         label="Archive"
         title="Finished commissions"
-        description="Browse completed commissions grouped by month or by client."
+        description="Everything you've delivered, grouped by month or by client."
       />
 
-      <section className="h-[calc(100vh-117px)] overflow-y-auto p-5 pb-6">
-        {commissions.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <h3 className="text-2xl font-black">No completed commissions</h3>
-              <p className="mt-2 text-sm text-muted">
-                Finished commissions will be archived here automatically.
-              </p>
-            </div>
+      <section className="h-[calc(100vh-117px)] min-h-0 p-5 pb-6">
+        <div className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Segmented
+              options={[
+                { value: "month", label: "By month" },
+                { value: "client", label: "By client" },
+              ]}
+              value={groupMode}
+              onChange={setGroupMode}
+            />
+
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search title or client…"
+              className="min-w-48 flex-1 rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
+            />
+
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(event) => setDateFrom(event.target.value)}
+              className="rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
+            />
+            <span className="text-xs text-faint">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(event) => setDateTo(event.target.value)}
+              className="rounded-md border border-line-strong bg-paper px-3 py-2 text-sm"
+            />
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+                className="px-1 text-xs font-semibold text-muted underline-offset-2 hover:text-ink hover:underline"
+              >
+                Clear
+              </button>
+            )}
+
+            <span className="ml-auto text-sm font-bold">
+              {filteredCompleted.length} finished · {totalEarnings.toFixed(0)} EUR
+            </span>
           </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex rounded-2xl border border-line-strong bg-surface p-1">
-                <button
-                  type="button"
-                  onClick={() => setGroupMode("month")}
-                  className={
-                    groupMode === "month"
-                      ? "rounded-xl bg-primary px-3 py-1.5 text-xs font-black text-on-primary"
-                      : "rounded-xl px-3 py-1.5 text-xs font-bold text-muted"
-                  }
-                >
-                  By month
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => setGroupMode("client")}
-                  className={
-                    groupMode === "client"
-                      ? "rounded-xl bg-primary px-3 py-1.5 text-xs font-black text-on-primary"
-                      : "rounded-xl px-3 py-1.5 text-xs font-bold text-muted"
-                  }
-                >
-                  By client
-                </button>
-              </div>
-
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search by title or client..."
-                className="min-w-[200px] flex-1 rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm"
-              />
-
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-                className="rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm"
-              />
-
-              <span className="text-xs font-bold text-faint">to</span>
-
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-                className="rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm"
-              />
-
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setDateFrom("");
-                    setDateTo("");
-                  }}
-                  className="flex items-center gap-1 rounded-2xl bg-primary px-4 py-2 text-xs font-black text-on-primary shadow-sm transition hover:-translate-y-0.5"
-                >
-                  ✕ Clear filters
-                </button>
-              )}
-
-              <div className="rounded-2xl border border-line bg-surface px-4 py-2 text-sm font-bold text-ink shadow-sm">
-                {filteredCompleted.length} finished · {totalEarnings.toFixed(0)}€ total
-              </div>
-            </div>
-
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {filteredCompleted.length === 0 ? (
-              <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-line-strong text-sm text-faint">
-                No finished commissions match your filters.
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <p className="text-lg font-black">
+                  {completedCommissions.length === 0 ? "Nothing finished yet" : "No matches"}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {completedCommissions.length === 0
+                    ? "Commissions land here when they reach their last stage."
+                    : "Try another search or date range."}
+                </p>
               </div>
             ) : (
-              groups.map((group) => {
-                const activeIndex = getActiveSlideIndex(group.key, group.images);
-                const currentSlide = group.images[activeIndex] ?? null;
+              <div className="space-y-6">
+                {groups.map((group) => {
+                  const groupEarnings = group.commissions.reduce(
+                    (sum, commission) => sum + (commission.price ?? 0),
+                    0,
+                  );
 
-                const previousSlide =
-                  group.images.length > 1
-                    ? group.images[
-                        activeIndex === 0 ? group.images.length - 1 : activeIndex - 1
-                      ]
-                    : null;
-
-                const nextSlide =
-                  group.images.length > 1
-                    ? group.images[
-                        activeIndex === group.images.length - 1 ? 0 : activeIndex + 1
-                      ]
-                    : null;
-
-                const groupEarnings = group.commissions.reduce(
-                  (sum, commission) => sum + (commission.price ?? 0),
-                  0,
-                );
-
-                return (
-                  <div
-                    key={group.key}
-                    className="rounded-3xl border border-line bg-surface p-5 shadow-sm"
-                  >
-                    <div className="mb-4 flex items-center justify-between gap-4">
-                      <h3 className="text-lg font-black text-ink">
-                        {group.label}
-                      </h3>
-
-                      <span className="rounded-sm bg-paper px-3 py-1 text-xs font-bold text-faint">
-                        {group.commissions.length} finished · {groupEarnings.toFixed(0)}€
-                      </span>
-                    </div>
-
-                    {group.images.length === 0 ? (
-                      <div className="flex h-40 items-center justify-center rounded-3xl border border-dashed border-line-strong text-sm text-faint">
-                        No images for these commissions.
+                  return (
+                    <section key={group.key}>
+                      <div className="mb-1 flex items-baseline justify-between px-2">
+                        <h3 className="text-[11px] font-black uppercase tracking-[0.16em] text-faint">
+                          {group.label}
+                        </h3>
+                        <span className="text-xs text-faint">
+                          {group.commissions.length} · {groupEarnings.toFixed(0)} EUR
+                        </span>
                       </div>
-                    ) : (
-                      <div className="relative overflow-hidden rounded-3xl border border-line bg-paper p-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="rounded-sm bg-surface px-3 py-1 text-[10px] font-black text-muted shadow-sm">
-                            {currentSlide?.commission.title}
-                          </span>
 
-                          <span className="rounded-sm bg-surface px-3 py-1 text-[10px] font-black text-faint shadow-sm">
-                            {activeIndex + 1} / {group.images.length}
-                          </span>
-                        </div>
+                      <div className="divide-y divide-line border-y border-line">
+                        {[...group.commissions]
+                          .sort((a, b) => b.created_at.localeCompare(a.created_at))
+                          .map((commission) => {
+                            const images = stageImagesByCommissionId[commission.id] ?? [];
+                            const latestImage = images[images.length - 1] ?? null;
 
-                        <div className="relative flex min-h-[240px] items-center justify-center">
-                          {group.images.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handlePreviousSlide(group.key, group.images)}
-                              className="absolute left-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-black text-on-primary shadow-lg transition hover:scale-105"
-                            >
-                              ‹
-                            </button>
-                          )}
-
-                          {previousSlide && (
-                            <img
-                              src={thumbUrl(previousSlide.image.image_data_url)}
-                              loading="lazy" decoding="async"
-                              alt=""
-                              className="absolute left-4 z-0 max-h-[260px] scale-75 rounded-2xl object-contain opacity-20 blur-sm pointer-events-none"
-                            />
-                          )}
-
-                          {nextSlide && (
-                            <img
-                              src={thumbUrl(nextSlide.image.image_data_url)}
-                              loading="lazy" decoding="async"
-                              alt=""
-                              className="absolute right-4 z-0 max-h-[260px] scale-75 rounded-2xl object-contain opacity-20 blur-sm pointer-events-none"
-                            />
-                          )}
-
-                          {currentSlide && (
-                            <AnimatePresence mode="wait">
-                              <motion.button
-                                key={currentSlide.image.id}
-                                type="button"
-                                onClick={() => handleOpenCommission(currentSlide.commission)}
-                                initial={{ opacity: 0, scale: 0.96, filter: "blur(6px)", x: 20 }}
-                                animate={{ opacity: 1, scale: 1, filter: "blur(0px)", x: 0 }}
-                                exit={{ opacity: 0, scale: 0.96, filter: "blur(6px)", x: -20 }}
-                                transition={{ duration: 0.15, ease: "easeOut" }}
-                                className="mx-auto"
+                            return (
+                              <div
+                                key={commission.id}
+                                onClick={() => handleOpenCommission(commission)}
+                                title="Open commission"
+                                className="grid cursor-pointer grid-cols-[48px_minmax(0,1fr)_160px_80px_100px] items-center gap-4 px-2 py-2 transition hover:bg-paper"
                               >
-                                <img
-                                  src={imageUrl(currentSlide.image.image_data_url)}
-                                  alt={currentSlide.commission.title}
-                                  className="mx-auto max-h-[360px] w-auto rounded-2xl object-contain shadow-sm transition hover:scale-[1.02]"
-                                />
-                              </motion.button>
-                            </AnimatePresence>
-                          )}
+                                {latestImage ? (
+                                  <button
+                                    type="button"
+                                    title="View image"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setZoomedImage(imageUrl(latestImage.image_data_url));
+                                    }}
+                                    className="cursor-zoom-in"
+                                  >
+                                    <img
+                                      src={thumbUrl(latestImage.image_data_url)}
+                                      loading="lazy" decoding="async"
+                                      alt={commission.title}
+                                      className="h-12 w-12 rounded-md object-cover"
+                                    />
+                                  </button>
+                                ) : (
+                                  <div className="h-12 w-12 rounded-md bg-paper" />
+                                )}
 
-                          {group.images.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleNextSlide(group.key, group.images)}
-                              className="absolute right-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-black text-on-primary shadow-lg transition hover:scale-105"
-                            >
-                              ›
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between">
-                          <p className="text-xs font-bold text-muted">
-                            {groupMode === "month"
-                              ? currentSlide?.commission.client_name || "No client"
-                              : currentSlide
-                                ? new Date(currentSlide.commission.created_at).toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                  })
-                                : ""}
-                          </p>
-
-                          <p className="text-xs font-bold text-ink">
-                            {currentSlide?.commission.price
-                              ? `${currentSlide.commission.price} ${currentSlide.commission.currency || "EUR"}`
-                              : "No price"}
-                          </p>
-                        </div>
+                                <span className="truncate text-sm font-bold">{commission.title}</span>
+                                <span className="truncate text-sm text-muted">
+                                  {commission.client_name || "No client"}
+                                </span>
+                                <span className="text-sm text-faint">
+                                  {dateFormatter.format(new Date(commission.created_at))}
+                                </span>
+                                <span className="text-right text-sm font-bold">
+                                  {commission.price
+                                    ? `${commission.price} ${commission.currency || "EUR"}`
+                                    : "—"}
+                                </span>
+                              </div>
+                            );
+                          })}
                       </div>
-                    )}
-                  </div>
-                );
-              })
+                    </section>
+                  );
+                })}
+              </div>
             )}
           </div>
-        )}
+        </div>
       </section>
+
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-md"
+          onClick={() => setZoomedImage(null)}
+        >
+          <img src={zoomedImage} alt="" className="max-h-[90vh] max-w-[90vw] rounded-3xl shadow-2xl" />
+        </div>
+      )}
     </>
   );
 }

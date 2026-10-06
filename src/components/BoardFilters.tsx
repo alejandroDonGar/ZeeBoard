@@ -7,7 +7,7 @@ const PAYMENT_CATEGORY = "Payment";
 // Los personajes se filtran desde Clientes, no aquí
 const HIDDEN_CATEGORIES = ["Characters", PAYMENT_CATEGORY];
 
-function Segmented<T extends string | number>({
+export function Segmented<T extends string | number>({
   options,
   value,
   onChange,

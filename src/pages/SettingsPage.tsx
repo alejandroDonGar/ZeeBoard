@@ -1,7 +1,7 @@
 import PageHeader from "../components/PageHeader";
 import SettingsCard from "../components/SettingsCard";
 import { useEffect, useState } from "react";
-import { exportBackup } from "../lib/backup";
+import { exportBackup, pickBackupFolder, restoreBackup } from "../lib/backup";
 import { applyTheme, getTheme, type ThemeChoice } from "../lib/theme";
 import { getAllUsedImagePaths } from "../lib/database";
 import { cleanUpOrphanedImages, getStorageStats, type StorageStats } from "../lib/images";
@@ -35,6 +35,8 @@ function SettingsPage() {
   const [exporting, setExporting] = useState(false);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
   const [showCleanUpConfirmModal, setShowCleanUpConfirmModal] = useState(false);
+  const [restoreFolder, setRestoreFolder] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   async function handleExportBackup() {
     try {
@@ -146,6 +148,14 @@ function SettingsPage() {
             </button>
 
             <button
+              onClick={async () => setRestoreFolder(await pickBackupFolder())}
+              disabled={restoring}
+              className="rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {restoring ? "Restoring..." : "Restore backup"}
+            </button>
+
+            <button
               onClick={() => setShowCleanUpConfirmModal(true)}
               disabled={cleaningUp}
               className="rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-70"
@@ -163,6 +173,31 @@ function SettingsPage() {
           )}
         </SettingsCard>
       </section>
+
+      {restoreFolder && (
+        <ConfirmModal
+          eyebrow="Replace your data"
+          eyebrowTone="danger"
+          title="Restore this backup?"
+          message={`Your current commissions, clients and settings will be replaced by the ones in:
+${restoreFolder}
+
+A copy of your current data is saved first (in the app folder, "before-restore"), and no images are deleted. The app reloads when it's done.`}
+          confirmLabel="Restore backup"
+          onConfirm={async () => {
+            setRestoring(true);
+            try {
+              await restoreBackup(restoreFolder);
+            } catch (error) {
+              console.error(error);
+              setBackupMessage(`Could not restore: ${error}`);
+              setRestoreFolder(null);
+              setRestoring(false);
+            }
+          }}
+          onCancel={() => setRestoreFolder(null)}
+        />
+      )}
 
       {showCleanUpConfirmModal && (
         <ConfirmModal

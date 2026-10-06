@@ -1,3 +1,4 @@
+mod backup;
 mod images;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -14,6 +15,7 @@ pub fn run() {
             images::delete_image_files,
             images::cleanup_orphan_images,
             images::storage_stats,
+            backup::restore_backup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

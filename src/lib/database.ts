@@ -51,6 +51,14 @@ export async function getDatabase(): Promise<ZeeDatabase> {
   return db;
 }
 
+/** Cierra la conexión: hace falta antes de reemplazar el archivo al restaurar un backup */
+export async function closeDatabase(): Promise<void> {
+  if (db) {
+    await db.close();
+    db = null;
+  }
+}
+
 export async function initializeDatabase() {
   const database = await getDatabase();
 

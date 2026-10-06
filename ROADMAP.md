@@ -77,7 +77,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 
 **Flujo de trabajo**
 - [x] Recordatorios de fechas de entrega (también aviso de comisiones paradas)
-- [ ] Lista de espera y plazas abiertas
+- [x] Lista de espera y plazas abiertas (con importación del formulario de Google)
 - [ ] Mensajes predefinidos para clientes
 - [ ] Marca de agua al exportar WIPs
 - [ ] Lista de entregables por comisión

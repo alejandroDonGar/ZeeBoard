@@ -44,7 +44,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [ ] Dividir `database.ts` por entidades
 
 ## Fase 4 · Pulido y calidad
-- [ ] Restaurar copias de seguridad
+- [x] Restaurar copias de seguridad
 - [ ] Atajos de teclado y buscador global
 - [ ] Rendimiento con muchas comisiones
 - [ ] Icono, nombre e instalador

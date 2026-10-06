@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { locale, t } from "../lib/i18n";
 import {
   addPayment,
   deletePayment,
@@ -20,7 +21,7 @@ function parsePriceOrNull(text: string): number | null {
     return null;
   }
 }
-const dateFormatter = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+const dateFormatter = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric" });
 
 /** Bloque de pagos del detalle: precio, lo pagado, lo recibido y la comisión de la plataforma. */
 function CommissionPayments({
@@ -61,7 +62,7 @@ function CommissionPayments({
       await onChange();
     } catch (error) {
       console.error(error);
-      showToast(error instanceof Error ? error.message : `Payment error: ${error}`, "error");
+      showToast(error instanceof Error ? error.message : t("Payment error: {error}", { error: String(error) }), "error");
     }
   }
 
@@ -70,7 +71,7 @@ function CommissionPayments({
       const clientPaid = parsePrice(amount === "" ? String(summary.remaining) : amount);
 
       if (!clientPaid) {
-        throw new Error("Enter what the client paid");
+        throw new Error(t("Enter what the client paid"));
       }
 
       // Sin "recibido" escrito, se usa el calculado con la tarifa de la plataforma (si hay)
@@ -90,16 +91,16 @@ function CommissionPayments({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-md border border-line bg-paper px-3 py-2 text-sm">
         <span className={`rounded-sm px-2 py-0.5 text-xs font-bold ${status.className}`}>{status.label}</span>
         <span>
-          <span className="text-faint">Price </span>
+          <span className="text-faint">{t("Price")} </span>
           <b>{commission.price !== null ? formatMoney(commission.price, currency) : "—"}</b>
         </span>
         <span>
-          <span className="text-faint">Client paid </span>
+          <span className="text-faint">{t("Client paid")} </span>
           <b>{formatMoney(summary.paid, currency)}</b>
           {summary.remaining > 0 && <span className="text-faint"> · {formatMoney(summary.remaining, currency)} left</span>}
         </span>
         <span>
-          <span className="text-faint">Received </span>
+          <span className="text-faint">{t("Received")} </span>
           <b className="text-green-700">{formatMoney(summary.received, currency)}</b>
           {summary.pendingReceived > 0 && <span className="text-faint"> · {summary.pendingReceived} not entered</span>}
         </span>
@@ -110,7 +111,7 @@ function CommissionPayments({
           onClick={() => setOpen((value) => !value)}
           className="ml-auto rounded-md border border-line-strong bg-surface px-2.5 py-1 text-xs font-semibold text-ink transition hover:border-ink"
         >
-          Payments{payments.length > 0 ? ` · ${payments.length}` : ""} {open ? "▴" : "▾"}
+          {t("Payments")}{payments.length > 0 ? ` · ${payments.length}` : ""} {open ? "▴" : "▾"}
         </button>
       </div>
 
@@ -120,9 +121,9 @@ function CommissionPayments({
           <div className="absolute right-0 top-full z-40 mt-1 w-[440px] rounded-md border border-line bg-surface p-3 shadow-lg">
             <div className="divide-y divide-line border-y border-line text-sm">
             <div className="grid grid-cols-[minmax(0,1.1fr)_1fr_1fr_24px] gap-2 py-1.5 text-[11px] text-faint">
-              <span>Date</span>
-              <span>Client paid</span>
-              <span>You received</span>
+              <span>{t("Date")}</span>
+              <span>{t("Client paid")}</span>
+              <span>{t("You received")}</span>
               <span />
             </div>
 
@@ -134,7 +135,7 @@ function CommissionPayments({
                 {/* Lo recibido se apunta cuando llega: Enter o al salir del campo */}
                 <input
                   defaultValue={payment.received !== null ? String(payment.received).replace(".", ",") : ""}
-                  placeholder="Not yet"
+                  placeholder={t("Not yet")}
                   inputMode="decimal"
                   data-private
                   onBlur={(event) => {
@@ -150,7 +151,7 @@ function CommissionPayments({
 
                 <button
                   type="button"
-                  title="Remove payment"
+                  title={t("Remove payment")}
                   onClick={() => run(() => deletePayment(payment.id))}
                   className="rounded-sm text-faint opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
                 >
@@ -179,7 +180,7 @@ function CommissionPayments({
               <input
                 value={received}
                 onChange={(event) => setReceived(event.target.value)}
-                placeholder={suggestedReceived !== null ? String(suggestedReceived).replace(".", ",") : "Later"}
+                placeholder={suggestedReceived !== null ? String(suggestedReceived).replace(".", ",") : t("Later")}
                 title={platform ? `${platform.name}: ${platform.percent}% + ${platform.fixed}` : undefined}
                 inputMode="decimal"
                   data-private
@@ -187,7 +188,7 @@ function CommissionPayments({
               />
               <button
                 type="button"
-                title="Add payment"
+                title={t("Add payment")}
                 onClick={handleAdd}
                 className="h-full rounded-sm bg-primary text-on-primary transition hover:bg-primary-hover"
               >
@@ -217,7 +218,7 @@ function CommissionPayments({
                 <input
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
-                  placeholder="Note: PayPal, deposit…"
+                  placeholder={t("Note: PayPal, deposit…")}
                   className={`${field} flex-1`}
                 />
               </div>

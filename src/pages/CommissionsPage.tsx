@@ -1,3 +1,4 @@
+import { locale, t } from "../lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
@@ -454,7 +455,7 @@ function CommissionsPage() {
       setViewMode("list");
     } catch (error) {
       console.error(error);
-      showToast(error instanceof Error ? error.message : `Commission error: ${error}`, "error");
+      showToast(error instanceof Error ? error.message : t("Commission error: {error}", { error: String(error) }), "error");
     } finally {
       setSavingCommission(false);
     }
@@ -540,7 +541,7 @@ function CommissionsPage() {
       }
     } catch (error) {
       console.error("Could not upload stage image", error);
-      showToast(`Could not add image: ${error}`, "error");
+      showToast(t("Could not add image: {error}", { error: String(error) }), "error");
     } finally {
       setImportingStageId(null);
     }
@@ -602,11 +603,11 @@ function CommissionsPage() {
   const byDeadline = (a: Commission, b: Commission) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999");
   const inboxGroups = [
     {
-      label: "In progress",
+      label: t("In progress"),
       items: filteredCommissions.filter((commission) => commission.current_stage_id !== null).sort(byDeadline),
     },
     {
-      label: "Queue",
+      label: t("Queue"),
       items: filteredCommissions.filter((commission) => commission.current_stage_id === null).sort(byDeadline),
     },
   ];
@@ -714,7 +715,7 @@ function CommissionsPage() {
 
 
   const today = new Date();
-  const currentMonth = today.toLocaleString("en-US", {
+  const currentMonth = today.toLocaleString(locale, {
     month: "long",
   });
 
@@ -779,10 +780,10 @@ function CommissionsPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PageHeader
-        label="Main workspace"
-        title="Commissions"
-        description="Organize your drawings by stages, clients, dates and tags."
-        action="+ New commission"
+        label={t("Main workspace")}
+        title={t("Commissions")}
+        description={t("Organize your drawings by stages, clients, dates and tags.")}
+        action={t("+ New commission")}
         onAction={openNewCommissionForm}
       />
 
@@ -820,7 +821,7 @@ function CommissionsPage() {
           <nav className="min-h-0 overflow-y-auto rounded-3xl border border-line bg-surface p-3 shadow-sm">
             {inboxGroups.every((group) => group.items.length === 0) ? (
               <p className="p-4 text-center text-sm text-faint">
-                {commissions.length === 0 ? "No commissions yet" : "No matches"}
+                {commissions.length === 0 ? t("No commissions yet") : t("No matches")}
               </p>
             ) : (
               inboxGroups
@@ -863,18 +864,18 @@ function CommissionsPage() {
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-bold">{commission.title}</span>
                             <span className="block truncate text-[11px] text-faint">
-                              {[commission.client_name && hide(commission.client_name), stageName].filter(Boolean).join(" · ") || "No client"}
+                              {[commission.client_name && hide(commission.client_name), stageName].filter(Boolean).join(" · ") || t("No client")}
                             </span>
                           </span>
 
                           {deadlineStatus ? (
                             <span className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold ${deadlineStatus.className}`}>
-                              {deadlineStatus.label.replace(" days left", "d").replace(" days overdue", "d late")}
+                              {deadlineStatus.short}
                             </span>
                           ) : (
                             // Sin fecha: los días desde que la aceptaste, con color al acercarse a lo que prometes
                             <span
-                              title="Days since you accepted it"
+                              title={t("Days since you accepted it")}
                               className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold ${
                                 daysToDeadline(commission, appSettings().promise_max_days, new Date()).daysLeft < 0
                                   ? "bg-red-50 text-red-600"
@@ -901,8 +902,8 @@ function CommissionsPage() {
           <div className="min-h-0 flex-1 overflow-y-auto px-1">
             {viewMode === "list" && !activeCommission ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
-                <p className="text-lg font-black">Pick a commission</p>
-                <p className="mt-1 text-sm text-muted">Choose one from the list, or use ↑ ↓ to move between them.</p>
+                <p className="text-lg font-black">{t("Pick a commission")}</p>
+                <p className="mt-1 text-sm text-muted">{t("Choose one from the list, or use ↑ ↓ to move between them.")}</p>
               </div>
             ) : viewMode === "list" && activeCommission ? (
               <div className="flex h-full min-h-0 flex-col gap-5">
@@ -912,7 +913,7 @@ function CommissionsPage() {
                     <h3 className="truncate text-2xl font-black">{activeCommission.title}</h3>
                     <p className="mt-1 text-sm text-muted">
                       {[
-                        hide(activeCommission.client_name || "No client"),
+                        hide(activeCommission.client_name || t("No client")),
                         activeCommission.platform,
                         templates.find((template) => template.id === activeCommission.template_id)?.name,
                       ]
@@ -928,7 +929,7 @@ function CommissionsPage() {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {(revisionsIncluded !== null || activeCorrections.length > 0) && (
                         <span
-                          title="Each client correction counts as one revision"
+                          title={t("Each client correction counts as one revision")}
                           className={`rounded-sm px-2 py-0.5 text-xs font-bold ${
                             revisionsIncluded === null
                               ? "bg-highlight text-muted"
@@ -939,19 +940,19 @@ function CommissionsPage() {
                                   : "bg-highlight text-muted"
                           }`}
                         >
-                          Revisions {activeCorrections.length}
+                          {t("Revisions")} {activeCorrections.length}
                           {revisionsIncluded !== null && ` / ${revisionsIncluded}`}
-                          {revisionsIncluded !== null && activeCorrections.length > revisionsIncluded && " · extra"}
+                          {revisionsIncluded !== null && activeCorrections.length > revisionsIncluded && ` · ${t("extra")}`}
                         </span>
                       )}
                       {activeClient?.tag_handle && (
                         <button
                           type="button"
-                          title="Copy the account to tag when you post"
+                          title={t("Copy the account to tag when you post")}
                           onClick={() => copyTag(activeClient.tag_handle!)}
                           className="rounded-sm border border-line-strong px-2 py-0.5 text-xs font-bold text-muted transition hover:border-ink hover:text-ink"
                         >
-                          Tag {hide(activeClient.tag_handle)}
+                          {t("Tag")} {hide(activeClient.tag_handle)}
                           {activeClient.tag_platform && activeClient.tag_platform !== "Other" ? ` · ${activeClient.tag_platform}` : ""} ⧉
                         </button>
                       )}
@@ -971,13 +972,13 @@ function CommissionsPage() {
                     onClick={handleOpenEditCommission}
                     className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
                   >
-                    Edit
+                    {t("Edit")}
                   </button>
 
                   <div className="relative">
                     <button
                       type="button"
-                      title="More actions"
+                      title={t("More actions")}
                       onClick={() => setCommissionMenuOpen((open) => !open)}
                       className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
                     >
@@ -997,18 +998,18 @@ function CommissionsPage() {
                             }}
                             className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-highlight"
                           >
-                            {duplicatingCommission ? "Duplicating…" : "Duplicate"}
+                            {duplicatingCommission ? t("Duplicating…") : t("Duplicate")}
                           </button>
                           <button
                             type="button"
-                            title="Short text for the PayPal invoice"
+                            title={t("Short text for the PayPal invoice")}
                             onClick={() => {
                               setCommissionMenuOpen(false);
                               copyInvoiceDescription();
                             }}
                             className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-highlight"
                           >
-                            Copy description
+                            {t("Copy description")}
                           </button>
                           <button
                             type="button"
@@ -1018,7 +1019,7 @@ function CommissionsPage() {
                             }}
                             className="block w-full rounded-sm px-3 py-2 text-left text-sm text-red-500 hover:bg-red-50"
                           >
-                            Delete
+                            {t("Delete")}
                           </button>
                         </div>
                       </>
@@ -1034,7 +1035,7 @@ function CommissionsPage() {
 
                 {workflowStages.length === 0 ? (
                   <p className="rounded-md border border-dashed border-line-strong p-6 text-center text-sm text-faint">
-                    This commission has no template, so it has no stages. Edit it to pick one.
+                    {t("This commission has no template, so it has no stages. Edit it to pick one.")}
                   </p>
                 ) : (
                   <>
@@ -1071,7 +1072,7 @@ function CommissionsPage() {
                               >
                                 <button
                                   type="button"
-                                  title="Open in focus mode"
+                                  title={t("Open in focus mode")}
                                   onClick={() => setFocusImageId(image.id)}
                                   className="block cursor-zoom-in"
                                 >
@@ -1089,7 +1090,7 @@ function CommissionsPage() {
                                   <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-sm bg-black/60 px-1.5 py-0.5 text-[11px] text-white">
                                     <button
                                       type="button"
-                                      title="Previous alt"
+                                      title={t("Previous alt")}
                                       onClick={() => setActiveStageImageIndexByStageId((current) => ({
                                         ...current,
                                         [stage.id]: (imageIndex - 1 + stageImages.length) % stageImages.length,
@@ -1101,7 +1102,7 @@ function CommissionsPage() {
                                     Alt {imageIndex + 1} of {stageImages.length}
                                     <button
                                       type="button"
-                                      title="Next alt"
+                                      title={t("Next alt")}
                                       onClick={() => setActiveStageImageIndexByStageId((current) => ({
                                         ...current,
                                         [stage.id]: (imageIndex + 1) % stageImages.length,
@@ -1116,7 +1117,7 @@ function CommissionsPage() {
                                 <span className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
                                   <button
                                     type="button"
-                                    title="Add an alt"
+                                    title={t("Add an alt")}
                                     disabled={importingStageId !== null}
                                     onClick={() => handleAddStageImages(stage.id)}
                                     className="flex h-7 w-7 items-center justify-center rounded-sm bg-black/60 text-white hover:bg-black/80"
@@ -1125,7 +1126,7 @@ function CommissionsPage() {
                                   </button>
                                   <button
                                     type="button"
-                                    title="Remove this image"
+                                    title={t("Remove this image")}
                                     onClick={() => handleDeleteStageImage(image.id)}
                                     className="flex h-7 w-7 items-center justify-center rounded-sm bg-black/60 text-white hover:bg-red-500"
                                   >
@@ -1146,7 +1147,7 @@ function CommissionsPage() {
                                 }`}
                               >
                                 <span className="text-xl">+</span>
-                                {importingStageId === stage.id ? "Optimizing…" : isCurrent ? "Drop or Ctrl+V" : "Drop here"}
+                                {importingStageId === stage.id ? t("Optimizing…") : isCurrent ? t("Drop or Ctrl+V") : t("Drop here")}
                               </button>
                             )}
 
@@ -1166,7 +1167,7 @@ function CommissionsPage() {
                                 {stage.name}
                               </span>
                               {importingStageId === stage.id && image && (
-                                <span className="text-xs text-faint">Optimizing…</span>
+                                <span className="text-xs text-faint">{t("Optimizing…")}</span>
                               )}
                             </p>
 
@@ -1189,7 +1190,7 @@ function CommissionsPage() {
                                         : "text-faint hover:text-ink"
                                   }`}
                                 >
-                                  {count > 0 ? `${count} correction${count === 1 ? "" : "s"}` : "+ correction"}
+                                  {count > 0 ? t(count === 1 ? "{n} correction" : "{n} corrections", { n: count }) : t("+ correction")}
                                   {open ? " ▴" : count > 0 ? " ▾" : ""}
                                 </button>
                               );
@@ -1210,12 +1211,12 @@ function CommissionsPage() {
                           .map((correction) => (
                             <div key={correction.id} className="group flex items-baseline gap-3 py-1 text-sm">
                               <span className="w-14 shrink-0 text-xs text-faint">
-                                {new Date(correction.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                                {new Date(correction.created_at).toLocaleDateString(locale, { day: "numeric", month: "short" })}
                               </span>
                               <span className="flex-1 whitespace-pre-wrap">{correction.text}</span>
                               <button
                                 type="button"
-                                title="Remove correction"
+                                title={t("Remove correction")}
                                 onClick={async () => {
                                   await deleteCorrection(correction.id);
                                   setCorrections(await getAllCorrections());
@@ -1243,7 +1244,7 @@ function CommissionsPage() {
                               showToast(error instanceof Error ? error.message : `${error}`, "error");
                             }
                           }}
-                          placeholder="What did the client ask to change? Enter to add"
+                          placeholder={t("What did the client ask to change? Enter to add")}
                           className="mt-2 w-full rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink"
                         />
                       </div>
@@ -1252,16 +1253,16 @@ function CommissionsPage() {
                     <div className="flex shrink-0 items-center gap-2">
                       <button
                         type="button"
-                        title="Back to the previous stage"
+                        title={t("Back to the previous stage")}
                         onClick={() => handleMoveStage(-1)}
                         disabled={currentStageIndex <= 0}
                         className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-muted transition hover:border-ink hover:text-ink disabled:opacity-30"
                       >
-                        ‹ Back
+                        {t("‹ Back")}
                       </button>
 
                       {isLastStage ? (
-                        <span className="rounded-md bg-green-600 px-4 py-1.5 text-sm font-bold text-white">✓ Finished</span>
+                        <span className="rounded-md bg-green-600 px-4 py-1.5 text-sm font-bold text-white">{t("✓ Finished")}</span>
                       ) : (
                         <button
                           type="button"
@@ -1269,14 +1270,14 @@ function CommissionsPage() {
                           className="rounded-md bg-primary px-4 py-1.5 text-sm font-bold text-on-primary transition hover:bg-primary-hover"
                         >
                           {currentStageIndex < 0
-                            ? `Start ${workflowStages[0].name}`
-                            : `${workflowStages[currentStageIndex].name} done →`}
+                            ? t("Start {name}", { name: workflowStages[0].name })
+                            : t("{name} done →", { name: workflowStages[currentStageIndex].name })}
                         </button>
                       )}
 
                       {pasteStage && (
                         <span className="ml-2 text-xs text-faint">
-                          Ctrl+V adds to <b className="text-ink">{pasteStage.name}</b>
+                          {t("Ctrl+V adds to")} <b className="text-ink">{pasteStage.name}</b>
                         </span>
                       )}
                     </div>
@@ -1286,16 +1287,16 @@ function CommissionsPage() {
                 {(activeCommission.notes || activeCharacters.length > 0) && (
                   <div className="grid shrink-0 grid-cols-2 gap-6 border-t border-line pt-4">
                     <div>
-                      <p className="mb-1 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Notes</p>
+                      <p className="mb-1 text-[11px] font-black uppercase tracking-[0.16em] text-faint">{t("Notes")}</p>
                       <p className="line-clamp-4 whitespace-pre-wrap text-sm text-muted">
-                        {activeCommission.notes ? <Linkified text={activeCommission.notes} /> : "No notes."}
+                        {activeCommission.notes ? <Linkified text={activeCommission.notes} /> : t("No notes.")}
                       </p>
                     </div>
 
                     <div>
-                      <p className="mb-1 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Characters</p>
+                      <p className="mb-1 text-[11px] font-black uppercase tracking-[0.16em] text-faint">{t("Characters")}</p>
                       {activeCharacters.length === 0 ? (
-                        <p className="text-sm text-faint">No characters.</p>
+                        <p className="text-sm text-faint">{t("No characters.")}</p>
                       ) : (
                         <div className="space-y-1.5">
                           {activeCharacters.map((character) => (
@@ -1330,18 +1331,18 @@ function CommissionsPage() {
             ) : commissions.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-md text-center">
-                  <h4 className="text-xl font-black">No commissions yet</h4>
+                  <h4 className="text-xl font-black">{t("No commissions yet")}</h4>
                   <p className="mt-2 text-sm leading-relaxed text-muted">
-                    Create your first commission to start building your workflow.
+                    {t("Create your first commission to start building your workflow.")}
                   </p>
                 </div>
               </div>
             ) : filteredCommissions.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-md text-center">
-                  <h4 className="text-xl font-black">No matches</h4>
+                  <h4 className="text-xl font-black">{t("No matches")}</h4>
                   <p className="mt-2 text-sm leading-relaxed text-muted">
-                    No commissions match your current search or filters.
+                    {t("No commissions match your current search or filters.")}
                   </p>
                 </div>
               </div>
@@ -1427,16 +1428,16 @@ function CommissionsPage() {
                       )}
 
                       <p className="mt-2 text-sm font-semibold text-muted">
-                        {hide(commission.client_name || "No client")}
+                        {hide(commission.client_name || t("No client"))}
                       </p>
 
                       <p className="mt-1 text-xs text-faint">
-                        {commission.platform || "No platform"}
+                        {commission.platform || t("No platform")}
                       </p>
 
                       <div className="mt-3">
                         <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.14em] text-faint">
-                          <span>Progress</span>
+                          <span>{t("Progress")}</span>
                           <span>{completionPercentage}%</span>
                         </div>
 
@@ -1455,14 +1456,14 @@ function CommissionsPage() {
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         {altCount > 0 && (
                           <span className="rounded-sm border border-line-strong bg-surface px-3 py-1 text-xs font-black text-muted shadow-sm">
-                            📷 {altCount} {altCount === 1 ? "Alt" : "Alts"}
+                            📷 {altCount} {t(altCount === 1 ? "Alt" : "Alts")}
                           </span>
                         )}
 
                         <span className="rounded-sm bg-surface px-3 py-1 text-xs font-bold text-ink shadow-sm">
                           {commission.price
                             ? formatMoney(commission.price, commission.currency)
-                            : "No price"}
+                            : t("No price")}
                         </span>
 
                         {deadlineStatus ? (
@@ -1473,7 +1474,7 @@ function CommissionsPage() {
                           </span>
                         ) : (
                           <span className="rounded-sm bg-surface px-3 py-1 text-xs font-bold text-ink shadow-sm">
-                            No deadline
+                            {t("No deadline")}
                           </span>
                         )}
                       </div>
@@ -1495,7 +1496,7 @@ function CommissionsPage() {
         <aside className="h-full min-h-0 overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="max-h-full overflow-y-auto rounded-3xl border border-line bg-paper p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-              Calendar
+              {t("Calendar")}
             </p>
 
             <p className="mt-2 text-lg font-black">
@@ -1505,7 +1506,7 @@ function CommissionsPage() {
             {selectedDeadlineCommission && (
               <div className="mt-4 rounded-2xl bg-surface p-4 shadow-sm">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                  Next deadline
+                  {t("Next deadline")}
                 </p>
 
                 <p className="mt-2 text-sm font-black">
@@ -1518,20 +1519,20 @@ function CommissionsPage() {
 
                 <p className="mt-3 rounded-sm bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
                   {daysUntilSelectedDeadline !== null
-                    ? `${daysUntilSelectedDeadline} days left`
-                    : "No date"}
+                    ? t(daysUntilSelectedDeadline === 1 ? "{n} day left" : "{n} days left", { n: daysUntilSelectedDeadline })
+                    : t("No date")}
                 </p>
               </div>
             )}
 
             <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs font-bold text-faint">
-              <span>Mon</span>
-              <span>Tue</span>
-              <span>Wed</span>
-              <span>Thu</span>
-              <span>Fri</span>
-              <span>Sat</span>
-              <span>Sun</span>
+              <span>{t("Mon")}</span>
+              <span>{t("Tue")}</span>
+              <span>{t("Wed")}</span>
+              <span>{t("Thu")}</span>
+              <span>{t("Fri")}</span>
+              <span>{t("Sat")}</span>
+              <span>{t("Sun")}</span>
             </div>
 
             <div className="mt-3 grid grid-cols-7 gap-2">
@@ -1582,14 +1583,14 @@ function CommissionsPage() {
             {selectedDeadlineCommission?.deadline && (
               <div className="mt-4 rounded-2xl bg-surface p-4 shadow-sm">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                  Deadline summary
+                  {t("Deadline summary")}
                 </p>
 
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-muted">Today</span>
+                    <span className="font-semibold text-muted">{t("Today")}</span>
                     <span className="font-bold text-ink">
-                      {today.toLocaleDateString("en-US", {
+                      {today.toLocaleDateString(locale, {
                         month: "short",
                         day: "numeric",
                       })}
@@ -1597,10 +1598,10 @@ function CommissionsPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-muted">Deadline</span>
+                    <span className="font-semibold text-muted">{t("Deadline")}</span>
                     <span className="font-bold text-red-600">
                       {new Date(selectedDeadlineCommission.deadline).toLocaleDateString(
-                        "en-US",
+                        locale,
                         {
                           month: "short",
                           day: "numeric",
@@ -1612,11 +1613,11 @@ function CommissionsPage() {
                   <div className="rounded-sm bg-amber-100 px-3 py-2 text-center text-xs font-black text-amber-900">
                     {daysUntilSelectedDeadline !== null
                       ? daysUntilSelectedDeadline > 0
-                        ? `${daysUntilSelectedDeadline} days left`
+                        ? t(daysUntilSelectedDeadline === 1 ? "{n} day left" : "{n} days left", { n: daysUntilSelectedDeadline })
                         : daysUntilSelectedDeadline === 0
-                          ? "Due today"
-                          : `${Math.abs(daysUntilSelectedDeadline)} days overdue`
-                      : "No deadline"}
+                          ? t("Due today")
+                          : t(daysUntilSelectedDeadline === -1 ? "{n} day overdue" : "{n} days overdue", { n: Math.abs(daysUntilSelectedDeadline) })
+                      : t("No deadline")}
                   </div>
                 </div>
               </div>
@@ -1634,12 +1635,12 @@ function CommissionsPage() {
                 autoFocus
                 value={commissionTitle}
                 onChange={(event) => setCommissionTitle(event.target.value)}
-                placeholder="Commission title"
+                placeholder={t("Commission title")}
                 className="w-full rounded-md border border-transparent bg-transparent px-1 text-2xl font-black outline-none hover:border-line focus:border-ink"
               />
 
               <div>
-                <p className={formLabel}>Client</p>
+                <p className={formLabel}>{t("Client")}</p>
                 <div className="flex gap-2">
                   <input
                     list={isPrivate() ? undefined : "client-options"}
@@ -1652,7 +1653,7 @@ function CommissionsPage() {
                       setSelectedClientId(match?.id ?? null);
                       if (match?.platform) setPlatform(match.platform);
                     }}
-                    placeholder="Search or type a name"
+                    placeholder={t("Search or type a name")}
                     className={`${formField} flex-1`}
                   />
                   <datalist id="client-options">
@@ -1678,7 +1679,7 @@ function CommissionsPage() {
               </div>
 
               <div>
-                <p className={formLabel}>Characters</p>
+                <p className={formLabel}>{t("Characters")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {formCharacterOptions.map((character) => {
                     const selected = selectedCharacterIds.includes(character.id);
@@ -1730,7 +1731,7 @@ function CommissionsPage() {
                         setCharacterSearch(event.target.value);
                       }
                     }}
-                    placeholder="+ from another client"
+                    placeholder={t("+ from another client")}
                     className="w-40 rounded-sm border border-dashed border-line-strong bg-transparent px-2 py-1 text-sm outline-none focus:border-ink"
                   />
                   <datalist id="character-options">
@@ -1746,7 +1747,7 @@ function CommissionsPage() {
                   Type
                   {formMode === "edit" && (
                     <span className="ml-2 normal-case tracking-normal text-faint">
-                      · can't change after creating (stages and images depend on it)
+                      {t("· can't change after creating (stages and images depend on it)")}
                     </span>
                   )}
                 </p>
@@ -1772,7 +1773,7 @@ function CommissionsPage() {
                       >
                         <span className="block truncate text-sm font-bold">{template.name}</span>
                         <span className="text-xs text-faint">
-                          {template.base_price != null ? formatMoney(template.base_price) : "No base price"}
+                          {template.base_price != null ? formatMoney(template.base_price) : t("No base price")}
                         </span>
                       </button>
                     );
@@ -1781,7 +1782,7 @@ function CommissionsPage() {
               </div>
 
               <div>
-                <p className={formLabel}>Tags</p>
+                <p className={formLabel}>{t("Tags")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {allTags.map((tag) => {
                     const selected = selectedTagIds.includes(tag.id);
@@ -1823,10 +1824,10 @@ function CommissionsPage() {
             {/* Derecha: resumen en vivo, precio, entrega y notas */}
             <div className="flex min-h-0 flex-col gap-4 overflow-y-auto border-l border-line bg-paper p-6">
               <div>
-                <p className={formLabel}>Summary</p>
+                <p className={formLabel}>{t("Summary")}</p>
                 <p className="truncate text-lg font-black">{commissionTitle.trim() || "Untitled commission"}</p>
                 <p className="text-sm text-muted">
-                  {[clientName.trim() || "No client", platform, formTemplate?.name].filter(Boolean).join(" · ")}
+                  {[clientName.trim() || t("No client"), platform, formTemplate?.name].filter(Boolean).join(" · ")}
                 </p>
               </div>
 
@@ -1859,7 +1860,7 @@ function CommissionsPage() {
                 )}
 
                 <div className="flex items-center justify-between gap-2 pt-1 font-black">
-                  <span>Price</span>
+                  <span>{t("Price")}</span>
                   <span className="flex items-center gap-1">
                     <input
                       value={commissionPrice}
@@ -1867,7 +1868,7 @@ function CommissionsPage() {
                       placeholder="0"
                       inputMode="decimal"
                       data-private
-                      title="Calculated from the type and characters; you can change it"
+                      title={t("Calculated from the type and characters; you can change it")}
                       className="w-24 rounded-md border border-line-strong bg-surface px-2 py-1 text-right font-black outline-none focus:border-ink"
                     />
                     <select
@@ -1884,7 +1885,7 @@ function CommissionsPage() {
               </div>
 
               <label className="block">
-                <span className={formLabel}>Deadline · optional</span>
+                <span className={formLabel}>{t("Deadline · optional")}</span>
                 <input
                   type="date"
                   value={commissionDeadline}
@@ -1894,11 +1895,11 @@ function CommissionsPage() {
               </label>
 
               <label className="flex min-h-24 flex-1 flex-col">
-                <span className={formLabel}>Notes</span>
+                <span className={formLabel}>{t("Notes")}</span>
                 <textarea
                   value={commissionNotes}
                   onChange={(event) => setCommissionNotes(event.target.value)}
-                  placeholder="Background, pose, details to remember…"
+                  placeholder={t("Background, pose, details to remember…")}
                   className={`${formField} w-full flex-1 resize-none`}
                 />
               </label>
@@ -1909,7 +1910,7 @@ function CommissionsPage() {
                   onClick={() => setFormMode(null)}
                   className="rounded-md px-4 py-2 text-sm font-semibold text-muted hover:text-ink"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button
                   type="button"
@@ -1917,7 +1918,7 @@ function CommissionsPage() {
                   disabled={savingCommission || !commissionTitle.trim()}
                   className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
                 >
-                  {savingCommission ? "Saving…" : formMode === "new" ? "Create commission" : "Save changes"}
+                  {savingCommission ? t("Saving…") : formMode === "new" ? t("Create commission") : t("Save changes")}
                 </button>
               </div>
             </div>
@@ -1927,11 +1928,11 @@ function CommissionsPage() {
 
       {showDeleteCommissionModal && (
         <ConfirmModal
-            eyebrow="Delete commission"
+            eyebrow={t("Delete commission")}
             title={activeCommission?.title ?? ""}
-            message="This action cannot be undone."
-            confirmLabel="Delete"
-            confirmingLabel="Deleting..."
+            message={t("This action cannot be undone.")}
+            confirmLabel={t("Delete")}
+            confirmingLabel={t("Deleting...")}
             isConfirming={deletingCommission}
             onConfirm={handleDeleteCommission}
             onCancel={() => setShowDeleteCommissionModal(false)}

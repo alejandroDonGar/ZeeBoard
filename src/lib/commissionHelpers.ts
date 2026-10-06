@@ -77,6 +77,7 @@ export function getDeadlineStatus(deadline: string | null) {
   if (daysLeft < 0) {
     return {
       label: t(daysLeft === -1 ? "{n} day overdue" : "{n} days overdue", { n: Math.abs(daysLeft) }),
+      short: t("{n}d late", { n: Math.abs(daysLeft) }),
       className: "bg-red-500 text-white",
     };
   }
@@ -84,6 +85,7 @@ export function getDeadlineStatus(deadline: string | null) {
   if (daysLeft === 0) {
     return {
       label: t("Due today"),
+      short: t("Due today"),
       className: "bg-red-500 text-white",
     };
   }
@@ -91,12 +93,14 @@ export function getDeadlineStatus(deadline: string | null) {
   if (daysLeft <= 7) {
     return {
       label: t(daysLeft === 1 ? "{n} day left" : "{n} days left", { n: daysLeft }),
+      short: t("{n}d", { n: daysLeft }),
       className: "bg-amber-100 text-amber-900",
     };
   }
 
   return {
     label: t("{n} days left", { n: daysLeft }),
+    short: t("{n}d", { n: daysLeft }),
     className: "bg-white text-[#7c7163]",
   };
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { locale, t } from "../lib/i18n";
 import {
   addRequest,
   appSettings,
@@ -37,7 +38,7 @@ const PLATFORMS = ["Twitter / X", "Bluesky", "Discord", "Telegram", "Email", "Ot
 type Draft = { name: string; platform: string; contact: string; template_id: number | null; characters: number; details: string };
 const emptyDraft: Draft = { name: "", platform: "Twitter / X", contact: "", template_id: null, characters: 1, details: "" };
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+const dateFormatter = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
 
 function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => void }) {
   const [requests, setRequests] = useState<CommissionRequest[]>([]);
@@ -68,7 +69,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
   }
 
   async function chooseResponsesFile() {
-    const file = await open({ title: "Choose the responses CSV", filters: [{ name: "CSV", extensions: ["csv"] }] });
+    const file = await open({ title: t("Choose the responses CSV"), filters: [{ name: "CSV", extensions: ["csv"] }] });
 
     if (typeof file === "string") {
       await saveSlots({ responses_file: file });
@@ -86,14 +87,14 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
       if (result) {
         showToast(
           result.added > 0
-            ? `${result.added} new ${result.added === 1 ? "request" : "requests"} from the form.`
-            : "Nothing new in the form.",
+            ? t(result.added === 1 ? "{n} new request from the form." : "{n} new requests from the form.", { n: result.added })
+            : t("Nothing new in the form."),
           "success",
         );
       }
     } catch (error) {
       console.error(error);
-      showToast(`Could not read the responses file: ${error instanceof Error ? error.message : error}`, "error");
+      showToast(t("Could not read the responses file: {error}", { error: error instanceof Error ? error.message : String(error) }), "error");
     } finally {
       setBusy(false);
     }
@@ -106,7 +107,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
       await load();
     } catch (error) {
       console.error(error);
-      showToast(`${errorPrefix}: ${error instanceof Error ? error.message : error}`, "error");
+      showToast(`${t(errorPrefix)}: ${error instanceof Error ? error.message : error}`, "error");
     } finally {
       setBusy(false);
     }
@@ -188,7 +189,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
       onOpenCommissionsPage();
     } catch (error) {
       console.error(error);
-      showToast(`Could not accept: ${error instanceof Error ? error.message : error}`, "error");
+      showToast(t("Could not accept: {error}", { error: error instanceof Error ? error.message : String(error) }), "error");
       setBusy(false);
     }
   }
@@ -210,12 +211,15 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
       const { added, skipped } = await importRequests(parsed);
       await load();
       showToast(
-        added === 0 ? "No new responses: everything in that file was already imported." : `Imported ${added} new ${added === 1 ? "request" : "requests"}${skipped > 0 ? ` (${skipped} already there)` : ""}.`,
+        added === 0
+          ? t("No new responses: everything in that file was already imported.")
+          : t(added === 1 ? "Imported {n} new request." : "Imported {n} new requests.", { n: added }) +
+            (skipped > 0 ? ` ${t("({n} already there)", { n: skipped })}` : ""),
         "success",
       );
     } catch (error) {
       console.error(error);
-      showToast(`Could not import: ${error instanceof Error ? error.message : error}`, "error");
+      showToast(t("Could not import: {error}", { error: error instanceof Error ? error.message : String(error) }), "error");
     } finally {
       setBusy(false);
     }
@@ -278,7 +282,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                 }
                 className="rounded-md border border-amber-400 bg-amber-100 px-2 py-0.5 text-sm font-semibold text-amber-900"
               >
-                <option value="">Choose the type…</option>
+                <option value="">{t("Choose the type…")}</option>
                 {templates.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -286,14 +290,14 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                 ))}
               </select>
             )}{" "}
-            · {request.characters} {request.characters === 1 ? "character" : "characters"}
+            · {t(request.characters === 1 ? "{n} character" : "{n} characters", { n: request.characters })}
             {estimate && <span className="text-muted"> · ≈ {estimate}</span>}
             {request.email && <span className="text-muted"> · {hide(request.email)}</span>}
           </p>
 
           {request.tag_handle && (
             <p className="mt-0.5 text-xs text-muted">
-              Tag when posting: {request.tag_platform && request.tag_platform !== "Other" ? `${request.tag_platform} ` : ""}
+              {t("Tag when posting:")} {request.tag_platform && request.tag_platform !== "Other" ? `${request.tag_platform} ` : ""}
               {hide(request.tag_handle)}
             </p>
           )}
@@ -307,10 +311,10 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
         <div className="flex shrink-0 items-center gap-2">
           {request.status === "accepted" && (
-            <span className="rounded-sm bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700">Accepted</span>
+            <span className="rounded-sm bg-green-50 px-2 py-0.5 text-xs font-bold text-green-700">{t("Accepted")}</span>
           )}
           {request.status === "declined" && (
-            <span className="rounded-sm bg-highlight px-2 py-0.5 text-xs font-bold text-muted">Declined</span>
+            <span className="rounded-sm bg-highlight px-2 py-0.5 text-xs font-bold text-muted">{t("Declined")}</span>
           )}
 
           {(request.status === "new" || request.status === "waitlist") && (
@@ -319,25 +323,25 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                 type="button"
                 onClick={() => startAccept(request)}
                 disabled={busy || request.template_id === null}
-                title={request.template_id === null ? "Choose the type first" : undefined}
+                title={request.template_id === null ? t("Choose the type first") : undefined}
                 className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
               >
-                Accept
+                {t("Accept")}
               </button>
               {request.status === "new" && (
                 <button type="button" onClick={() => run(() => setRequestStatus(request.id, "waitlist"), "Could not move it")} disabled={busy} className={ghost}>
-                  Waitlist
+                  {t("Waitlist")}
                 </button>
               )}
               <button type="button" onClick={() => run(() => setRequestStatus(request.id, "declined"), "Could not decline")} disabled={busy} className={ghost}>
-                Decline
+                {t("Decline")}
               </button>
             </>
           )}
 
           {request.status === "declined" && (
             <button type="button" onClick={() => run(() => setRequestStatus(request.id, "new"), "Could not restore")} disabled={busy} className={ghost}>
-              Restore
+              {t("Restore")}
             </button>
           )}
 
@@ -350,14 +354,14 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
               }}
               className={ghost}
             >
-              Open
+              {t("Open")}
             </button>
           )}
 
           {archived && (
             <button
               type="button"
-              title="Remove from the list"
+              title={t("Remove from the list")}
               onClick={() => run(() => deleteRequest(request.id), "Could not remove it")}
               className="px-1 text-faint transition hover:text-red-500"
             >
@@ -372,10 +376,10 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
   return (
     <>
       <PageHeader
-        label="Intake"
-        title="Requests"
-        description="People who want a commission: accept them, keep them waiting, or decline."
-        action="+ New request"
+        label={t("Intake")}
+        title={t("Requests")}
+        description={t("People who want a commission: accept them, keep them waiting, or decline.")}
+        action={t("+ New request")}
         onAction={() => setDraft({ ...emptyDraft })}
       />
 
@@ -384,7 +388,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
           <div className={panel}>
             <div className="flex items-center gap-4 px-5 py-4">
               <div className="flex-1">
-                <p className="font-semibold">Open for commissions</p>
+                <p className="font-semibold">{t("Open for commissions")}</p>
                 <p className="text-sm text-muted">Opening or closing your form is still up to you; this keeps count.</p>
               </div>
               <Segmented
@@ -399,24 +403,24 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
             <div className="flex items-center gap-4 px-5 py-4">
               <div className="min-w-0 flex-1">
-                <p className="font-semibold">Form responses</p>
+                <p className="font-semibold">{t("Form responses")}</p>
                 <p className="truncate text-sm text-muted" title={settings.responses_file ?? undefined}>
-                  {settings.responses_file ?? "Not connected: pick the CSV your Google script keeps up to date."}
+                  {settings.responses_file ?? t("Not connected: pick the CSV your Google script keeps up to date.")}
                 </p>
                 {settings.responses_file && (
                   <p className="text-xs text-faint">
                     {settings.last_form_sync
-                      ? `Checked ${new Date(settings.last_form_sync).toLocaleString()} · again every 30 minutes`
-                      : "Not checked yet"}
+                      ? t("Checked {date} · again every 30 minutes", { date: new Date(settings.last_form_sync).toLocaleString() })
+                      : t("Not checked yet")}
                   </p>
                 )}
               </div>
               <button type="button" onClick={chooseResponsesFile} disabled={busy} className={ghost}>
-                {settings.responses_file ? "Change…" : "Choose file…"}
+                {settings.responses_file ? t("Change…") : t("Choose file…")}
               </button>
               {settings.responses_file && (
                 <button type="button" onClick={checkNow} disabled={busy} className={ghost}>
-                  Check now
+                  {t("Check now")}
                 </button>
               )}
             </div>
@@ -424,9 +428,9 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
             <div className="flex items-center gap-4 px-5 py-4">
               <div className="flex-1">
                 <p className="font-semibold">
-                  {taken} of {settings.slots_total} slots taken
+                  {t("{taken} of {total} slots taken", { taken, total: settings.slots_total })}
                   <span className={`ml-2 text-sm font-normal ${free < 0 ? "text-red-500" : "text-muted"}`}>
-                    {free > 0 ? `${free} free` : free === 0 ? "full" : `${-free} over`}
+                    {free > 0 ? t("{n} free", { n: free }) : free === 0 ? t("full") : t("{n} over", { n: -free })}
                   </span>
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -439,7 +443,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                     />
                   ))}
                 </div>
-                <p className="mt-1.5 text-xs text-faint">Every commission that isn't finished takes a slot, including the ones in the queue.</p>
+                <p className="mt-1.5 text-xs text-faint">{t("Every commission that isn't finished takes a slot, including the ones in the queue.")}</p>
               </div>
               <label className="flex items-center gap-1.5 text-sm font-semibold">
                 <input
@@ -449,17 +453,17 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                   onChange={(event) => saveSlots({ slots_total: Math.max(1, Math.round(Number(event.target.value)) || 1) }).catch(console.error)}
                   className="w-16 rounded-md border border-line-strong bg-paper px-2 py-1.5 text-right font-bold outline-none focus:border-ink"
                 />
-                slots
+                {t("slots")}
               </label>
             </div>
           </div>
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-[11px] font-black uppercase tracking-[0.16em] text-faint">New · {waiting.length}</h3>
+              <h3 className="text-[11px] font-black uppercase tracking-[0.16em] text-faint">{t("New · {n}", { n: waiting.length })}</h3>
 
               <label className={`${ghost} cursor-pointer ${busy ? "pointer-events-none opacity-50" : ""}`}>
-                Import responses…
+                {t("Import responses…")}
                 <input
                   type="file"
                   accept=".csv,text/csv"
@@ -474,7 +478,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
             </div>
             {waiting.length === 0 ? (
               <p className="rounded-3xl border border-dashed border-line-strong px-5 py-6 text-center text-sm text-faint">
-                No new requests. Add one with "+ New request".
+                {t("No new requests. Add one with \"+ New request\".")}
               </p>
             ) : (
               <div className={panel}>{waiting.map(renderRequest)}</div>
@@ -483,11 +487,11 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
           {waitlist.length > 0 && (
             <div>
-              <h3 className={heading}>Waitlist · {waitlist.length}</h3>
+              <h3 className={heading}>{t("Waitlist · {n}", { n: waitlist.length })}</h3>
               <div className={panel}>{waitlist.map(renderRequest)}</div>
               {free > 0 && (
                 <p className="mt-2 text-sm text-muted">
-                  You have {free} free {free === 1 ? "slot" : "slots"}: time to take someone from the waitlist.
+                  {t(free === 1 ? "You have {n} free slot: time to take someone from the waitlist." : "You have {n} free slots: time to take someone from the waitlist.", { n: free })}
                 </p>
               )}
             </div>
@@ -500,7 +504,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                 onClick={() => setShowArchive((open) => !open)}
                 className={`${heading} transition hover:text-ink`}
               >
-                Archive · {archive.length} {showArchive ? "▴" : "▾"}
+                {t("Archive · {n}", { n: archive.length })} {showArchive ? "▴" : "▾"}
               </button>
               {showArchive && <div className={panel}>{archive.map(renderRequest)}</div>}
             </div>
@@ -511,7 +515,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
       {draft && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="w-[520px] max-w-[94vw] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
-            <h3 className="text-xl font-black">New request</h3>
+            <h3 className="text-xl font-black">{t("New request")}</h3>
 
             <div className="mt-5 space-y-3">
               <input
@@ -519,7 +523,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                 data-private
                 value={draft.name}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                placeholder="Name"
+                placeholder={t("Name")}
                 className={field}
               />
 
@@ -533,7 +537,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                   data-private
                   value={draft.contact}
                   onChange={(event) => setDraft({ ...draft, contact: event.target.value })}
-                  placeholder="@username or email"
+                  placeholder={t("@username or email")}
                   className={field}
                 />
               </div>
@@ -544,7 +548,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                   onChange={(event) => setDraft({ ...draft, template_id: event.target.value ? Number(event.target.value) : null })}
                   className={field}
                 >
-                  <option value="">Type of commission</option>
+                  <option value="">{t("Type of commission")}</option>
                   {templates.map((template) => (
                     <option key={template.id} value={template.id}>
                       {template.name}
@@ -556,7 +560,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                   min={1}
                   value={draft.characters}
                   onChange={(event) => setDraft({ ...draft, characters: Math.max(1, Math.round(Number(event.target.value)) || 1) })}
-                  title="Number of characters"
+                  title={t("Number of characters")}
                   className={field}
                 />
               </div>
@@ -564,7 +568,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
               <textarea
                 value={draft.details}
                 onChange={(event) => setDraft({ ...draft, details: event.target.value })}
-                placeholder="What they asked for: idea, references, links…"
+                placeholder={t("What they asked for: idea, references, links…")}
                 rows={4}
                 className={field}
               />
@@ -572,7 +576,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setDraft(null)} className="rounded-md px-4 py-2 text-sm font-semibold text-muted hover:text-ink">
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 type="button"
@@ -580,7 +584,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
                 disabled={busy || !draft.name.trim() || draft.template_id === null}
                 className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
               >
-                Add request
+                {t("Add request")}
               </button>
             </div>
           </div>
@@ -589,10 +593,10 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
       {confirmAccept && (
         <ConfirmModal
-          eyebrow="Slots are full"
-          title={`Accept ${hide(confirmAccept.name)} anyway?`}
-          message={`You have ${taken} of ${settings.slots_total} slots taken. Accepting adds one more. You can also send them to the waitlist instead.`}
-          confirmLabel="Accept anyway"
+          eyebrow={t("Slots are full")}
+          title={t("Accept {name} anyway?", { name: hide(confirmAccept.name) })}
+          message={t("You have {taken} of {total} slots taken. Accepting adds one more. You can also send them to the waitlist instead.", { taken, total: settings.slots_total })}
+          confirmLabel={t("Accept anyway")}
           confirmVariant="primary"
           onConfirm={() => accept(confirmAccept)}
           onCancel={() => setConfirmAccept(null)}

@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 /**
  * Importar las respuestas del formulario de Google (CSV descargado de la hoja de respuestas).
  * Todo aquí es lógica pura: el CSV entra como texto y salen solicitudes listas para guardar.
@@ -211,7 +212,7 @@ export function parseResponses<T extends { id: number; name: string }>(
   const [header, ...rows] = parseCsv(csv);
 
   if (!header) {
-    return { requests: [], error: "The file is empty" };
+    return { requests: [], error: t("The file is empty") };
   }
 
   const find = (pattern: RegExp) => header.findIndex((title) => pattern.test(title));
@@ -226,7 +227,7 @@ export function parseResponses<T extends { id: number; name: string }>(
   if (typeColumn < 0 || contactColumn < 0) {
     return {
       requests: [],
-      error: "This doesn't look like your commission form: I can't find the type and contact columns",
+      error: t("This doesn't look like your commission form: I can't find the type and contact columns"),
     };
   }
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t } from "../lib/i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { formatMoney } from "../lib/commissionHelpers";
@@ -10,7 +11,7 @@ export type PaypalPreview = { matches: PaypalMatch[]; clients: Client[]; commiss
 
 /** Elige el CSV de actividad de PayPal y lo cruza con tus clientes y comisiones; null si cancelas. */
 export async function pickPaypalFile(): Promise<PaypalPreview | null> {
-  const file = await open({ title: "Choose the PayPal activity CSV", filters: [{ name: "CSV", extensions: ["csv"] }] });
+  const file = await open({ title: t("Choose the PayPal activity CSV"), filters: [{ name: "CSV", extensions: ["csv"] }] });
 
   if (typeof file !== "string") {
     return null;
@@ -29,9 +30,9 @@ export async function pickPaypalFile(): Promise<PaypalPreview | null> {
 
 const STATUS_TEXT: Record<PaypalMatch["status"], string> = {
   ready: "",
-  duplicate: "Already imported",
-  unknown: "No client with this email",
-  nodebt: "This client has nothing left to pay",
+  duplicate: t("Already imported"),
+  unknown: t("No client with this email"),
+  nodebt: t("This client has nothing left to pay"),
 };
 
 function PaypalImport({ preview, onClose }: { preview: PaypalPreview; onClose: () => void }) {
@@ -63,7 +64,7 @@ function PaypalImport({ preview, onClose }: { preview: PaypalPreview; onClose: (
       window.location.reload();
     } catch (importError) {
       console.error(importError);
-      setError(`Could not import: ${importError}`);
+      setError(t("Could not import: {error}", { error: String(importError) }));
       setSaving(false);
     }
   }
@@ -71,13 +72,13 @@ function PaypalImport({ preview, onClose }: { preview: PaypalPreview; onClose: (
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="flex max-h-[80vh] w-[720px] flex-col rounded-3xl border border-line bg-surface p-6 shadow-2xl">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">PayPal</p>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">{t("PayPal")}</p>
         <h3 className="mt-2 text-2xl font-black text-ink">
-          {ready.length} of {matches.length} payments ready
+          {t("{ready} of {total} payments ready", { ready: ready.length, total: matches.length })}
         </h3>
 
         <div className="mt-4 min-h-0 flex-1 divide-y divide-line overflow-y-auto rounded-md border border-line">
-          {matches.length === 0 && <p className="p-4 text-sm text-muted">No incoming payments found in this file.</p>}
+          {matches.length === 0 && <p className="p-4 text-sm text-muted">{t("No incoming payments found in this file.")}</p>}
 
           {matches.map((item) => (
             <div key={item.row.txId} className="flex items-center gap-3 px-3 py-2 text-sm">
@@ -112,14 +113,14 @@ function PaypalImport({ preview, onClose }: { preview: PaypalPreview; onClose: (
 
         <div className="mt-6 flex justify-end gap-3">
           <button onClick={onClose} className="rounded-md border border-line-strong px-4 py-2 font-semibold">
-            Cancel
+            {t("Cancel")}
           </button>
           <button
             onClick={handleImport}
             disabled={saving || ready.length === 0}
             className="rounded-md bg-primary px-4 py-2 font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Importing…" : `Import ${ready.length}`}
+            {saving ? t("Importing…") : t("Import {n}", { n: ready.length })}
           </button>
         </div>
       </div>

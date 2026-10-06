@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 /**
  * Importar la "Actividad" de PayPal (CSV): cada cobro se cruza con el cliente por su correo
  * y se propone como pago de su comisión con deuda. Lógica pura: el CSV entra como texto.
@@ -42,7 +43,7 @@ export function parsePaypalCsv(text: string): { rows: PaypalRow[]; error?: strin
   const [header, ...lines] = parseCsv(text);
 
   if (!header) {
-    return { rows: [], error: "The file is empty" };
+    return { rows: [], error: t("The file is empty") };
   }
 
   const find = (pattern: RegExp) => header.findIndex((title) => pattern.test(title.trim()));
@@ -58,7 +59,7 @@ export function parsePaypalCsv(text: string): { rows: PaypalRow[]; error?: strin
   ].map(find);
 
   if ([dateC, currencyC, grossC, fromC, txC].some((index) => index < 0)) {
-    return { rows: [], error: "This doesn't look like a PayPal activity CSV (date, currency, gross, sender email, transaction id)" };
+    return { rows: [], error: t("This doesn't look like a PayPal activity CSV (date, currency, gross, sender email, transaction id)") };
   }
 
   const rows: PaypalRow[] = [];

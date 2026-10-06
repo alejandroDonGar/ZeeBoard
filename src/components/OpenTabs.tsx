@@ -20,23 +20,23 @@ function OpenTabs({
   clients: Client[];
 }) {
   return (
-    <section className="border-b border-[#ded7cc] bg-white px-8 py-3">
+    <section className="border-b border-line bg-surface px-8 py-3">
       <div className="flex items-center gap-3 overflow-x-auto">
-        <span className="mr-1 text-xs font-bold uppercase tracking-[0.18em] text-[#9a8f82]">
+        <span className="mr-1 text-xs font-bold uppercase tracking-[0.18em] text-faint">
           Open
         </span>
         <button
           onClick={onShowAllCommissions}
           className={
             activeCommissionId === null
-              ? "shrink-0 rounded-2xl border border-[#1f2933] bg-[#1f2933] px-4 py-2 text-sm font-bold text-white shadow-sm"
-              : "shrink-0 rounded-2xl border border-[#e6ded2] bg-[#fffaf2] px-4 py-2 text-sm font-semibold text-[#1f2933] shadow-sm"
+              ? "shrink-0 rounded-2xl border border-ink bg-primary px-4 py-2 text-sm font-bold text-on-primary shadow-sm"
+              : "shrink-0 rounded-2xl border border-line bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-sm"
           }
         >
           All commissions
         </button>
         {openCommissionTabs.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#d8cec0] px-4 py-2 text-sm text-[#9a8f82]">
+          <div className="rounded-2xl border border-dashed border-line-strong px-4 py-2 text-sm text-faint">
             No commissions open
           </div>
         ) : (
@@ -50,8 +50,8 @@ function OpenTabs({
                 key={commission.id}
                 className={
                   isActive
-                    ? "flex shrink-0 items-center gap-2 rounded-2xl border border-[#1f2933] bg-[#1f2933] px-4 py-2 text-sm font-bold text-white shadow-sm"
-                    : "flex shrink-0 items-center gap-2 rounded-2xl border border-[#e6ded2] bg-[#fffaf2] px-4 py-2 text-sm font-semibold text-[#1f2933] shadow-sm"
+                    ? "flex shrink-0 items-center gap-2 rounded-2xl border border-ink bg-primary px-4 py-2 text-sm font-bold text-on-primary shadow-sm"
+                    : "flex shrink-0 items-center gap-2 rounded-2xl border border-line bg-paper px-4 py-2 text-sm font-semibold text-ink shadow-sm"
                 }
               >
                 {client?.avatar_url && (
@@ -70,7 +70,7 @@ function OpenTabs({
 
                 {paymentTag && (
                   <span
-                    className="rounded-full px-2 py-0.5 text-[10px] font-black text-white"
+                    className="rounded-sm px-2 py-0.5 text-[10px] font-black text-white"
                     style={{ backgroundColor: paymentTag.color }}
                   >
                     {paymentTag.name}
@@ -81,8 +81,8 @@ function OpenTabs({
                   onClick={() => onCloseCommission(commission.id)}
                   className={
                     isActive
-                      ? "rounded-full px-2 text-white/70 hover:bg-white/10 hover:text-white"
-                      : "rounded-full px-2 text-[#9a8f82] hover:bg-[#f1e8da] hover:text-[#1f2933]"
+                      ? "rounded-sm px-2 text-on-primary/70 hover:bg-on-primary/10 hover:text-on-primary"
+                      : "rounded-sm px-2 text-faint hover:bg-highlight hover:text-ink"
                   }
                 >
                   ×

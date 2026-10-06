@@ -87,10 +87,10 @@ function TagsPage() {
       />
 
       <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[340px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
-        <div className="flex min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="mb-5">
             <h3 className="text-xl font-black">New tag</h3>
-            <p className="mt-1 text-sm text-[#7c7163]">
+            <p className="mt-1 text-sm text-muted">
               Use tags like urgent, commercial or personal.
             </p>
           </div>
@@ -99,14 +99,14 @@ function TagsPage() {
             value={tagName}
             onChange={(event) => setTagName(event.target.value)}
             placeholder="Tag name"
-            className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none transition focus:border-[#1f2933]"
+            className="rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold outline-none transition focus:border-ink"
           />
 
           
 
-          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3">
+          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-line-strong bg-paper px-4 py-3">
             <label
-              className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-2xl border border-[#d8cec0] bg-white shadow-sm"
+              className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-2xl border border-line-strong bg-surface shadow-sm"
               style={{ backgroundColor: tagColor }}
             >
               <input
@@ -122,7 +122,7 @@ function TagsPage() {
                 Selected colour
               </p>
 
-              <p className="text-xs text-[#9a8f82]">
+              <p className="text-xs text-faint">
                 Click to change
               </p>
             </div>
@@ -131,7 +131,7 @@ function TagsPage() {
               onChange={(event) =>
                 setTagCategory(event.target.value)
               }
-              className="mt-3 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              className="mt-3 rounded-2xl border border-line-strong bg-paper px-4 py-3"
             >
               <option>Payment</option>
               <option>Characters</option>
@@ -141,10 +141,10 @@ function TagsPage() {
             </select>
           </div>
 
-          <div className="mt-4 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4">
+          <div className="mt-4 rounded-3xl border border-line bg-paper p-4">
             <div className="mt-3">
               <span
-                className="inline-flex rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
+                className="inline-flex rounded-sm px-4 py-2 text-sm font-black text-white shadow-sm"
                 style={{ backgroundColor: tagColor }}
               >
                 {tagName || "Example tag"}
@@ -159,7 +159,7 @@ function TagsPage() {
             className={
               tagCreated
                 ? "mt-3 rounded-2xl bg-green-600 px-4 py-3 text-sm font-bold text-white shadow-md transition-all duration-300"
-                : "mt-3 rounded-2xl bg-[#1f2933] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+                : "mt-3 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
             }
           >
             {creatingTag
@@ -170,18 +170,18 @@ function TagsPage() {
           </button>
         </div>
 
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-xl font-black">Saved tags</h3>
 
-            <span className="rounded-full bg-[#fffaf2] px-3 py-1 text-xs font-bold text-[#9a8f82]">
+            <span className="rounded-sm bg-paper px-3 py-1 text-xs font-bold text-faint">
               {tags.length} tags
             </span>
           </div>
 
           <div className="mt-5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-2">
             {tags.length === 0 ? (
-              <div className="flex h-[300px] items-center justify-center rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] text-sm text-[#9a8f82]">
+              <div className="flex h-[300px] items-center justify-center rounded-3xl border border-dashed border-line-strong bg-paper text-sm text-faint">
                 No tags yet
               </div>
             ) : (
@@ -189,7 +189,7 @@ function TagsPage() {
                 {Object.entries(groupedTags).map(
                   ([category, categoryTags]) => (
                     <div key={category} className="pb-7">
-                      <h4 className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <h4 className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-faint">
                         {category}
                       </h4>
 
@@ -197,10 +197,10 @@ function TagsPage() {
                         {categoryTags.map((tag) => (
                           <div
                             key={tag.id}
-                            className="flex items-center gap-2 rounded-full border border-[#e6ded2] bg-[#fffaf2] p-1 shadow-sm"
+                            className="flex items-center gap-2 rounded-sm border border-line bg-paper p-1 shadow-sm"
                           >
                             <span
-                              className="rounded-full px-4 py-2 text-sm font-black text-white"
+                              className="rounded-sm px-4 py-2 text-sm font-black text-white"
                               style={{ backgroundColor: tag.color }}
                             >
                               {tag.name}
@@ -208,7 +208,7 @@ function TagsPage() {
 
                             <button
                               onClick={() => setTagToDelete(tag)}
-                              className="rounded-full px-2 text-xs font-black text-red-500 transition hover:bg-red-50"
+                              className="rounded-sm px-2 text-xs font-black text-red-500 transition hover:bg-red-50"
                             >
                               ×
                             </button>

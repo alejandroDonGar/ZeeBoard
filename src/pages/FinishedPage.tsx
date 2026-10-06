@@ -230,7 +230,7 @@ function FinishedPage({
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
               <h3 className="text-2xl font-black">No completed commissions</h3>
-              <p className="mt-2 text-sm text-[#7c7163]">
+              <p className="mt-2 text-sm text-muted">
                 Finished commissions will be archived here automatically.
               </p>
             </div>
@@ -238,14 +238,14 @@ function FinishedPage({
         ) : (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex rounded-2xl border border-[#d8cec0] bg-white p-1">
+              <div className="flex rounded-2xl border border-line-strong bg-surface p-1">
                 <button
                   type="button"
                   onClick={() => setGroupMode("month")}
                   className={
                     groupMode === "month"
-                      ? "rounded-xl bg-[#1f2933] px-3 py-1.5 text-xs font-black text-white"
-                      : "rounded-xl px-3 py-1.5 text-xs font-bold text-[#7c7163]"
+                      ? "rounded-xl bg-primary px-3 py-1.5 text-xs font-black text-on-primary"
+                      : "rounded-xl px-3 py-1.5 text-xs font-bold text-muted"
                   }
                 >
                   By month
@@ -256,8 +256,8 @@ function FinishedPage({
                   onClick={() => setGroupMode("client")}
                   className={
                     groupMode === "client"
-                      ? "rounded-xl bg-[#1f2933] px-3 py-1.5 text-xs font-black text-white"
-                      : "rounded-xl px-3 py-1.5 text-xs font-bold text-[#7c7163]"
+                      ? "rounded-xl bg-primary px-3 py-1.5 text-xs font-black text-on-primary"
+                      : "rounded-xl px-3 py-1.5 text-xs font-bold text-muted"
                   }
                 >
                   By client
@@ -268,23 +268,23 @@ function FinishedPage({
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search by title or client..."
-                className="min-w-[200px] flex-1 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-2 text-sm"
+                className="min-w-[200px] flex-1 rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm"
               />
 
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(event) => setDateFrom(event.target.value)}
-                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-2 text-sm"
+                className="rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm"
               />
 
-              <span className="text-xs font-bold text-[#9a8f82]">to</span>
+              <span className="text-xs font-bold text-faint">to</span>
 
               <input
                 type="date"
                 value={dateTo}
                 onChange={(event) => setDateTo(event.target.value)}
-                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-2 text-sm"
+                className="rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm"
               />
 
               {hasActiveFilters && (
@@ -295,19 +295,19 @@ function FinishedPage({
                     setDateFrom("");
                     setDateTo("");
                   }}
-                  className="flex items-center gap-1 rounded-2xl bg-[#1f2933] px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5"
+                  className="flex items-center gap-1 rounded-2xl bg-primary px-4 py-2 text-xs font-black text-on-primary shadow-sm transition hover:-translate-y-0.5"
                 >
                   ✕ Clear filters
                 </button>
               )}
 
-              <div className="rounded-2xl border border-[#e6ded2] bg-white px-4 py-2 text-sm font-bold text-[#1f2933] shadow-sm">
+              <div className="rounded-2xl border border-line bg-surface px-4 py-2 text-sm font-bold text-ink shadow-sm">
                 {filteredCompleted.length} finished · {totalEarnings.toFixed(0)}€ total
               </div>
             </div>
 
             {filteredCompleted.length === 0 ? (
-              <div className="flex h-64 items-center justify-center rounded-[2rem] border border-dashed border-[#d8cec0] text-sm text-[#9a8f82]">
+              <div className="flex h-64 items-center justify-center rounded-3xl border border-dashed border-line-strong text-sm text-faint">
                 No finished commissions match your filters.
               </div>
             ) : (
@@ -337,30 +337,30 @@ function FinishedPage({
                 return (
                   <div
                     key={group.key}
-                    className="rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm"
+                    className="rounded-3xl border border-line bg-surface p-5 shadow-sm"
                   >
                     <div className="mb-4 flex items-center justify-between gap-4">
-                      <h3 className="text-lg font-black text-[#1f2933]">
+                      <h3 className="text-lg font-black text-ink">
                         {group.label}
                       </h3>
 
-                      <span className="rounded-full bg-[#fffaf2] px-3 py-1 text-xs font-bold text-[#9a8f82]">
+                      <span className="rounded-sm bg-paper px-3 py-1 text-xs font-bold text-faint">
                         {group.commissions.length} finished · {groupEarnings.toFixed(0)}€
                       </span>
                     </div>
 
                     {group.images.length === 0 ? (
-                      <div className="flex h-40 items-center justify-center rounded-3xl border border-dashed border-[#d8cec0] text-sm text-[#9a8f82]">
+                      <div className="flex h-40 items-center justify-center rounded-3xl border border-dashed border-line-strong text-sm text-faint">
                         No images for these commissions.
                       </div>
                     ) : (
-                      <div className="relative overflow-hidden rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-3">
+                      <div className="relative overflow-hidden rounded-3xl border border-line bg-paper p-3">
                         <div className="mb-2 flex items-center justify-between">
-                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black text-[#7c7163] shadow-sm">
+                          <span className="rounded-sm bg-surface px-3 py-1 text-[10px] font-black text-muted shadow-sm">
                             {currentSlide?.commission.title}
                           </span>
 
-                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black text-[#9a8f82] shadow-sm">
+                          <span className="rounded-sm bg-surface px-3 py-1 text-[10px] font-black text-faint shadow-sm">
                             {activeIndex + 1} / {group.images.length}
                           </span>
                         </div>
@@ -370,7 +370,7 @@ function FinishedPage({
                             <button
                               type="button"
                               onClick={() => handlePreviousSlide(group.key, group.images)}
-                              className="absolute left-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2933] text-lg font-black text-white shadow-lg transition hover:scale-105"
+                              className="absolute left-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-black text-on-primary shadow-lg transition hover:scale-105"
                             >
                               ‹
                             </button>
@@ -419,7 +419,7 @@ function FinishedPage({
                             <button
                               type="button"
                               onClick={() => handleNextSlide(group.key, group.images)}
-                              className="absolute right-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2933] text-lg font-black text-white shadow-lg transition hover:scale-105"
+                              className="absolute right-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-black text-on-primary shadow-lg transition hover:scale-105"
                             >
                               ›
                             </button>
@@ -427,7 +427,7 @@ function FinishedPage({
                         </div>
 
                         <div className="mt-3 flex items-center justify-between">
-                          <p className="text-xs font-bold text-[#7c7163]">
+                          <p className="text-xs font-bold text-muted">
                             {groupMode === "month"
                               ? currentSlide?.commission.client_name || "No client"
                               : currentSlide
@@ -439,7 +439,7 @@ function FinishedPage({
                                 : ""}
                           </p>
 
-                          <p className="text-xs font-bold text-[#1f2933]">
+                          <p className="text-xs font-bold text-ink">
                             {currentSlide?.commission.price
                               ? `${currentSlide.commission.price} ${currentSlide.commission.currency || "EUR"}`
                               : "No price"}

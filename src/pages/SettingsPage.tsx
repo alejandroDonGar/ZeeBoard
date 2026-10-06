@@ -2,6 +2,7 @@ import PageHeader from "../components/PageHeader";
 import SettingsCard from "../components/SettingsCard";
 import { useEffect, useState } from "react";
 import { exportBackup } from "../lib/backup";
+import { applyTheme, getTheme, type ThemeChoice } from "../lib/theme";
 import { getAllUsedImagePaths } from "../lib/database";
 import { cleanUpOrphanedImages, getStorageStats, type StorageStats } from "../lib/images";
 import ConfirmModal from "../components/ConfirmModal";
@@ -15,6 +16,7 @@ function formatBytes(bytes: number): string {
 }
 
 function SettingsPage() {
+  const [theme, setTheme] = useState<ThemeChoice>(getTheme);
   const [storage, setStorage] = useState<StorageStats | null>(null);
   const [imagesInUse, setImagesInUse] = useState(0);
 
@@ -91,7 +93,27 @@ function SettingsPage() {
 
       <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-2 gap-5 p-5 pb-6">
         <SettingsCard title="Language" description="English is the default language. Spanish will be available later." />
-        <SettingsCard title="Themes" description="Zebra Light, Sakura, Ocean, Forest and Midnight will be available." />
+        <SettingsCard title="Appearance" description="Light, dark, or follow your Windows setting.">
+          <div className="mt-4 inline-flex rounded-2xl border border-line bg-paper p-1">
+            {(["light", "dark", "system"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => {
+                  applyTheme(option);
+                  setTheme(option);
+                }}
+                className={
+                  theme === option
+                    ? "rounded-xl bg-primary px-4 py-2 text-sm font-bold capitalize text-on-primary shadow-sm"
+                    : "rounded-xl px-4 py-2 text-sm font-semibold capitalize text-muted transition hover:text-ink"
+                }
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </SettingsCard>
         <SettingsCard
           title="Storage"
           description="Your data stays on this computer. Images are kept as light copies; your original canvases stay wherever you keep them."
@@ -103,12 +125,12 @@ function SettingsPage() {
                 ["Thumbnails", formatBytes(storage.thumbsBytes), "For cards and lists"],
                 ["Database", formatBytes(storage.databaseBytes), "Commissions, clients…"],
               ].map(([label, value, detail]) => (
-                <div key={label} className="rounded-2xl bg-[#fffaf2] p-3">
-                  <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9a8f82]">
+                <div key={label} className="rounded-2xl bg-paper p-3">
+                  <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-faint">
                     {label}
                   </dt>
-                  <dd className="mt-1 text-lg font-black text-[#1f2933]">{value}</dd>
-                  <dd className="text-[11px] text-[#7c7163]">{detail}</dd>
+                  <dd className="mt-1 text-lg font-black text-ink">{value}</dd>
+                  <dd className="text-[11px] text-muted">{detail}</dd>
                 </div>
               ))}
             </dl>
@@ -118,7 +140,7 @@ function SettingsPage() {
             <button
               onClick={handleExportBackup}
               disabled={exporting}
-              className="rounded-2xl bg-[#1f2933] px-4 py-2 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+              className="rounded-2xl bg-primary px-4 py-2 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {exporting ? "Exporting..." : "Export backup"}
             </button>
@@ -126,18 +148,18 @@ function SettingsPage() {
             <button
               onClick={() => setShowCleanUpConfirmModal(true)}
               disabled={cleaningUp}
-              className="rounded-2xl border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933] disabled:cursor-not-allowed disabled:opacity-70"
+              className="rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-70"
             >
               {cleaningUp ? "Cleaning up..." : "Clean up unused images"}
             </button>
           </div>
 
           {backupMessage && (
-            <p className="mt-3 text-xs text-[#7c7163]">{backupMessage}</p>
+            <p className="mt-3 text-xs text-muted">{backupMessage}</p>
           )}
 
           {cleanUpMessage && (
-            <p className="mt-1 text-xs text-[#7c7163]">{cleanUpMessage}</p>
+            <p className="mt-1 text-xs text-muted">{cleanUpMessage}</p>
           )}
         </SettingsCard>
       </section>

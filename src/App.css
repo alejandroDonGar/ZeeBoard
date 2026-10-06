@@ -1,1 +1,93 @@
 @import "tailwindcss";
+
+/*
+ * Colores de la app. Se usan con su nombre en las clases: bg-canvas, text-muted, border-line…
+ * Los valores viven en variables CSS para poder cambiarlos con el tema (claro / oscuro).
+ */
+@theme inline {
+  --color-canvas: var(--canvas); /* fondo de la ventana */
+  --color-surface: var(--surface); /* tarjetas y modales */
+  --color-paper: var(--paper); /* paneles cálidos dentro de las tarjetas */
+  --color-highlight: var(--highlight); /* hover, elemento resaltado */
+  --color-ink: var(--ink); /* texto principal */
+  --color-muted: var(--muted); /* texto secundario */
+  --color-faint: var(--faint); /* etiquetas, texto de apoyo */
+  --color-line: var(--line); /* bordes */
+  --color-line-strong: var(--line-strong); /* bordes de campos y zonas punteadas */
+  --color-primary: var(--primary); /* botones principales */
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary); /* texto sobre botones principales */
+
+  /* Esquinas rectas y sobrias: las clases rounded-* de toda la app usan estos valores */
+  --radius-sm: 3px; /* etiquetas, chips, barras de progreso */
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px; /* botones pequeños, miniaturas */
+  --radius-2xl: 4px; /* botones, campos, imágenes */
+  --radius-3xl: 6px; /* tarjetas y modales */
+}
+
+:root {
+  color-scheme: light;
+  --canvas: #f6f3ee;
+  --surface: #ffffff;
+  --paper: #fffaf2;
+  --highlight: #f1e8da;
+  --ink: #1f2933;
+  --muted: #7c7163;
+  --faint: #9a8f82;
+  --line: #e6ded2;
+  --line-strong: #d8cec0;
+  --primary: #1f2933;
+  --primary-hover: #2c3947;
+  --on-primary: #ffffff;
+}
+
+/* Modo oscuro: lo pide el usuario en Ajustes, o lo pide el sistema si el tema es "System" */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --canvas: #16181c;
+    --surface: #1f2227;
+    --paper: #262a30;
+    --highlight: #30353c;
+    --ink: #ece6dc;
+    --muted: #a8a093;
+    --faint: #847d72;
+    --line: #33373e;
+    --line-strong: #464b53;
+    --primary: #ece6dc;
+    --primary-hover: #ffffff;
+    --on-primary: #1f2933;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #16181c;
+  --surface: #1f2227;
+  --paper: #262a30;
+  --highlight: #30353c;
+  --ink: #ece6dc;
+  --muted: #a8a093;
+  --faint: #847d72;
+  --line: #33373e;
+  --line-strong: #464b53;
+  --primary: #ece6dc;
+  --primary-hover: #ffffff;
+  --on-primary: #1f2933;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+/* Sin barras de scroll visibles: se desplaza con la rueda del ratón o el touchpad */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}

@@ -25,22 +25,22 @@ function ConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <div className="w-[450px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+      <div className="w-[450px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
         <p
           className={
             eyebrowTone === "danger"
               ? "text-xs font-bold uppercase tracking-[0.2em] text-red-500"
-              : "text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]"
+              : "text-xs font-bold uppercase tracking-[0.2em] text-faint"
           }
         >
           {eyebrow}
         </p>
 
-        <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+        <h3 className="mt-2 text-2xl font-black text-ink">
           {title}
         </h3>
 
-        <p className="mt-4 whitespace-pre-line text-sm text-[#7c7163]">
+        <p className="mt-4 whitespace-pre-line text-sm text-muted">
           {message}
         </p>
 
@@ -48,7 +48,7 @@ function ConfirmModal({
           {onCancel && (
             <button
               onClick={onCancel}
-              className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+              className="rounded-2xl border border-line-strong px-4 py-2 font-semibold"
             >
               {cancelLabel}
             </button>
@@ -60,7 +60,7 @@ function ConfirmModal({
             className={
               confirmVariant === "danger"
                 ? "rounded-2xl bg-red-500 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-70"
-                : "rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-70"
+                : "rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-70"
             }
           >
             {isConfirming && confirmingLabel ? confirmingLabel : confirmLabel}

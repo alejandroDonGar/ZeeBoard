@@ -53,10 +53,10 @@ function App() {
 
   if (!ready) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#f6f3ee] text-[#1f2933]">
+      <div className="flex h-screen items-center justify-center bg-canvas text-ink">
         <div className="text-center">
           <p className="text-4xl">🦓</p>
-          <p className="mt-3 text-sm font-bold text-[#7c7163]">
+          <p className="mt-3 text-sm font-bold text-muted">
             {progress
               ? progress.done < progress.total
                 ? `Optimizing images ${progress.done + 1} / ${progress.total}…`
@@ -65,16 +65,16 @@ function App() {
           </p>
 
           {progress && (
-            <div className="mx-auto mt-4 h-2 w-64 overflow-hidden rounded-full bg-[#e6ded2]">
+            <div className="mx-auto mt-4 h-2 w-64 overflow-hidden rounded-sm bg-line">
               <div
-                className="h-full rounded-full bg-[#1f2933] transition-all duration-500"
+                className="h-full rounded-sm bg-primary transition-all duration-500"
                 style={{ width: `${(progress.done / progress.total) * 100}%` }}
               />
             </div>
           )}
 
           {progress && progress.done < progress.total && (
-            <p className="mt-3 text-xs text-[#9a8f82]">
+            <p className="mt-3 text-xs text-faint">
               Only needed once. Large canvases take a few seconds each.
             </p>
           )}
@@ -85,18 +85,18 @@ function App() {
 
   return (
     <ToastProvider>
-      <div className="h-screen overflow-hidden bg-[#f6f3ee] text-[#1f2933]">
+      <div className="h-screen overflow-hidden bg-canvas text-ink">
       <div className="flex h-full">
-        <aside className="flex w-72 flex-col border-r border-[#ded7cc] bg-[#fffaf2] px-5 py-6">
+        <aside className="flex w-72 flex-col border-r border-line bg-paper px-5 py-6">
           <div className="mb-10">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1f2933] text-2xl shadow-md">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-2xl shadow-md">
                 🦓
               </div>
 
               <div>
                 <h1 className="text-2xl font-black tracking-tight">ZeeBoard</h1>
-                <p className="text-xs font-medium text-[#7c7163]">
+                <p className="text-xs font-medium text-muted">
                   Commission workspace
                 </p>
               </div>
@@ -113,8 +113,8 @@ function App() {
                   onClick={() => setCurrentPage(item.id)}
                   className={
                     isActive
-                      ? "w-full rounded-2xl bg-[#1f2933] px-4 py-3 text-left text-sm font-bold text-white shadow-md"
-                      : "w-full rounded-2xl px-4 py-3 text-left text-sm font-semibold text-[#6f665c] transition hover:bg-[#f1e8da] hover:text-[#1f2933]"
+                      ? "w-full rounded-2xl bg-primary px-4 py-3 text-left text-sm font-bold text-on-primary shadow-md"
+                      : "w-full rounded-2xl px-4 py-3 text-left text-sm font-semibold text-muted transition hover:bg-highlight hover:text-ink"
                   }
                 >
                   {item.label}
@@ -123,12 +123,12 @@ function App() {
             })}
           </nav>
 
-          <div className="mt-auto rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+          <div className="mt-auto rounded-3xl border border-line bg-surface p-4 shadow-sm">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
               Current theme
             </p>
             <p className="mt-2 text-sm font-bold">Zebra Light</p>
-            <p className="mt-1 text-xs leading-relaxed text-[#7c7163]">
+            <p className="mt-1 text-xs leading-relaxed text-muted">
               A soft workspace for tracking commissions, clients and deadlines.
             </p>
           </div>

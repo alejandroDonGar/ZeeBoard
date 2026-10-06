@@ -243,10 +243,10 @@ function TemplatesPage() {
       />
 
       <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[380px_minmax(0,1fr)] gap-5 p-5 pb-6 overflow-hidden">
-        <div className="flex h-full min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="mb-5">
             <h3 className="text-xl font-black">New template</h3>
-            <p className="mt-1 text-sm text-[#7c7163]">
+            <p className="mt-1 text-sm text-muted">
               Create a workflow with one stage per line.
             </p>
           </div>
@@ -255,7 +255,7 @@ function TemplatesPage() {
             value={templateName}
             onChange={(event) => setTemplateName(event.target.value)}
             placeholder="Template name"
-            className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none transition focus:border-[#1f2933]"
+            className="rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold outline-none transition focus:border-ink"
           />
 
           <div className="mt-3 flex gap-2">
@@ -269,20 +269,20 @@ function TemplatesPage() {
                 }
               }}
               placeholder="Stage name"
-              className="min-w-0 flex-1 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none transition focus:border-[#1f2933]"
+              className="min-w-0 flex-1 rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold outline-none transition focus:border-ink"
             />
 
             <button
               onClick={handleAddStage}
-              className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933]"
+              className="rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-bold text-ink transition hover:border-ink"
             >
               Add
             </button>
           </div>
 
-          <div className="mt-3 min-h-28 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] p-3">
+          <div className="mt-3 min-h-28 rounded-2xl border border-line-strong bg-paper p-3">
             {newStages.length === 0 ? (
-              <p className="text-sm text-[#9a8f82]">
+              <p className="text-sm text-faint">
                 No stages added yet.
               </p>
             ) : (
@@ -290,7 +290,7 @@ function TemplatesPage() {
                 {newStages.map((stage, index) => (
                   <div
                     key={`${stage}-${index}`}
-                    className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2 text-sm font-semibold shadow-sm"
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-3 py-2 text-sm font-semibold shadow-sm"
                   >
                     <span>
                       {index + 1}. {stage}
@@ -311,18 +311,18 @@ function TemplatesPage() {
           <button
             onClick={handleCreateTemplate}
             disabled={creatingTemplate}
-            className="mt-3 rounded-2xl bg-[#1f2933] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-3 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
             >
             {creatingTemplate ? "Creating..." : "Create template"}
             </button>
 
           <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1">
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-faint">
               Templates
             </p>
 
             {templates.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-4 text-center text-sm text-[#9a8f82]">
+              <div className="rounded-3xl border border-dashed border-line-strong bg-paper p-4 text-center text-sm text-faint">
                 No templates yet
               </div>
             ) : (
@@ -336,8 +336,8 @@ function TemplatesPage() {
                       onClick={() => handleSelectTemplate(template)}
                       className={
                         isSelected
-                          ? "w-full rounded-3xl border border-[#1f2933] bg-[#1f2933] px-4 py-4 text-left font-bold text-white shadow-sm"
-                          : "w-full rounded-3xl border border-[#e6ded2] bg-[#fffaf2] px-4 py-4 text-left font-semibold text-[#1f2933] transition hover:border-[#1f2933]"
+                          ? "w-full rounded-3xl border border-ink bg-primary px-4 py-4 text-left font-bold text-on-primary shadow-sm"
+                          : "w-full rounded-3xl border border-line bg-paper px-4 py-4 text-left font-semibold text-ink transition hover:border-ink"
                       }
                     >
                       {template.name}
@@ -349,10 +349,10 @@ function TemplatesPage() {
           </div>
         </div>
 
-        <div className="flex h-full min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
           {selectedTemplate ? (
             <>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
                 Selected template
               </p>
 
@@ -362,7 +362,7 @@ function TemplatesPage() {
               <div className="mt-4 flex gap-3">
                 <button
                   onClick={() => handleDuplicateTemplate(selectedTemplate.id)}
-                  className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-2 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933]"
+                  className="rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm font-bold text-ink transition hover:border-ink"
                 >
                   Duplicate
                 </button>
@@ -382,7 +382,7 @@ function TemplatesPage() {
                 <input
                   value={editTemplateName}
                   onChange={(event) => setEditTemplateName(event.target.value)}
-                  className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-bold outline-none focus:border-[#1f2933]"
+                  className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-bold outline-none focus:border-ink"
                 />
 
                 <div className="flex gap-2">
@@ -390,12 +390,12 @@ function TemplatesPage() {
                     value={editStageName}
                     onChange={(event) => setEditStageName(event.target.value)}
                     placeholder="New stage"
-                    className="min-w-0 flex-1 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold outline-none focus:border-[#1f2933]"
+                    className="min-w-0 flex-1 rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold outline-none focus:border-ink"
                   />
 
                   <button
                     onClick={handleAddEditStage}
-                    className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-bold"
+                    className="rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-bold"
                   >
                     Add
                   </button>
@@ -404,7 +404,7 @@ function TemplatesPage() {
                 <AnimatePresence mode="popLayout">
                    <div className="min-h-0 flex-1 overflow-y-auto space-y-2 pr-2">
                     {editStages.length === 0 ? (
-                      <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-5 text-sm text-[#9a8f82]">
+                      <div className="rounded-3xl border border-dashed border-line-strong bg-paper p-5 text-sm text-faint">
                         This template has no stages.
                       </div>
                     ) : (
@@ -418,7 +418,7 @@ function TemplatesPage() {
                               ease: "easeInOut",
                             },
                           }}
-                            className="flex items-center gap-3 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4"
+                            className="flex items-center gap-3 rounded-3xl border border-line bg-paper p-4"
                           >
                           <span className="font-black">
                             {index + 1}
@@ -431,14 +431,14 @@ function TemplatesPage() {
                               updatedStages[index] = event.target.value;
                               setEditStages(updatedStages);
                             }}
-                            className="flex-1 rounded-xl border border-[#d8cec0] bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-[#1f2933]"
+                            className="flex-1 rounded-xl border border-line-strong bg-surface px-3 py-2 text-sm font-semibold outline-none focus:border-ink"
                           />
 
                           <div className="flex gap-1">
                             <button
                               onClick={() => handleMoveEditStageUp(index)}
                               disabled={index === 0}
-                              className="rounded-xl px-2 py-1 text-xs font-bold text-[#6f665c] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-30"
+                              className="rounded-xl px-2 py-1 text-xs font-bold text-muted transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-30"
                             >
                               ↑
                             </button>
@@ -446,7 +446,7 @@ function TemplatesPage() {
                             <button
                               onClick={() => handleMoveEditStageDown(index)}
                               disabled={index === editStages.length - 1}
-                              className="rounded-xl px-2 py-1 text-xs font-bold text-[#6f665c] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-30"
+                              className="rounded-xl px-2 py-1 text-xs font-bold text-muted transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-30"
                             >
                               ↓
                             </button>
@@ -472,7 +472,7 @@ function TemplatesPage() {
                   className={
                     templateSaved
                       ? "rounded-2xl bg-green-600 px-5 py-3 text-sm font-bold text-white shadow-md transition-all duration-300"
-                      : "rounded-2xl bg-[#1f2933] px-5 py-3 text-sm font-bold text-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
+                      : "rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-on-primary shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
                   }
                 >
                   {savingTemplate
@@ -488,7 +488,7 @@ function TemplatesPage() {
               <div className="text-center">
                 <h3 className="text-xl font-black">No template selected</h3>
 
-                <p className="mt-2 text-sm text-[#7c7163]">
+                <p className="mt-2 text-sm text-muted">
                   Create or select a template to view its stages.
                 </p>
               </div>

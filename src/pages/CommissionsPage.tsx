@@ -760,14 +760,14 @@ function CommissionsPage() {
       />
 
       <section className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-5 p-5 pb-6">
-        <div className="h-full min-h-0 rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="h-full min-h-0 rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
               <h3 className="text-xl font-black">
                 {activeCommission ? activeCommission.title : "Commission board"}
               </h3>
 
-              <p className="mt-1 text-sm text-[#7c7163]">
+              <p className="mt-1 text-sm text-muted">
                 {activeCommission
                   ? `${activeCommission.client_name || "No client"} · ${
                       activeCommission.platform || "No platform"
@@ -786,7 +786,7 @@ function CommissionsPage() {
                         value={searchQuery}
                         onChange={(event) => setSearchQuery(event.target.value)}
                         placeholder="Search by title or client..."
-                        className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-2 text-sm"
+                        className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm"
                         />
                     </div>
 
@@ -795,7 +795,7 @@ function CommissionsPage() {
                         onChange={(event) =>
                             setFilterStatus(event.target.value as typeof filterStatus)
                         }
-                        className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-2 text-sm font-semibold"
+                        className="rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm font-semibold"
                         >
                         <option value="all">All statuses</option>
                         <option value="active">Active</option>
@@ -810,7 +810,7 @@ function CommissionsPage() {
                             setFilterTagIds([]);
                             setFilterStatus("all");
                         }}
-                        className="flex items-center gap-1 rounded-2xl bg-[#1f2933] px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5"
+                        className="flex items-center gap-1 rounded-2xl bg-primary px-4 py-2 text-xs font-black text-on-primary shadow-sm transition hover:-translate-y-0.5"
                         >
                         ✕ Clear filters
                         </button>
@@ -842,10 +842,10 @@ function CommissionsPage() {
                     }
 
                     return (
-                        <div className="flex flex-col gap-y-3 rounded-2xl border border-[#e6ded2] bg-[#fffaf2] p-3">
+                        <div className="flex flex-col gap-y-3 rounded-2xl border border-line bg-paper p-3">
                         {categories.map(([category, categoryTags]) => (
                             <div key={category} className="grid w-full grid-cols-[110px_1fr] items-center gap-2">
-                                <span className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.14em] text-[#9a8f82]">
+                                <span className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.14em] text-faint">
                                 {category}
                                 </span>
 
@@ -866,8 +866,8 @@ function CommissionsPage() {
                                         }}
                                         className={
                                         selected
-                                            ? "rounded-full px-3 py-1 text-xs font-black text-white shadow-sm"
-                                            : "rounded-full border border-[#d8cec0] bg-white px-3 py-1 text-xs font-bold text-[#7c7163]"
+                                            ? "rounded-sm px-3 py-1 text-xs font-black text-white shadow-sm"
+                                            : "rounded-sm border border-line-strong bg-surface px-3 py-1 text-xs font-bold text-muted"
                                         }
                                         style={selected ? { backgroundColor: tag.color } : undefined}
                                     >
@@ -885,14 +885,14 @@ function CommissionsPage() {
                 )}
             {activeCommission ? (
               <div className="flex h-full min-h-0 flex-col gap-5">
-                <aside className="shrink-0 rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+                <aside className="shrink-0 rounded-3xl border border-line bg-paper p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
                     Commission detail
                   </p>
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={handleOpenEditCommission}
-                      className="rounded-2xl border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933]"
+                      className="rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink"
                     >
                       Edit
                     </button>
@@ -903,7 +903,7 @@ function CommissionsPage() {
                       className={
                         commissionDuplicated
                           ? "rounded-2xl bg-green-600 px-4 py-2 text-sm font-bold text-white transition-all duration-300"
-                          : "rounded-2xl border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#1f2933] transition hover:border-[#1f2933] disabled:opacity-70"
+                          : "rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink disabled:opacity-70"
                       }
                     >
                       {duplicatingCommission
@@ -922,13 +922,13 @@ function CommissionsPage() {
 
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     {activePaymentTag && (
-                      <div className="rounded-2xl border border-[#e6ded2] bg-white px-3 py-2 shadow-sm">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <div className="rounded-2xl border border-line bg-surface px-3 py-2 shadow-sm">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-faint">
                           Payment
                         </p>
 
                         <span
-                          className="mt-1 inline-flex rounded-full px-3 py-1 text-xs font-black text-white"
+                          className="mt-1 inline-flex rounded-sm px-3 py-1 text-xs font-black text-white"
                           style={{ backgroundColor: activePaymentTag.color }}
                         >
                           {activePaymentTag.name}
@@ -941,7 +941,7 @@ function CommissionsPage() {
                         {activeNormalTags.map((tag) => (
                           <span
                             key={tag.id}
-                            className="rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
+                            className="rounded-sm px-4 py-2 text-sm font-black text-white shadow-sm"
                             style={{ backgroundColor: tag.color }}
                           >
                             {tag.name}
@@ -953,14 +953,14 @@ function CommissionsPage() {
 
                   <div className="mt-4 grid grid-cols-7 gap-4">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                         Title
                       </p>
                       <p className="mt-2 font-bold">{activeCommission.title}</p>
                     </div>
 
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                         Client
                       </p>
                       <p className="mt-2 font-bold">
@@ -969,7 +969,7 @@ function CommissionsPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                         Platform
                       </p>
                       <p className="mt-2 font-bold">
@@ -978,7 +978,7 @@ function CommissionsPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                         Price
                       </p>
                       <p className="mt-2 font-bold">
@@ -989,7 +989,7 @@ function CommissionsPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                         Deadline
                       </p>
                       <p className="mt-2 font-bold">
@@ -998,7 +998,7 @@ function CommissionsPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                         Current stage
                       </p>
                       <p className="mt-2 font-bold">
@@ -1007,7 +1007,7 @@ function CommissionsPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                         Progress
                       </p>
                       <p className="mt-2 font-bold">
@@ -1017,14 +1017,14 @@ function CommissionsPage() {
                   </div>
                 </aside>
 
-                <div className="shrink-0 rounded-[2rem] border border-[#e6ded2] bg-[#fffaf2] p-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+                <div className="shrink-0 rounded-3xl border border-line bg-paper p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
                     Workflow
                   </p>
 
                   <div className="mt-4 flex min-h-[220px] items-start gap-3 overflow-x-auto pb-3">
                     {workflowStages.length === 0 ? (
-                      <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-white p-4 text-sm text-[#9a8f82]">
+                      <div className="rounded-3xl border border-dashed border-line-strong bg-surface p-4 text-sm text-faint">
                         No template assigned.
                       </div>
                     ) : (
@@ -1061,7 +1061,7 @@ function CommissionsPage() {
                                 ? "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-green-300 bg-green-100 p-4 text-green-900 shadow-sm"
                                 : index === currentStageIndex
                                   ? "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-amber-300 bg-amber-100 p-4 text-amber-900 shadow-sm"
-                                  : "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm"
+                                  : "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-line bg-surface p-4 shadow-sm"
                             }
                           >
                             <div className="flex items-center gap-3">
@@ -1071,7 +1071,7 @@ function CommissionsPage() {
                                     ? "flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-xs font-black text-white"
                                     : index === currentStageIndex
                                       ? "flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white"
-                                      : "flex h-8 w-8 items-center justify-center rounded-full bg-[#1f2933] text-xs font-black text-white"
+                                      : "flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-black text-on-primary"
                                 }
                               >
                                 {index < currentStageIndex ? "✓" : index + 1}
@@ -1079,19 +1079,19 @@ function CommissionsPage() {
 
                               <div>
                                 <p className="font-bold">{stage.name}</p>
-                                <p className="text-xs text-[#9a8f82]">Stage {index + 1}</p>
+                                <p className="text-xs text-faint">Stage {index + 1}</p>
                               </div>
                             </div>
 
                             {mainStageImage && (
-                              <div className="relative mt-4 overflow-hidden rounded-3xl border border-white/60 bg-white p-3 shadow-sm">
+                              <div className="relative mt-4 overflow-hidden rounded-3xl border border-white/60 bg-surface p-3 shadow-sm">
                                 <div className="relative z-10">
                                   <div className="mb-2 flex items-center justify-between">
-                                    <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-[#7c7163] shadow-sm">
+                                    <span className="rounded-sm bg-surface/90 px-3 py-1 text-[10px] font-black text-muted shadow-sm">
                                       {mainStageImage.label}
                                     </span>
 
-                                    <span className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-black text-[#9a8f82] shadow-sm">
+                                    <span className="rounded-sm bg-surface/90 px-3 py-1 text-[10px] font-black text-faint shadow-sm">
                                       {activeImageIndex + 1} / {stageImages.length}
                                     </span>
                                   </div>
@@ -1101,7 +1101,7 @@ function CommissionsPage() {
                                       <button
                                         type="button"
                                         onClick={() => handlePreviousStageImage(stage.id, stageImages)}
-                                        className="absolute left-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2933] text-lg font-black text-white shadow-lg transition hover:scale-105"
+                                        className="absolute left-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-black text-on-primary shadow-lg transition hover:scale-105"
                                       >
                                         ‹
                                       </button>
@@ -1180,7 +1180,7 @@ function CommissionsPage() {
                                       <button
                                         type="button"
                                         onClick={() => handleNextStageImage(stage.id, stageImages)}
-                                        className="absolute right-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2933] text-lg font-black text-white shadow-lg transition hover:scale-105"
+                                        className="absolute right-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-black text-on-primary shadow-lg transition hover:scale-105"
                                       >
                                         ›
                                       </button>
@@ -1188,14 +1188,14 @@ function CommissionsPage() {
                                   </div>
 
                                   <div className="mt-3 flex items-center justify-between">
-                                    <p className="text-xs font-bold text-[#7c7163]">
+                                    <p className="text-xs font-bold text-muted">
                                       {stageImages.length === 1 ? "1 alt" : `${stageImages.length} alts`}
                                     </p>
 
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteStageImage(mainStageImage.id)}
-                                      className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-500 transition hover:bg-red-100"
+                                      className="rounded-sm bg-red-50 px-3 py-1 text-xs font-black text-red-500 transition hover:bg-red-100"
                                     >
                                       Remove current
                                     </button>
@@ -1214,10 +1214,10 @@ function CommissionsPage() {
                               }
                               disabled={importingStageId !== null}
                               onClick={() => handleAddStageImages(stage.id)}
-                              className={`mt-4 block w-full cursor-pointer rounded-2xl border border-dashed px-3 py-3 text-center text-xs font-black transition hover:border-[#1f2933] disabled:cursor-wait disabled:opacity-60 ${
+                              className={`mt-4 block w-full cursor-pointer rounded-2xl border border-dashed px-3 py-3 text-center text-xs font-black transition hover:border-ink disabled:cursor-wait disabled:opacity-60 ${
                                 dragZoneId === `stage:${stage.id}`
-                                  ? "scale-[1.02] border-[#1f2933] bg-[#f1e8da] text-[#1f2933]"
-                                  : "border-[#d8cec0] bg-white text-[#7c7163]"
+                                  ? "scale-[1.02] border-ink bg-highlight text-ink"
+                                  : "border-line-strong bg-surface text-muted"
                               }`}
                             >
                               {importingStageId === stage.id
@@ -1239,7 +1239,7 @@ function CommissionsPage() {
                     className={
                       isLastStage
                         ? "mt-5 rounded-2xl bg-green-600 px-5 py-3 text-sm font-bold text-white shadow-md"
-                        : "mt-5 rounded-2xl bg-[#1f2933] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
+                        : "mt-5 rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
                     }
                   >
                     {isLastStage ? "✓ Finished" : "Move to next stage"}
@@ -1250,7 +1250,7 @@ function CommissionsPage() {
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-md text-center">
                   <h4 className="text-xl font-black">No commissions yet</h4>
-                  <p className="mt-2 text-sm leading-relaxed text-[#7c7163]">
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
                     Create your first commission to start building your workflow.
                   </p>
                 </div>
@@ -1259,7 +1259,7 @@ function CommissionsPage() {
               <div className="flex h-full items-center justify-center">
                 <div className="max-w-md text-center">
                   <h4 className="text-xl font-black">No matches</h4>
-                  <p className="mt-2 text-sm leading-relaxed text-[#7c7163]">
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
                     No commissions match your current search or filters.
                   </p>
                 </div>
@@ -1282,7 +1282,7 @@ function CommissionsPage() {
                     <button
                       key={commission.id}
                       onClick={() => handleOpenCommission(commission)}
-                      className="min-w-0 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#1f2933] hover:shadow-md"
+                      className="min-w-0 rounded-3xl border border-line bg-paper p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-ink hover:shadow-md"
                     >
                       {latestImage && (
                         <div
@@ -1290,7 +1290,7 @@ function CommissionsPage() {
                             event.stopPropagation();
                             setZoomedImage(imageUrl(latestImage.image_data_url));
                           }}
-                          className="mb-3 cursor-zoom-in overflow-hidden rounded-2xl bg-white shadow-sm transition hover:scale-[1.02]"
+                          className="mb-3 cursor-zoom-in overflow-hidden rounded-2xl bg-surface shadow-sm transition hover:scale-[1.02]"
                         >
                           <img
                             src={thumbUrl(latestImage.image_data_url)}
@@ -1302,12 +1302,12 @@ function CommissionsPage() {
                       )}
                       {paymentTag && (
                         <div className="mt-3">
-                          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#9a8f82]">
+                          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-faint">
                             Payment
                           </p>
 
                           <span
-                            className="inline-flex rounded-full px-3 py-1 text-xs font-black text-white shadow-sm"
+                            className="inline-flex rounded-sm px-3 py-1 text-xs font-black text-white shadow-sm"
                             style={{ backgroundColor: paymentTag.color }}
                           >
                             {paymentTag.name}
@@ -1324,7 +1324,7 @@ function CommissionsPage() {
                           {commissionCharacters.map((character) => (
                             <span
                               key={character.id}
-                              className="rounded-full border border-[#d8cec0] bg-white px-3 py-1 text-xs font-black text-[#7c7163] shadow-sm"
+                              className="rounded-sm border border-line-strong bg-surface px-3 py-1 text-xs font-black text-muted shadow-sm"
                             >
                               {character.name}
                             </span>
@@ -1338,7 +1338,7 @@ function CommissionsPage() {
                             <span
                               key={tag.id}
                               title={tag.name}
-                              className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl text-[0px] font-black text-white shadow-sm xl:w-auto xl:max-w-full xl:rounded-full xl:px-3 xl:text-xs"
+                              className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl text-[0px] font-black text-white shadow-sm xl:w-auto xl:max-w-full xl:rounded-sm xl:px-3 xl:text-xs"
                               style={{ backgroundColor: tag.color }}
                             >
                               <span className="hidden truncate xl:block">
@@ -1349,26 +1349,26 @@ function CommissionsPage() {
                         </div>
                       )}
 
-                      <p className="mt-2 text-sm font-semibold text-[#6f665c]">
+                      <p className="mt-2 text-sm font-semibold text-muted">
                         {commission.client_name || "No client"}
                       </p>
 
-                      <p className="mt-1 text-xs text-[#9a8f82]">
+                      <p className="mt-1 text-xs text-faint">
                         {commission.platform || "No platform"}
                       </p>
 
                       <div className="mt-3">
-                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.14em] text-[#9a8f82]">
+                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.14em] text-faint">
                           <span>Progress</span>
                           <span>{completionPercentage}%</span>
                         </div>
 
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                        <div className="mt-2 h-2 overflow-hidden rounded-sm bg-surface">
                           <div
                             className={
                               completionPercentage === 100
-                                ? "h-full rounded-full bg-green-500"
-                                : "h-full rounded-full bg-[#1f2933]"
+                                ? "h-full rounded-sm bg-green-500"
+                                : "h-full rounded-sm bg-primary"
                             }
                             style={{ width: `${completionPercentage}%` }}
                           />
@@ -1377,12 +1377,12 @@ function CommissionsPage() {
 
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         {altCount > 0 && (
-                          <span className="rounded-full border border-[#d8cec0] bg-white px-3 py-1 text-xs font-black text-[#7c7163] shadow-sm">
+                          <span className="rounded-sm border border-line-strong bg-surface px-3 py-1 text-xs font-black text-muted shadow-sm">
                             📷 {altCount} {altCount === 1 ? "Alt" : "Alts"}
                           </span>
                         )}
 
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1f2933] shadow-sm">
+                        <span className="rounded-sm bg-surface px-3 py-1 text-xs font-bold text-ink shadow-sm">
                           {commission.price
                             ? `${commission.price} ${commission.currency || "EUR"}`
                             : "No price"}
@@ -1390,19 +1390,19 @@ function CommissionsPage() {
 
                         {deadlineStatus ? (
                           <span
-                            className={`rounded-full px-3 py-1 text-xs font-black shadow-sm ${deadlineStatus.className}`}
+                            className={`rounded-sm px-3 py-1 text-xs font-black shadow-sm ${deadlineStatus.className}`}
                           >
                             {deadlineStatus.label}
                           </span>
                         ) : (
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1f2933] shadow-sm">
+                          <span className="rounded-sm bg-surface px-3 py-1 text-xs font-bold text-ink shadow-sm">
                             No deadline
                           </span>
                         )}
                       </div>
 
                       {commission.notes && (
-                        <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-[#7c7163]">
+                        <p className="mt-4 line-clamp-3 text-sm leading-relaxed text-muted">
                           {commission.notes}
                         </p>
                       )}
@@ -1414,9 +1414,9 @@ function CommissionsPage() {
           </div>
         </div>
 
-        <aside className="h-full min-h-0 overflow-hidden rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
-          <div className="max-h-full overflow-y-auto rounded-3xl border border-[#e6ded2] bg-[#f9f4ec] p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+        <aside className="h-full min-h-0 overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-sm">
+          <div className="max-h-full overflow-y-auto rounded-3xl border border-line bg-paper p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
               Calendar
             </p>
 
@@ -1425,8 +1425,8 @@ function CommissionsPage() {
             </p>
 
             {selectedDeadlineCommission && (
-              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+              <div className="mt-4 rounded-2xl bg-surface p-4 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                   Next deadline
                 </p>
 
@@ -1434,11 +1434,11 @@ function CommissionsPage() {
                   {selectedDeadlineCommission.title}
                 </p>
 
-                <p className="mt-1 text-xs text-[#7c7163]">
+                <p className="mt-1 text-xs text-muted">
                   {selectedDeadlineCommission.deadline}
                 </p>
 
-                <p className="mt-3 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
+                <p className="mt-3 rounded-sm bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
                   {daysUntilSelectedDeadline !== null
                     ? `${daysUntilSelectedDeadline} days left`
                     : "No date"}
@@ -1446,7 +1446,7 @@ function CommissionsPage() {
               </div>
             )}
 
-            <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs font-bold text-[#9a8f82]">
+            <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs font-bold text-faint">
               <span>Mon</span>
               <span>Tue</span>
               <span>Wed</span>
@@ -1489,10 +1489,10 @@ function CommissionsPage() {
                       isDeadlineDay
                         ? "flex aspect-square items-center justify-center rounded-xl bg-red-500 text-xs font-black text-white"
                         : isToday
-                          ? "flex aspect-square items-center justify-center rounded-xl bg-[#2c3947] text-xs font-black text-[#fffaf2] shadow-sm"
+                          ? "flex aspect-square items-center justify-center rounded-xl bg-primary-hover text-xs font-black text-on-primary shadow-sm"
                           : isInDeadlineRange
                             ? "flex aspect-square items-center justify-center rounded-xl bg-amber-100 text-xs font-bold text-amber-900"
-                            : "flex aspect-square items-center justify-center rounded-xl bg-white text-xs font-bold text-[#9a8f82]"
+                            : "flex aspect-square items-center justify-center rounded-xl bg-surface text-xs font-bold text-faint"
                     }
                   >
                     {day ?? ""}
@@ -1502,15 +1502,15 @@ function CommissionsPage() {
             </div>
 
             {selectedDeadlineCommission?.deadline && (
-              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+              <div className="mt-4 rounded-2xl bg-surface p-4 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                   Deadline summary
                 </p>
 
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-[#7c7163]">Today</span>
-                    <span className="font-bold text-[#1f2933]">
+                    <span className="font-semibold text-muted">Today</span>
+                    <span className="font-bold text-ink">
                       {today.toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -1519,7 +1519,7 @@ function CommissionsPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-[#7c7163]">Deadline</span>
+                    <span className="font-semibold text-muted">Deadline</span>
                     <span className="font-bold text-red-600">
                       {new Date(selectedDeadlineCommission.deadline).toLocaleDateString(
                         "en-US",
@@ -1531,7 +1531,7 @@ function CommissionsPage() {
                     </span>
                   </div>
 
-                  <div className="rounded-full bg-amber-100 px-3 py-2 text-center text-xs font-black text-amber-900">
+                  <div className="rounded-sm bg-amber-100 px-3 py-2 text-center text-xs font-black text-amber-900">
                     {daysUntilSelectedDeadline !== null
                       ? daysUntilSelectedDeadline > 0
                         ? `${daysUntilSelectedDeadline} days left`
@@ -1548,13 +1548,13 @@ function CommissionsPage() {
       </section>
       {showNewCommissionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-[650px] flex-col rounded-[2rem] border border-[#e1d8ca] bg-white shadow-2xl">
+          <div className="flex max-h-[90vh] w-[650px] flex-col rounded-3xl border border-line bg-surface shadow-2xl">
             <div className="shrink-0 px-6 pt-6">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
                 New commission
               </p>
 
-              <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+              <h3 className="mt-2 text-2xl font-black text-ink">
                 Create commission
               </h3>
             </div>
@@ -1566,11 +1566,11 @@ function CommissionsPage() {
                   value={commissionTitle}
                   onChange={(event) => setCommissionTitle(event.target.value)}
                   placeholder="Commission title"
-                  className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                  className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 />
 
                 <div className="col-span-2">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
                     Commissioners
                   </p>
 
@@ -1599,8 +1599,8 @@ function CommissionsPage() {
                           }}
                           className={
                             selected
-                              ? "rounded-full bg-[#1f2933] px-4 py-2 text-sm font-black text-white"
-                              : "rounded-full border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#7c7163]"
+                              ? "rounded-sm bg-primary px-4 py-2 text-sm font-black text-on-primary"
+                              : "rounded-sm border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-muted"
                           }
                         >
                           {client.name}
@@ -1611,12 +1611,12 @@ function CommissionsPage() {
                 </div>
 
                 <div className="col-span-2">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
                     Characters
                   </p>
 
                   {selectedClientIds.length === 0 ? (
-                    <p className="rounded-2xl border border-dashed border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm text-[#9a8f82]">
+                    <p className="rounded-2xl border border-dashed border-line-strong bg-paper px-4 py-3 text-sm text-faint">
                       Select one or more commissioners first.
                     </p>
                   ) : (
@@ -1628,14 +1628,14 @@ function CommissionsPage() {
                         return (
                           <div
                             key={clientId}
-                            className="rounded-2xl border border-[#e6ded2] bg-[#fffaf2] p-3"
+                            className="rounded-2xl border border-line bg-paper p-3"
                           >
-                            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-[#9a8f82]">
+                            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-faint">
                               {client?.name || "Client"}
                             </p>
 
                             {characters.length === 0 ? (
-                              <p className="text-sm text-[#9a8f82]">
+                              <p className="text-sm text-faint">
                                 No characters saved for this client.
                               </p>
                             ) : (
@@ -1656,8 +1656,8 @@ function CommissionsPage() {
                                       }}
                                       className={
                                         selected
-                                          ? "rounded-full bg-[#1f2933] px-4 py-2 text-sm font-black text-white"
-                                          : "rounded-full border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#7c7163]"
+                                          ? "rounded-sm bg-primary px-4 py-2 text-sm font-black text-on-primary"
+                                          : "rounded-sm border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-muted"
                                       }
                                     >
                                       {character.name}
@@ -1674,8 +1674,8 @@ function CommissionsPage() {
                 </div>
 
                 {selectedCharacterIds.length > 0 && (
-                  <div className="col-span-2 rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4">
-                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <div className="col-span-2 rounded-3xl border border-line bg-paper p-4">
+                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
                       Selected references
                     </p>
 
@@ -1690,12 +1690,12 @@ function CommissionsPage() {
 
                         return (
                           <div key={characterId}>
-                            <p className="mb-2 text-sm font-black text-[#1f2933]">
+                            <p className="mb-2 text-sm font-black text-ink">
                               {character?.name || "Character"}
                             </p>
 
                             {references.length === 0 ? (
-                              <p className="text-sm text-[#9a8f82]">
+                              <p className="text-sm text-faint">
                                 No references saved.
                               </p>
                             ) : (
@@ -1707,7 +1707,7 @@ function CommissionsPage() {
                                     onClick={() =>
                                       setZoomedImage(imageUrl(reference.image_data_url))
                                     }
-                                    className="overflow-hidden rounded-2xl border border-[#e6ded2] bg-white shadow-sm"
+                                    className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm"
                                   >
                                     <img
                                       src={thumbUrl(reference.image_data_url)}
@@ -1729,7 +1729,7 @@ function CommissionsPage() {
                 <select
                   value={platform}
                   onChange={(event) => setPlatform(event.target.value)}
-                  className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                  className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 >
                   <option>Discord</option>
                   <option>Twitter / X</option>
@@ -1746,7 +1746,7 @@ function CommissionsPage() {
                       event.target.value ? Number(event.target.value) : null,
                     )
                   }
-                  className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                  className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 >
                   <option value="">Select template</option>
                   {templates.map((template) => (
@@ -1760,20 +1760,20 @@ function CommissionsPage() {
                   value={commissionPrice}
                   onChange={(event) => setCommissionPrice(event.target.value)}
                   placeholder="Price"
-                  className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                  className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 />
 
                 <select
                   value={currency}
                   onChange={(event) => setCurrency(event.target.value)}
-                  className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                  className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 >
                   <option>EUR</option>
                   <option>USD</option>
                   <option>GBP</option>
                 </select>
 
-                <label className="col-span-2 flex items-center gap-3 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold">
+                <label className="col-span-2 flex items-center gap-3 rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold">
                   <input
                     type="checkbox"
                     checked={hasDeadline}
@@ -1787,7 +1787,7 @@ function CommissionsPage() {
                     type="date"
                     value={commissionDeadline}
                     onChange={(event) => setCommissionDeadline(event.target.value)}
-                    className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                    className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
                   />
                 )}
 
@@ -1796,10 +1796,10 @@ function CommissionsPage() {
                   onChange={(event) => setCommissionNotes(event.target.value)}
                   placeholder="Notes"
                   rows={4}
-                  className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                  className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 />
                 <div className="col-span-2">
-                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
                     Tags
                   </p>
 
@@ -1838,8 +1838,8 @@ function CommissionsPage() {
                           }}
                           className={
                             selected
-                              ? "rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
-                              : "rounded-full border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#7c7163]"
+                              ? "rounded-sm px-4 py-2 text-sm font-black text-white shadow-sm"
+                              : "rounded-sm border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-muted"
                           }
                           style={
                             selected
@@ -1859,10 +1859,10 @@ function CommissionsPage() {
 
             </div>
 
-            <div className="flex shrink-0 justify-end gap-3 border-t border-[#e6ded2] p-6">
+            <div className="flex shrink-0 justify-end gap-3 border-t border-line p-6">
               <button
                 onClick={() => setShowNewCommissionModal(false)}
-                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+                className="rounded-2xl border border-line-strong px-4 py-2 font-semibold"
               >
                 Cancel
               </button>
@@ -1873,7 +1873,7 @@ function CommissionsPage() {
                 className={
                   commissionCreated
                     ? "rounded-2xl bg-green-600 px-4 py-2 font-bold text-white transition-all duration-300"
-                    : "rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white transition-all duration-300 hover:-translate-y-0.5"
+                    : "rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary transition-all duration-300 hover:-translate-y-0.5"
                 }
               >
                 {creatingCommission
@@ -1888,12 +1888,12 @@ function CommissionsPage() {
       )}
       {showEditCommissionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="w-[650px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+          <div className="w-[650px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
               Edit commission
             </p>
 
-            <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+            <h3 className="mt-2 text-2xl font-black text-ink">
               Update commission
             </h3>
 
@@ -1902,7 +1902,7 @@ function CommissionsPage() {
                 value={commissionTitle}
                 onChange={(event) => setCommissionTitle(event.target.value)}
                 placeholder="Commission title"
-                className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
               />
 
               <select
@@ -1920,7 +1920,7 @@ function CommissionsPage() {
                   setClientName(selectedClient?.name || "");
                   setPlatform(selectedClient?.platform || "Discord");
                 }}
-                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
               >
                 <option value="">Select client</option>
 
@@ -1935,7 +1935,7 @@ function CommissionsPage() {
               <select
                 value={platform}
                 onChange={(event) => setPlatform(event.target.value)}
-                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
               >
                 <option>Discord</option>
                 <option>Twitter / X</option>
@@ -1949,20 +1949,20 @@ function CommissionsPage() {
                 value={commissionPrice}
                 onChange={(event) => setCommissionPrice(event.target.value)}
                 placeholder="Price"
-                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
               />
 
               <select
                 value={currency}
                 onChange={(event) => setCurrency(event.target.value)}
-                className="rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="rounded-2xl border border-line-strong bg-paper px-4 py-3"
               >
                 <option>EUR</option>
                 <option>USD</option>
                 <option>GBP</option>
               </select>
 
-              <label className="col-span-2 flex items-center gap-3 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3 text-sm font-semibold">
+              <label className="col-span-2 flex items-center gap-3 rounded-2xl border border-line-strong bg-paper px-4 py-3 text-sm font-semibold">
                 <input
                   type="checkbox"
                   checked={hasDeadline}
@@ -1976,7 +1976,7 @@ function CommissionsPage() {
                   type="date"
                   value={commissionDeadline}
                   onChange={(event) => setCommissionDeadline(event.target.value)}
-                  className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                  className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
                 />
               )}
 
@@ -1985,10 +1985,10 @@ function CommissionsPage() {
                 onChange={(event) => setCommissionNotes(event.target.value)}
                 placeholder="Notes"
                 rows={4}
-                className="col-span-2 rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="col-span-2 rounded-2xl border border-line-strong bg-paper px-4 py-3"
               />
               <div className="col-span-2">
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-faint">
                   Tags
                 </p>
 
@@ -2026,8 +2026,8 @@ function CommissionsPage() {
                         }}
                         className={
                           selected
-                            ? "rounded-full px-4 py-2 text-sm font-black text-white shadow-sm"
-                            : "rounded-full border border-[#d8cec0] bg-white px-4 py-2 text-sm font-bold text-[#7c7163]"
+                            ? "rounded-sm px-4 py-2 text-sm font-black text-white shadow-sm"
+                            : "rounded-sm border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-muted"
                         }
                         style={
                           selected
@@ -2046,7 +2046,7 @@ function CommissionsPage() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowEditCommissionModal(false)}
-                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+                className="rounded-2xl border border-line-strong px-4 py-2 font-semibold"
               >
                 Cancel
               </button>
@@ -2057,7 +2057,7 @@ function CommissionsPage() {
                 className={
                   commissionSaved
                     ? "rounded-2xl bg-green-600 px-4 py-2 font-bold text-white transition-all duration-300"
-                    : "rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white transition-all duration-300 hover:-translate-y-0.5"
+                    : "rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary transition-all duration-300 hover:-translate-y-0.5"
                 }
               >
                 {savingCommission

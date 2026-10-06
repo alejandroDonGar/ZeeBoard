@@ -166,8 +166,8 @@ function DashboardPage() {
       />
 
       <section className="grid grid-cols-4 gap-4 px-5 pt-5">
-        <div className="rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#9a8f82]">
+        <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-faint">
             Total earned
           </p>
           <p className="mt-2 text-2xl font-black">
@@ -175,15 +175,15 @@ function DashboardPage() {
           </p>
         </div>
 
-        <div className="rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#9a8f82]">
+        <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-faint">
             Active
           </p>
           <p className="mt-2 text-2xl font-black">{activeCount}</p>
         </div>
 
-        <div className="rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#9a8f82]">
+        <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-faint">
             Completed
           </p>
           <p className="mt-2 text-2xl font-black text-green-600">
@@ -191,8 +191,8 @@ function DashboardPage() {
           </p>
         </div>
 
-        <div className="rounded-3xl border border-[#e6ded2] bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#9a8f82]">
+        <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-faint">
             Unpaid
           </p>
           <p className="mt-2 text-2xl font-black text-red-500">
@@ -202,20 +202,20 @@ function DashboardPage() {
       </section>
 
       <section className="grid grid-cols-2 gap-5 p-5">
-        <div className="rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <h3 className="text-lg font-black">Revenue, last 6 months</h3>
 
           <div className="mt-5 space-y-3">
             {revenueByMonth.map((entry) => (
               <div key={entry.label}>
-                <div className="flex items-center justify-between text-xs font-bold text-[#7c7163]">
+                <div className="flex items-center justify-between text-xs font-bold text-muted">
                   <span>{entry.label}</span>
                   <span>{entry.total.toFixed(0)}€</span>
                 </div>
 
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#f6f3ee]">
+                <div className="mt-1 h-2 overflow-hidden rounded-sm bg-canvas">
                   <div
-                    className="h-full rounded-full bg-[#1f2933]"
+                    className="h-full rounded-sm bg-primary"
                     style={{
                       width: `${(entry.total / maxMonthRevenue) * 100}%`,
                     }}
@@ -226,11 +226,11 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <h3 className="text-lg font-black">Upcoming deadlines</h3>
 
           {upcomingDeadlines.length === 0 ? (
-            <p className="mt-4 text-sm text-[#9a8f82]">
+            <p className="mt-4 text-sm text-faint">
               No upcoming deadlines.
             </p>
           ) : (
@@ -241,20 +241,20 @@ function DashboardPage() {
                 return (
                   <div
                     key={commission.id}
-                    className="flex items-center justify-between gap-3 rounded-2xl bg-[#fffaf2] px-4 py-3"
+                    className="flex items-center justify-between gap-3 rounded-2xl bg-paper px-4 py-3"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-[#1f2933]">
+                      <p className="truncate text-sm font-black text-ink">
                         {commission.title}
                       </p>
-                      <p className="mt-1 text-xs text-[#7c7163]">
+                      <p className="mt-1 text-xs text-muted">
                         {commission.client_name || "No client"}
                       </p>
                     </div>
 
                     {deadlineStatus && (
                       <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${deadlineStatus.className}`}
+                        className={`shrink-0 rounded-sm px-3 py-1 text-xs font-black ${deadlineStatus.className}`}
                       >
                         {deadlineStatus.label}
                       </span>
@@ -268,11 +268,11 @@ function DashboardPage() {
       </section>
 
       <section className="px-5 pb-6">
-        <div className="rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <h3 className="text-lg font-black">Most used tags</h3>
 
           {topTags.length === 0 ? (
-            <p className="mt-4 text-sm text-[#9a8f82]">
+            <p className="mt-4 text-sm text-faint">
               No tags in use yet.
             </p>
           ) : (
@@ -280,15 +280,15 @@ function DashboardPage() {
               {topTags.map(({ tag, count }) => (
                 <div
                   key={tag.id}
-                  className="flex items-center gap-2 rounded-full border border-[#e6ded2] bg-[#fffaf2] py-1 pl-1 pr-3"
+                  className="flex items-center gap-2 rounded-sm border border-line bg-paper py-1 pl-1 pr-3"
                 >
                   <span
-                    className="rounded-full px-3 py-1 text-xs font-black text-white"
+                    className="rounded-sm px-3 py-1 text-xs font-black text-white"
                     style={{ backgroundColor: tag.color }}
                   >
                     {tag.name}
                   </span>
-                  <span className="text-xs font-bold text-[#9a8f82]">
+                  <span className="text-xs font-bold text-faint">
                     {count}
                   </span>
                 </div>

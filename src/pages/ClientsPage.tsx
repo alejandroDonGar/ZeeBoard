@@ -257,7 +257,7 @@ function ClientsPage({
 
   function getClientAvatarBackground(name: string) {
     const colours = [
-      "bg-[#1f2933]",
+      "bg-primary",
       "bg-[#7c3aed]",
       "bg-[#0891b2]",
       "bg-[#16a34a]",
@@ -479,7 +479,7 @@ function ClientsPage({
       />
 
       <section className="grid h-[calc(100vh-117px)] min-h-0 grid-cols-[360px_minmax(0,1fr)] gap-5 overflow-hidden p-5 pb-6">
-        <div className="flex min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <h3 className="text-xl font-black">
             New client
           </h3>
@@ -491,7 +491,7 @@ function ClientsPage({
                 setClientName(event.target.value)
               }
               placeholder="Client name"
-              className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
             />
 
             <select
@@ -499,7 +499,7 @@ function ClientsPage({
               onChange={(event) =>
                 setClientPlatform(event.target.value)
               }
-              className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
             >
               <option>Twitter / X</option>
               <option>Bluesky</option>
@@ -514,7 +514,7 @@ function ClientsPage({
                 setClientHandle(event.target.value)
               }
               placeholder="@username"
-              className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
             />
 
             <textarea
@@ -524,32 +524,32 @@ function ClientsPage({
               }
               placeholder="Notes"
               rows={4}
-              className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+              className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
             />
 
             <button
               onClick={handleCreateClient}
-              className="w-full rounded-2xl bg-[#1f2933] px-4 py-3 font-bold text-white"
+              className="w-full rounded-2xl bg-primary px-4 py-3 font-bold text-on-primary"
             >
               Create client
             </button>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col rounded-[2rem] border border-[#e1d8ca] bg-white p-5 shadow-sm">
+        <div className="flex min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-black">
               Clients
             </h3>
 
-            <span className="rounded-full bg-[#fffaf2] px-3 py-1 text-xs font-bold text-[#9a8f82]">
+            <span className="rounded-sm bg-paper px-3 py-1 text-xs font-bold text-faint">
               {clients.length} clients
             </span>
           </div>
 
           <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
             {clients.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-[#d8cec0] bg-[#fffaf2] p-8 text-center text-sm text-[#9a8f82]">
+              <div className="rounded-3xl border border-dashed border-line-strong bg-paper p-8 text-center text-sm text-faint">
                 No clients yet
               </div>
             ) : (
@@ -583,7 +583,7 @@ function ClientsPage({
                   <div
                     key={client.id}
                     onClick={() => setSelectedClient(client)}
-                    className="cursor-pointer rounded-3xl border border-[#e6ded2] bg-[#fffaf2] p-4 transition hover:border-[#1f2933] hover:shadow-md"
+                    className="cursor-pointer rounded-3xl border border-line bg-paper p-4 transition hover:border-ink hover:shadow-md"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
@@ -607,31 +607,31 @@ function ClientsPage({
                           <h4 className="font-black">{client.name}</h4>
 
                           {client.platform && (
-                            <p className="mt-1 text-sm font-semibold text-[#1f2933]">
+                            <p className="mt-1 text-sm font-semibold text-ink">
                               {client.platform}
                             </p>
                           )}
 
                           {client.handle && (
-                            <p className="text-sm text-[#7c7163]">
+                            <p className="text-sm text-muted">
                               {client.handle}
                             </p>
                           )}
 
                           <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#7c7163] shadow-sm">
+                            <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-muted shadow-sm">
                               {clientCommissions.length} commissions
                             </span>
 
-                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#1f2933] shadow-sm">
+                            <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-ink shadow-sm">
                               {clientTotal} EUR
                             </span>
 
-                            <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-700 shadow-sm">
+                            <span className="rounded-sm bg-green-50 px-3 py-1 text-xs font-black text-green-700 shadow-sm">
                               {clientPaidCount} paid
                             </span>
 
-                            <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600 shadow-sm">
+                            <span className="rounded-sm bg-red-50 px-3 py-1 text-xs font-black text-red-600 shadow-sm">
                               {clientUnpaidCount} unpaid
                             </span>
                           </div>
@@ -642,7 +642,7 @@ function ClientsPage({
                         {client.platform === "Bluesky" && client.handle && (
                           <button
                             onClick={() => handleFetchClientAvatar(client)}
-                            className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#1f2933] shadow-sm transition hover:bg-[#f1e8da]"
+                            className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-ink shadow-sm transition hover:bg-highlight"
                           >
                             Fetch avatar
                           </button>
@@ -653,7 +653,7 @@ function ClientsPage({
                             event.stopPropagation();
                             handleOpenEditClient(client);
                           }}
-                          className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#1f2933] shadow-sm transition hover:bg-[#f1e8da]"
+                          className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-ink shadow-sm transition hover:bg-highlight"
                         >
                           Edit
                         </button>
@@ -663,7 +663,7 @@ function ClientsPage({
                             event.stopPropagation();
                             setClientToDelete(client);
                           }}
-                          className="rounded-full bg-white px-3 py-1 text-xs font-black text-red-500 shadow-sm transition hover:bg-red-50"
+                          className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-red-500 shadow-sm transition hover:bg-red-50"
                         >
                           Delete
                         </button>
@@ -678,7 +678,7 @@ function ClientsPage({
       </section>
       {selectedClient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-[560px] overflow-y-auto rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-[560px] overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-2xl">
             <div className="flex items-start gap-4">
               {selectedClient.avatar_url ? (
                 <img
@@ -697,33 +697,33 @@ function ClientsPage({
               )}
 
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
                   Client profile
                 </p>
 
-                <h3 className="mt-1 text-2xl font-black text-[#1f2933]">
+                <h3 className="mt-1 text-2xl font-black text-ink">
                   {selectedClient.name}
                 </h3>
 
-                <p className="mt-1 text-sm font-semibold text-[#7c7163]">
+                <p className="mt-1 text-sm font-semibold text-muted">
                   {selectedClient.platform || "No platform"}
                   {selectedClient.handle
                     ? ` · ${selectedClient.handle}`
                     : ""}
                 </p>
                 <div className="mt-6 grid grid-cols-4 gap-3">
-                  <div className="rounded-3xl bg-[#fffaf2] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <div className="rounded-3xl bg-paper p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                       Total
                     </p>
 
-                    <p className="mt-2 text-xl font-black text-[#1f2933]">
+                    <p className="mt-2 text-xl font-black text-ink">
                       {selectedClientCommissions.length}
                     </p>
                   </div>
 
-                  <div className="rounded-3xl bg-[#fffaf2] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <div className="rounded-3xl bg-paper p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                       Active
                     </p>
 
@@ -732,8 +732,8 @@ function ClientsPage({
                     </p>
                   </div>
 
-                  <div className="rounded-3xl bg-[#fffaf2] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <div className="rounded-3xl bg-paper p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                       Completed
                     </p>
 
@@ -742,30 +742,30 @@ function ClientsPage({
                     </p>
                   </div>
 
-                  <div className="rounded-3xl bg-[#fffaf2] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <div className="rounded-3xl bg-paper p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                       Spent
                     </p>
 
-                    <p className="mt-2 text-xl font-black text-[#1f2933]">
+                    <p className="mt-2 text-xl font-black text-ink">
                       {totalSpent} EUR
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-3 gap-3">
-                  <div className="rounded-3xl bg-[#fffaf2] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <div className="rounded-3xl bg-paper p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                       Average
                     </p>
 
-                    <p className="mt-2 text-xl font-black text-[#1f2933]">
+                    <p className="mt-2 text-xl font-black text-ink">
                       {averagePrice} EUR
                     </p>
                   </div>
 
-                  <div className="rounded-3xl bg-[#fffaf2] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <div className="rounded-3xl bg-paper p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                       Paid
                     </p>
 
@@ -774,8 +774,8 @@ function ClientsPage({
                     </p>
                   </div>
 
-                  <div className="rounded-3xl bg-[#fffaf2] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                  <div className="rounded-3xl bg-paper p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                       Unpaid
                     </p>
 
@@ -786,19 +786,19 @@ function ClientsPage({
                 </div>
               </div>
             </div>
-            <div className="mt-6 rounded-3xl bg-[#fffaf2] p-4">
+            <div className="mt-6 rounded-3xl bg-paper p-4">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                   Commissions
                 </p>
 
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#9a8f82] shadow-sm">
+                <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-faint shadow-sm">
                   {selectedClientCommissions.length}
                 </span>
               </div>
 
               {selectedClientCommissions.length === 0 ? (
-                <p className="mt-3 text-sm text-[#7c7163]">
+                <p className="mt-3 text-sm text-muted">
                   No commissions yet.
                 </p>
               ) : (
@@ -817,7 +817,7 @@ function ClientsPage({
                     return (
                       <div
                         key={commission.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm"
+                        className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 shadow-sm"
                       >
                         <div className="flex min-w-0 items-center gap-3">
                           {commissionPreview && (
@@ -827,7 +827,7 @@ function ClientsPage({
                                 event.stopPropagation();
                                 setZoomedImage(imageUrl(commissionPreview.image_data_url));
                               }}
-                              className="shrink-0 overflow-hidden rounded-2xl border border-[#e6ded2] bg-[#fffaf2] shadow-sm transition hover:scale-[1.03]"
+                              className="shrink-0 overflow-hidden rounded-2xl border border-line bg-paper shadow-sm transition hover:scale-[1.03]"
                             >
                               <img
                                 src={thumbUrl(commissionPreview.image_data_url)}
@@ -840,11 +840,11 @@ function ClientsPage({
 
                           <div className="flex min-w-0 items-center gap-3">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-black text-[#1f2933]">
+                              <p className="truncate text-sm font-black text-ink">
                                 {commission.title}
                               </p>
 
-                              <p className="mt-1 text-xs text-[#7c7163]">
+                              <p className="mt-1 text-xs text-muted">
                                 {commission.price
                                   ? `${commission.price} ${commission.currency || "EUR"}`
                                   : "No price"}
@@ -853,7 +853,7 @@ function ClientsPage({
                               </p>
 
                               <div className="mt-2">
-                                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.12em] text-[#9a8f82]">
+                                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.12em] text-faint">
                                   <span>
                                     {isCompleted ? "Completed" : "Progress"}
                                   </span>
@@ -863,12 +863,12 @@ function ClientsPage({
                                   </span>
                                 </div>
 
-                                <div className="mt-1 h-2 overflow-hidden rounded-full bg-[#fffaf2]">
+                                <div className="mt-1 h-2 overflow-hidden rounded-sm bg-paper">
                                   <div
                                     className={
                                       isCompleted
-                                        ? "h-full rounded-full bg-green-500"
-                                        : "h-full rounded-full bg-[#1f2933]"
+                                        ? "h-full rounded-sm bg-green-500"
+                                        : "h-full rounded-sm bg-primary"
                                     }
                                     style={{ width: `${completionPercentage}%` }}
                                   />
@@ -880,7 +880,7 @@ function ClientsPage({
 
                         <button
                           onClick={() => handleOpenCommissionFromClient(commission)}
-                          className="rounded-full bg-[#1f2933] px-3 py-1 text-xs font-black text-white shadow-sm"
+                          className="rounded-sm bg-primary px-3 py-1 text-xs font-black text-on-primary shadow-sm"
                         >
                           Open
                         </button>
@@ -890,13 +890,13 @@ function ClientsPage({
                 </div>
               )}
             </div>
-            <div className="mt-6 rounded-3xl bg-[#fffaf2] p-4">
+            <div className="mt-6 rounded-3xl bg-paper p-4">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                   Characters
                 </p>
 
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#7c7163]">
+                <span className="rounded-sm bg-surface px-3 py-1 text-xs font-black text-muted">
                   {(charactersByClientId[selectedClient.id] ?? []).length}
                 </span>
               </div>
@@ -908,12 +908,12 @@ function ClientsPage({
                     setNewCharacterName(event.target.value)
                   }
                   placeholder="Character name"
-                  className="flex-1 rounded-2xl border border-[#d8cec0] bg-white px-4 py-2"
+                  className="flex-1 rounded-2xl border border-line-strong bg-surface px-4 py-2"
                 />
 
                 <button
                   onClick={handleCreateCharacter}
-                  className="rounded-2xl bg-[#1f2933] px-4 py-2 text-sm font-black text-white"
+                  className="rounded-2xl bg-primary px-4 py-2 text-sm font-black text-on-primary"
                 >
                   Add
                 </button>
@@ -939,7 +939,7 @@ function ClientsPage({
                   return (
                     <div
                       key={character.id}
-                      className="rounded-2xl bg-white p-3 shadow-sm"
+                      className="rounded-2xl bg-surface p-3 shadow-sm"
                     >
                       <button
                         onClick={() =>
@@ -957,19 +957,19 @@ function ClientsPage({
                           </p>
 
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-[#fffaf2] px-3 py-1 text-xs font-black text-[#7c7163] shadow-sm">
+                            <span className="rounded-sm bg-paper px-3 py-1 text-xs font-black text-muted shadow-sm">
                               {references.length} refs
                             </span>
 
-                            <span className="rounded-full bg-[#fffaf2] px-3 py-1 text-xs font-black text-[#7c7163] shadow-sm">
+                            <span className="rounded-sm bg-paper px-3 py-1 text-xs font-black text-muted shadow-sm">
                               {commissionsUsingCharacter.length} commissions
                             </span>
                           </div>
 
                           {lastUsedCommission && (
-                            <p className="mt-2 text-xs font-semibold text-[#9a8f82]">
+                            <p className="mt-2 text-xs font-semibold text-faint">
                               Last used in{" "}
-                              <span className="font-black text-[#1f2933]">
+                              <span className="font-black text-ink">
                                 {lastUsedCommission.title}
                               </span>
                             </p>
@@ -989,10 +989,10 @@ function ClientsPage({
                             title="Click, drop images here or paste with Ctrl+V"
                             disabled={importingCharacterId !== null}
                             onClick={() => handleAddCharacterReferences(character.id)}
-                            className={`block w-full cursor-pointer rounded-2xl border border-dashed px-4 py-3 text-center text-xs font-black transition hover:border-[#1f2933] disabled:cursor-wait disabled:opacity-60 ${
+                            className={`block w-full cursor-pointer rounded-2xl border border-dashed px-4 py-3 text-center text-xs font-black transition hover:border-ink disabled:cursor-wait disabled:opacity-60 ${
                               dragZoneId === `character:${character.id}`
-                                ? "scale-[1.02] border-[#1f2933] bg-[#f1e8da] text-[#1f2933]"
-                                : "border-[#d8cec0] bg-[#fffaf2] text-[#7c7163]"
+                                ? "scale-[1.02] border-ink bg-highlight text-ink"
+                                : "border-line-strong bg-paper text-muted"
                             }`}
                           >
                             {importingCharacterId === character.id
@@ -1003,7 +1003,7 @@ function ClientsPage({
                           </button>
 
                           {references.length === 0 ? (
-                            <p className="mt-3 text-center text-sm text-[#9a8f82]">
+                            <p className="mt-3 text-center text-sm text-faint">
                               No references yet.
                             </p>
                           ) : (
@@ -1011,7 +1011,7 @@ function ClientsPage({
                               {references.map((reference) => (
                                 <div
                                   key={reference.id}
-                                  className="overflow-hidden rounded-2xl border border-[#e6ded2] bg-white shadow-sm"
+                                  className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm"
                                 >
                                   <button
                                     type="button"
@@ -1029,7 +1029,7 @@ function ClientsPage({
                                   </button>
 
                                   <div className="flex items-center justify-between px-2 py-1">
-                                    <span className="truncate text-[10px] font-black text-[#7c7163]">
+                                    <span className="truncate text-[10px] font-black text-muted">
                                       {reference.label}
                                     </span>
 
@@ -1051,12 +1051,12 @@ function ClientsPage({
                             </div>
                           )}
                           <div className="mt-6">
-                            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-[#9a8f82]">
+                            <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-faint">
                                 Commission history
                             </p>
 
                             {commissionsUsingCharacter.length === 0 ? (
-                                <p className="text-center text-sm text-[#9a8f82]">
+                                <p className="text-center text-sm text-faint">
                                 No commissions yet.
                                 </p>
                             ) : (
@@ -1073,7 +1073,7 @@ function ClientsPage({
                                         key={historyCommission.id}
                                         type="button"
                                         onClick={() => handleOpenCommissionFromClient(historyCommission)}
-                                        className="overflow-hidden rounded-2xl border border-[#e6ded2] bg-white text-left shadow-sm transition hover:scale-[1.02] hover:border-[#1f2933]"
+                                        className="overflow-hidden rounded-2xl border border-line bg-surface text-left shadow-sm transition hover:scale-[1.02] hover:border-ink"
                                     >
                                         {latestHistoryImage ? (
                                         <img
@@ -1083,13 +1083,13 @@ function ClientsPage({
                                             className="aspect-square w-full object-cover"
                                         />
                                         ) : (
-                                        <div className="flex aspect-square items-center justify-center bg-[#fffaf2] text-[10px] text-[#9a8f82]">
+                                        <div className="flex aspect-square items-center justify-center bg-paper text-[10px] text-faint">
                                             No image
                                         </div>
                                         )}
 
                                         <div className="px-2 py-1">
-                                        <p className="truncate text-[10px] font-black text-[#7c7163]">
+                                        <p className="truncate text-[10px] font-black text-muted">
                                             {historyCommission.title}
                                         </p>
                                         </div>
@@ -1107,12 +1107,12 @@ function ClientsPage({
               </div>
             </div>
             {selectedClient.notes && (
-              <div className="mt-6 rounded-3xl bg-[#fffaf2] p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9a8f82]">
+              <div className="mt-6 rounded-3xl bg-paper p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
                   Notes
                 </p>
 
-                <p className="mt-2 text-sm text-[#7c7163]">
+                <p className="mt-2 text-sm text-muted">
                   {selectedClient.notes}
                 </p>
               </div>
@@ -1121,7 +1121,7 @@ function ClientsPage({
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setSelectedClient(null)}
-                className="rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white"
+                className="rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary"
               >
                 Close
               </button>
@@ -1143,12 +1143,12 @@ function ClientsPage({
       )}
       {clientToEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="w-[520px] rounded-[2rem] border border-[#e1d8ca] bg-white p-6 shadow-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#9a8f82]">
+          <div className="w-[520px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
               Edit client
             </p>
 
-            <h3 className="mt-2 text-2xl font-black text-[#1f2933]">
+            <h3 className="mt-2 text-2xl font-black text-ink">
               Update client
             </h3>
 
@@ -1157,13 +1157,13 @@ function ClientsPage({
                 value={clientName}
                 onChange={(event) => setClientName(event.target.value)}
                 placeholder="Client name"
-                className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
               />
 
               <select
                 value={clientPlatform}
                 onChange={(event) => setClientPlatform(event.target.value)}
-                className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
               >
                 <option>Twitter / X</option>
                 <option>Bluesky</option>
@@ -1176,7 +1176,7 @@ function ClientsPage({
                 value={clientHandle}
                 onChange={(event) => setClientHandle(event.target.value)}
                 placeholder="@username"
-                className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
               />
 
               <textarea
@@ -1184,7 +1184,7 @@ function ClientsPage({
                 onChange={(event) => setClientNotes(event.target.value)}
                 placeholder="Notes"
                 rows={4}
-                className="w-full rounded-2xl border border-[#d8cec0] bg-[#fffaf2] px-4 py-3"
+                className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-3"
               />
             </div>
 
@@ -1197,7 +1197,7 @@ function ClientsPage({
                   setClientHandle("");
                   setClientNotes("");
                 }}
-                className="rounded-2xl border border-[#d8cec0] px-4 py-2 font-semibold"
+                className="rounded-2xl border border-line-strong px-4 py-2 font-semibold"
               >
                 Cancel
               </button>
@@ -1205,7 +1205,7 @@ function ClientsPage({
               <button
                 onClick={handleSaveClientChanges}
                 disabled={savingClient}
-                className="rounded-2xl bg-[#1f2933] px-4 py-2 font-bold text-white"
+                className="rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary"
               >
                 {savingClient ? "Saving..." : "Save"}
               </button>

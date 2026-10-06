@@ -1,3 +1,5 @@
+import { t } from "../lib/i18n";
+
 function PageHeader({
   label,
   title,
@@ -16,10 +18,10 @@ function PageHeader({
       <div className="flex items-center justify-between gap-6">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-faint">
-            {label}
+            {t(label)}
           </p>
-          <h2 className="mt-1 text-3xl font-black">{title}</h2>
-          <p className="mt-1 text-sm text-muted">{description}</p>
+          <h2 className="mt-1 text-3xl font-black">{t(title)}</h2>
+          <p className="mt-1 text-sm text-muted">{t(description)}</p>
         </div>
 
         {action && (
@@ -27,7 +29,7 @@ function PageHeader({
             onClick={onAction}
             className="rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
           >
-            {action}
+            {t(action)}
           </button>
         )}
       </div>

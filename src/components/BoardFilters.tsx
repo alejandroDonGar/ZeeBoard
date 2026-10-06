@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Tag } from "../lib/database";
+import { t } from "../lib/i18n";
 
 export type StatusFilter = "all" | "active" | "overdue";
 export type PaymentFilter = "all" | "unpaid" | "partial" | "paid";
@@ -29,7 +30,7 @@ export function Segmented<T extends string | number>({
               : "rounded-sm px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-ink"
           }
         >
-          {option.label}
+          {t(option.label)}
         </button>
       ))}
     </div>

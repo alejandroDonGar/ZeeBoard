@@ -16,6 +16,7 @@ import { setPrivate, usePrivacy } from "./lib/privacy";
 import { loadAttention, notifyNew } from "./lib/reminders";
 import { REQUESTS_CHANGED, syncFormResponses } from "./lib/formSync";
 import { getRequests } from "./lib/database";
+import { t } from "./lib/i18n";
 
 type Page = "dashboard" | "commissions" | "requests" | "clients" | "tags" | "templates" | "finished" | "settings";
 
@@ -185,7 +186,7 @@ function App() {
               <div>
                 <h1 className="text-2xl font-black tracking-tight">ZeeBoard</h1>
                 <p className="text-xs font-medium text-muted">
-                  Commission workspace
+                  {t("Commission workspace")}
                 </p>
               </div>
             </div>
@@ -205,7 +206,7 @@ function App() {
                       : "w-full rounded-2xl px-4 py-3 text-left text-sm font-semibold text-muted transition hover:bg-highlight hover:text-ink"
                   }
                 >
-                  {item.label}
+                  {t(item.label)}
                   {item.id === "requests" && newRequests > 0 && (
                     <span className="ml-2 rounded-sm bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">
                       {newRequests}
@@ -219,24 +220,24 @@ function App() {
           <button
             type="button"
             onClick={() => setPrivate(!privateMode)}
-            title="Hide client names and prices while streaming (Ctrl+Shift+P)"
+            title={t("Hide client names and prices while streaming (Ctrl+Shift+P)")}
             className={`mt-auto flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm font-bold transition ${
               privateMode
                 ? "border-amber-400 bg-amber-100 text-amber-900"
                 : "border-line bg-surface text-muted hover:border-ink hover:text-ink"
             }`}
           >
-            {privateMode ? "● Private mode on" : "Private mode"}
+            {privateMode ? t("● Private mode on") : t("Private mode")}
             <span className="text-[11px] font-semibold opacity-70">Ctrl+Shift+P</span>
           </button>
 
           <div className="mt-3 rounded-3xl border border-line bg-surface p-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-              Current theme
+              {t("Current theme")}
             </p>
             <p className="mt-2 text-sm font-bold">Zebra Light</p>
             <p className="mt-1 text-xs leading-relaxed text-muted">
-              A soft workspace for tracking commissions, clients and deadlines.
+              {t("A soft workspace for tracking commissions, clients and deadlines.")}
             </p>
           </div>
         </aside>

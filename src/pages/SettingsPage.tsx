@@ -18,6 +18,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { cleanUpOrphanedImages, getStorageStats, type StorageStats } from "../lib/images";
 import ConfirmModal from "../components/ConfirmModal";
+import { getLanguage, setLanguage, t, type Language } from "../lib/i18n";
 import PaypalImport, { pickPaypalFile, type PaypalPreview } from "../components/PaypalImport";
 
 function formatBytes(bytes: number): string {
@@ -63,11 +64,11 @@ function SettingsPage() {
       const path = await exportCsv(kind);
 
       if (path) {
-        setExportMessage(`Saved to: ${path}`);
+        setExportMessage(t("Saved to: {path}", { path }));
       }
     } catch (error) {
       console.error(error);
-      setExportMessage(`Could not export: ${error}`);
+      setExportMessage(t("Could not export: {error}", { error: String(error) }));
     } finally {
       setExportingKind(null);
     }
@@ -83,7 +84,7 @@ function SettingsPage() {
 
   async function handleToggleAuto(enabled: boolean) {
     // Sin carpeta no hay dónde copiar: se pide al activarla
-    const folder = auto.auto_backup_folder ?? (enabled ? await pickFolder("Choose a folder for automatic backups") : null);
+    const folder = auto.auto_backup_folder ?? (enabled ? await pickFolder(t("Choose a folder for automatic backups")) : null);
 
     if (enabled && !folder) {
       return;
@@ -97,11 +98,11 @@ function SettingsPage() {
       setAutoRunning(true);
       setAutoMessage(null);
       const path = await runAutoBackup(true);
-      setAutoMessage(`Backup saved to: ${path}`);
+      setAutoMessage(t("Backup saved to: {path}", { path: path ?? "" }));
       setAuto({ ...appSettings() });
     } catch (error) {
       console.error(error);
-      setAutoMessage(`Could not back up: ${error}`);
+      setAutoMessage(t("Could not back up: {error}", { error: String(error) }));
     } finally {
       setAutoRunning(false);
     }
@@ -148,11 +149,11 @@ function SettingsPage() {
       const backupPath = await exportBackup();
 
       if (backupPath) {
-        setBackupMessage(`Backup saved to: ${backupPath}`);
+        setBackupMessage(t("Backup saved to: {path}", { path: backupPath }));
       }
     } catch (error) {
       console.error(error);
-      setBackupMessage("Could not create backup. Please try again.");
+      setBackupMessage(t("Could not create backup. Please try again."));
     } finally {
       setExporting(false);
     }
@@ -171,7 +172,7 @@ function SettingsPage() {
         await backupBeforeCleanup();
       } catch (error) {
         console.error(error);
-        setCleanUpMessage(`Could not back up first, so nothing was deleted: ${error}`);
+        setCleanUpMessage(t("Could not back up first, so nothing was deleted: {error}", { error: String(error) }));
         return;
       }
 
@@ -184,12 +185,12 @@ function SettingsPage() {
 
       setCleanUpMessage(
         deletedCount === 0
-          ? "No unused images found."
-          : `Deleted ${deletedCount} unused file${deletedCount === 1 ? "" : "s"} · freed ${formatBytes(freedBytes)}.`,
+          ? t("No unused images found.")
+          : t(deletedCount === 1 ? "Deleted {n} unused file · freed {size}." : "Deleted {n} unused files · freed {size}.", { n: deletedCount, size: formatBytes(freedBytes) }),
       );
     } catch (error) {
       console.error(error);
-      setCleanUpMessage("Could not clean up images. Please try again.");
+      setCleanUpMessage(t("Could not clean up images. Please try again."));
     } finally {
       setCleaningUp(false);
       loadStorage().catch(console.error);
@@ -215,18 +216,18 @@ function SettingsPage() {
 
       <section className="h-[calc(100vh-117px)] overflow-y-auto p-5 pb-10">
         <div className="mx-auto max-w-2xl">
-          <h3 className={section}>Appearance</h3>
+          <h3 className={section}>{t("Appearance")}</h3>
           <div className={panel}>
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">Theme</p>
-                <p className="text-sm text-muted">Light, dark, or follow your Windows setting.</p>
+                <p className="font-semibold">{t("Theme")}</p>
+                <p className="text-sm text-muted">{t("Light, dark, or follow your Windows setting.")}</p>
               </div>
               <Segmented<ThemeChoice>
                 options={[
-                  { value: "light", label: "Light" },
-                  { value: "dark", label: "Dark" },
-                  { value: "system", label: "System" },
+                  { value: "light", label: t("Light") },
+                  { value: "dark", label: t("Dark") },
+                  { value: "system", label: t("System") },
                 ]}
                 value={theme}
                 onChange={(option) => {
@@ -235,14 +236,29 @@ function SettingsPage() {
                 }}
               />
             </div>
+
+            <div className={row}>
+              <div className="flex-1">
+                <p className="font-semibold">{t("Language")}</p>
+                <p className="text-sm text-muted">{t("The app reloads when you change it.")}</p>
+              </div>
+              <Segmented<Language>
+                options={[
+                  { value: "en", label: "English" },
+                  { value: "es", label: "Español" },
+                ]}
+                value={getLanguage()}
+                onChange={setLanguage}
+              />
+            </div>
           </div>
 
-          <h3 className={section}>Pricing</h3>
+          <h3 className={section}>{t("Pricing")}</h3>
           <div className={panel}>
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">Default currency</p>
-                <p className="text-sm text-muted">New commissions start with this one.</p>
+                <p className="font-semibold">{t("Default currency")}</p>
+                <p className="text-sm text-muted">{t("New commissions start with this one.")}</p>
               </div>
               <Segmented
                 options={["EUR", "USD", "GBP"].map((code) => ({ value: code, label: code }))}
@@ -256,10 +272,9 @@ function SettingsPage() {
 
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">Extra character</p>
+                <p className="font-semibold">{t("Extra character")}</p>
                 <p className="text-sm text-muted">
-                  Added to the base price for each character after the first. Commissions you already
-                  created keep their price.
+                  {t("Added to the base price for each character after the first. Commissions you already created keep their price.")}
                 </p>
               </div>
               <label className="flex items-center gap-1 text-sm font-semibold">
@@ -280,9 +295,9 @@ function SettingsPage() {
             </div>
 
             <div className="px-5 py-4">
-              <p className="font-semibold">Payment platforms</p>
+              <p className="font-semibold">{t("Payment platforms")}</p>
               <p className="text-sm text-muted">
-                Their fees, so "received" fills itself when you log a payment. Use your real rates.
+                {t("Their fees, so \"received\" fills itself when you log a payment. Use your real rates.")}
               </p>
 
               {platforms.length > 0 && (
@@ -320,7 +335,7 @@ function SettingsPage() {
                       </span>
                       <button
                         type="button"
-                        title="Remove platform"
+                        title={t("Remove platform")}
                         onClick={() => {
                           const next = platforms.filter((_, i) => i !== index);
                           setPlatforms(next);
@@ -340,19 +355,18 @@ function SettingsPage() {
                 onClick={() => setPlatforms([...platforms, { name: "", percent: 0, fixed: 0 }])}
                 className="mt-3 text-sm font-semibold text-muted transition hover:text-ink"
               >
-                + Add platform
+                {t("+ Add platform")}
               </button>
             </div>
           </div>
 
-          <h3 className={section}>Delivery</h3>
+          <h3 className={section}>{t("Delivery")}</h3>
           <div className={panel}>
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">Promised delivery time</p>
+                <p className="font-semibold">{t("Promised delivery time")}</p>
                 <p className="text-sm text-muted">
-                  The longest you tell clients it can take. A commission without a deadline counts from the day you
-                  accept it.
+                  {t("The longest you tell clients it can take. A commission without a deadline counts from the day you accept it.")}
                 </p>
               </div>
               <label className="flex items-center gap-1.5 text-sm font-semibold">
@@ -363,15 +377,15 @@ function SettingsPage() {
                   onChange={(event) => saveAuto({ promise_max_days: positive(event.target.value) }).catch(console.error)}
                   className={numberField}
                 />
-                days
+                {t("days")}
               </label>
             </div>
 
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">Delivery reminders</p>
+                <p className="font-semibold">{t("Delivery reminders")}</p>
                 <p className="text-sm text-muted">
-                  A Windows notification {auto.reminder_days_before} days before and on the day, while ZeeBoard is open.
+                  {t("A Windows notification {days} days before and on the day, while ZeeBoard is open.", { days: auto.reminder_days_before })}
                 </p>
               </div>
               {auto.reminders_enabled && (
@@ -385,13 +399,13 @@ function SettingsPage() {
                     }
                     className={numberField}
                   />
-                  days before
+                  {t("days before")}
                 </label>
               )}
               <Segmented
                 options={[
-                  { value: "off", label: "Off" },
-                  { value: "on", label: "On" },
+                  { value: "off", label: t("Off") },
+                  { value: "on", label: t("On") },
                 ]}
                 value={auto.reminders_enabled ? "on" : "off"}
                 onChange={(value) => saveAuto({ reminders_enabled: value === "on" }).catch(console.error)}
@@ -400,9 +414,9 @@ function SettingsPage() {
 
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">Stalled commissions</p>
+                <p className="font-semibold">{t("Stalled commissions")}</p>
                 <p className="text-sm text-muted">
-                  Warns you when a commission has had no new image, correction, payment or stage change for a while.
+                  {t("Warns you when a commission has had no new image, correction, payment or stage change for a while.")}
                 </p>
               </div>
               {auto.stalled_enabled && (
@@ -414,13 +428,13 @@ function SettingsPage() {
                     onChange={(event) => saveAuto({ stalled_days: positive(event.target.value) }).catch(console.error)}
                     className={numberField}
                   />
-                  days
+                  {t("days")}
                 </label>
               )}
               <Segmented
                 options={[
-                  { value: "off", label: "Off" },
-                  { value: "on", label: "On" },
+                  { value: "off", label: t("Off") },
+                  { value: "on", label: t("On") },
                 ]}
                 value={auto.stalled_enabled ? "on" : "off"}
                 onChange={(value) => saveAuto({ stalled_enabled: value === "on" }).catch(console.error)}
@@ -428,13 +442,13 @@ function SettingsPage() {
             </div>
           </div>
 
-          <h3 className={section}>Backups</h3>
+          <h3 className={section}>{t("Backups")}</h3>
           <div className={panel}>
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">Back up your data</p>
+                <p className="font-semibold">{t("Back up your data")}</p>
                 <p className="text-sm text-muted">
-                  Database and images, to any folder. Restoring saves a copy of your current data first.
+                  {t("Database and images, to any folder. Restoring saves a copy of your current data first.")}
                 </p>
                 {backupMessage && <p className="mt-1 text-xs text-muted">{backupMessage}</p>}
               </div>
@@ -444,7 +458,7 @@ function SettingsPage() {
                 disabled={exporting}
                 className="rounded-md bg-primary px-3 py-1.5 text-sm font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-60"
               >
-                {exporting ? "Exporting…" : "Export"}
+                {exporting ? t("Exporting…") : t("Export")}
               </button>
               <button
                 type="button"
@@ -452,22 +466,22 @@ function SettingsPage() {
                 disabled={restoring}
                 className={ghostButton}
               >
-                {restoring ? "Restoring…" : "Restore…"}
+                {restoring ? t("Restoring…") : t("Restore…")}
               </button>
             </div>
 
             <div className="px-5 py-4">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <p className="font-semibold">Automatic backups</p>
+                  <p className="font-semibold">{t("Automatic backups")}</p>
                   <p className="text-sm text-muted">
-                    A copy the first time you open ZeeBoard each day. Older copies are removed automatically.
+                    {t("A copy the first time you open ZeeBoard each day. Older copies are removed automatically.")}
                   </p>
                 </div>
                 <Segmented
                   options={[
-                    { value: "off", label: "Off" },
-                    { value: "on", label: "On" },
+                    { value: "off", label: t("Off") },
+                    { value: "on", label: t("On") },
                   ]}
                   value={auto.auto_backup_enabled ? "on" : "off"}
                   onChange={(value) => handleToggleAuto(value === "on").catch(console.error)}
@@ -477,24 +491,24 @@ function SettingsPage() {
               {auto.auto_backup_folder && (
                 <div className="mt-3 space-y-2 text-sm">
                   <div className="flex items-center gap-2">
-                    <span className="text-muted">Folder</span>
+                    <span className="text-muted">{t("Folder")}</span>
                     <span className="min-w-0 flex-1 truncate font-semibold" title={auto.auto_backup_folder}>
                       {auto.auto_backup_folder}
                     </span>
                     <button
                       type="button"
                       onClick={async () => {
-                        const folder = await pickFolder("Choose a folder for automatic backups");
+                        const folder = await pickFolder(t("Choose a folder for automatic backups"));
                         if (folder) await saveAuto({ auto_backup_folder: folder });
                       }}
                       className={ghostButton}
                     >
-                      Change…
+                      {t("Change…")}
                     </button>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-muted">Keep the last</span>
+                    <span className="text-muted">{t("Keep the last")}</span>
                     <input
                       type="number"
                       min={1}
@@ -506,15 +520,15 @@ function SettingsPage() {
                       }
                       className="w-16 rounded-md border border-line-strong bg-paper px-2 py-1 text-right font-bold outline-none focus:border-ink"
                     />
-                    <span className="text-muted">copies</span>
+                    <span className="text-muted">{t("copies")}</span>
 
                     <span className="ml-auto text-xs text-faint">
                       {auto.last_auto_backup
-                        ? `Last backup: ${new Date(auto.last_auto_backup).toLocaleString()}`
-                        : "No automatic backup yet"}
+                        ? t("Last backup: {date}", { date: new Date(auto.last_auto_backup).toLocaleString() })
+                        : t("No automatic backup yet")}
                     </span>
                     <button type="button" onClick={handleBackUpNow} disabled={autoRunning} className={ghostButton}>
-                      {autoRunning ? "Backing up…" : "Back up now"}
+                      {autoRunning ? t("Backing up…") : t("Back up now")}
                     </button>
                   </div>
 
@@ -524,26 +538,25 @@ function SettingsPage() {
             </div>
           </div>
 
-          <h3 className={section}>Import payments</h3>
+          <h3 className={section}>{t("Import payments")}</h3>
           <div className={panel}>
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">PayPal activity (CSV)</p>
+                <p className="font-semibold">{t("PayPal activity (CSV)")}</p>
                 <p className="text-sm text-muted">
-                  Matches each payment with a client by their email and adds it to their commission, with what you
-                  actually received. Payments already imported are skipped.
+                  {t("Matches each payment with a client by their email and adds it to their commission, with what you actually received. Payments already imported are skipped.")}
                 </p>
                 <p className="mt-1 text-sm font-semibold">
-                  {lastImport ? `Last imported payment: ${lastImport}. Download from ${downloadFrom}.` : "Nothing imported yet."}
+                  {lastImport ? t("Last imported payment: {last}. Download from {from}.", { last: lastImport, from: downloadFrom ?? "" }) : t("Nothing imported yet.")}
                 </p>
               </div>
               <button type="button" onClick={handleImportPaypal} className={ghostButton}>
-                Choose CSV
+                {t("Choose CSV")}
               </button>
             </div>
           </div>
 
-          <h3 className={section}>Export data</h3>
+          <h3 className={section}>{t("Export data")}</h3>
           <div className={panel}>
             {(
               [
@@ -558,27 +571,26 @@ function SettingsPage() {
             ).map(([kind, title, description]) => (
               <div key={kind} className={row}>
                 <div className="flex-1">
-                  <p className="font-semibold">{title}</p>
-                  <p className="text-sm text-muted">{description}</p>
+                  <p className="font-semibold">{t(title)}</p>
+                  <p className="text-sm text-muted">{t(description)}</p>
                 </div>
                 <button type="button" onClick={() => handleExport(kind)} disabled={exportingKind !== null} className={ghostButton}>
-                  {exportingKind === kind ? "Exporting…" : "Export CSV"}
+                  {exportingKind === kind ? t("Exporting…") : t("Export CSV")}
                 </button>
               </div>
             ))}
 
             <p className="px-5 py-3 text-xs text-muted">
-              Opens in Excel and Google Sheets (semicolon-separated, decimal comma). Exports always contain the real
-              names and prices, even in private mode.
+              {t("Opens in Excel and Google Sheets (semicolon-separated, decimal comma). Exports always contain the real names and prices, even in private mode.")}
               {exportMessage && <span className="mt-1 block">{exportMessage}</span>}
             </p>
           </div>
 
-          <h3 className={section}>Storage</h3>
+          <h3 className={section}>{t("Storage")}</h3>
           <div className={panel}>
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">{storage ? `${formatBytes(totalBytes)} used` : "Storage"}</p>
+                <p className="font-semibold">{storage ? t("{size} used", { size: formatBytes(totalBytes) }) : t("Storage")}</p>
                 {storage && (
                   <>
                     <div className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-sm bg-paper">
@@ -587,8 +599,13 @@ function SettingsPage() {
                       <span className="bg-line-strong" style={{ width: share(storage.databaseBytes) }} />
                     </div>
                     <p className="mt-1.5 text-xs text-muted">
-                      Images {formatBytes(storage.imagesBytes)} ({imagesInUse} in use · {storage.imageCount} files) ·
-                      Thumbnails {formatBytes(storage.thumbsBytes)} · Database {formatBytes(storage.databaseBytes)}
+                      {t("Images {images} ({used} in use · {count} files) · Thumbnails {thumbs} · Database {database}", {
+                        images: formatBytes(storage.imagesBytes),
+                        used: imagesInUse,
+                        count: storage.imageCount,
+                        thumbs: formatBytes(storage.thumbsBytes),
+                        database: formatBytes(storage.databaseBytes),
+                      })}
                     </p>
                   </>
                 )}
@@ -598,14 +615,14 @@ function SettingsPage() {
                 onClick={async () => revealItemInDir(await join(await appDataDir(), "zeeboard.db"))}
                 className={ghostButton}
               >
-                Open folder
+                {t("Open folder")}
               </button>
             </div>
 
             <div className={row}>
               <div className="flex-1">
-                <p className="font-semibold">Unused images</p>
-                <p className="text-sm text-muted">Files that no commission or character uses anymore.</p>
+                <p className="font-semibold">{t("Unused images")}</p>
+                <p className="text-sm text-muted">{t("Files that no commission or character uses anymore.")}</p>
                 {cleanUpMessage && <p className="mt-1 text-xs text-muted">{cleanUpMessage}</p>}
               </div>
               <button
@@ -614,7 +631,7 @@ function SettingsPage() {
                 disabled={cleaningUp}
                 className={ghostButton}
               >
-                {cleaningUp ? "Cleaning up…" : "Clean up"}
+                {cleaningUp ? t("Cleaning up…") : t("Clean up")}
               </button>
             </div>
           </div>
@@ -628,10 +645,10 @@ function SettingsPage() {
           eyebrow="Replace your data"
           eyebrowTone="danger"
           title="Restore this backup?"
-          message={`Your current commissions, clients and settings will be replaced by the ones in:
-${restoreFolder}
-
-A copy of your current data is saved first (in the app folder, "before-restore"), and no images are deleted. The app reloads when it's done.`}
+          message={t(
+            "Your current commissions, clients and settings will be replaced by the ones in:\n{folder}\n\nA copy of your current data is saved first (in the app folder, \"before-restore\"), and no images are deleted. The app reloads when it's done.",
+            { folder: restoreFolder },
+          )}
           confirmLabel="Restore backup"
           onConfirm={async () => {
             setRestoring(true);
@@ -639,7 +656,7 @@ A copy of your current data is saved first (in the app folder, "before-restore")
               await restoreBackup(restoreFolder);
             } catch (error) {
               console.error(error);
-              setBackupMessage(`Could not restore: ${error}`);
+              setBackupMessage(t("Could not restore: {error}", { error: String(error) }));
               setRestoreFolder(null);
               setRestoring(false);
             }

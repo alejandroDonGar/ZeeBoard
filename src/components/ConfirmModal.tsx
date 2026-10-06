@@ -1,3 +1,5 @@
+import { t } from "../lib/i18n";
+
 function ConfirmModal({
   eyebrow,
   eyebrowTone = "neutral",
@@ -33,15 +35,15 @@ function ConfirmModal({
               : "text-xs font-bold uppercase tracking-[0.2em] text-faint"
           }
         >
-          {eyebrow}
+          {t(eyebrow)}
         </p>
 
         <h3 className="mt-2 text-2xl font-black text-ink">
-          {title}
+          {t(title)}
         </h3>
 
         <p className="mt-4 whitespace-pre-line text-sm text-muted">
-          {message}
+          {t(message)}
         </p>
 
         <div className="mt-6 flex justify-end gap-3">
@@ -50,7 +52,7 @@ function ConfirmModal({
               onClick={onCancel}
               className="rounded-2xl border border-line-strong px-4 py-2 font-semibold"
             >
-              {cancelLabel}
+              {t(cancelLabel)}
             </button>
           )}
 
@@ -63,7 +65,7 @@ function ConfirmModal({
                 : "rounded-2xl bg-primary px-4 py-2 font-bold text-on-primary disabled:cursor-not-allowed disabled:opacity-70"
             }
           >
-            {isConfirming && confirmingLabel ? confirmingLabel : confirmLabel}
+            {t(isConfirming && confirmingLabel ? confirmingLabel : confirmLabel)}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { t } from "../lib/i18n";
 
 type ToastType = "success" | "error";
 
@@ -20,7 +21,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const showToast = useCallback((message: string, type: ToastType = "success") => {
     setToastType(type);
-    setToastMessage(message);
+    setToastMessage(t(message));
 
     setTimeout(() => {
       setToastMessage("");

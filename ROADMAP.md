@@ -74,6 +74,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [x] Etiquetas automáticas al aceptar una solicitud (tipo y número de personajes)
 - [x] Etiquetas automáticas también en el formulario de nueva comisión
 - [x] Aviso en Ajustes del último cobro de PayPal importado y desde qué fecha descargar
+- [ ] Idioma ES/EN: base, menú y Ajustes hechos; faltan el resto de pantallas
 - [x] Contador de revisiones incluidas (correcciones por etapa)
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real

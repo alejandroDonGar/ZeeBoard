@@ -65,10 +65,23 @@ export type AppSettings = {
   default_currency: string;
   /** 0.5 = cada personaje extra suma el 50 % del precio base */
   extra_character_rate: number;
+  auto_backup_enabled: boolean;
+  auto_backup_folder: string | null;
+  /** Cuántas copias automáticas se conservan */
+  auto_backup_keep: number;
+  /** Cuándo se hizo la última copia automática (ISO) */
+  last_auto_backup: string | null;
 };
 
 // Se cargan una vez al arrancar para poder leerlos sin await desde cualquier pantalla
-let settings: AppSettings = { default_currency: "EUR", extra_character_rate: 0.5 };
+let settings: AppSettings = {
+  default_currency: "EUR",
+  extra_character_rate: 0.5,
+  auto_backup_enabled: false,
+  auto_backup_folder: null,
+  auto_backup_keep: 7,
+  last_auto_backup: null,
+};
 
 export function appSettings(): AppSettings {
   return settings;
@@ -76,12 +89,13 @@ export function appSettings(): AppSettings {
 
 async function loadSettings(): Promise<void> {
   const database = await getDatabase();
-  const rows = await database.select<AppSettings[]>(
-    `SELECT default_currency, extra_character_rate FROM settings WHERE id = 1;`,
+  const rows = await database.select<(Omit<AppSettings, "auto_backup_enabled"> & { auto_backup_enabled: number })[]>(
+    `SELECT default_currency, extra_character_rate, auto_backup_enabled, auto_backup_folder, auto_backup_keep, last_auto_backup
+     FROM settings WHERE id = 1;`,
   );
 
   if (rows[0]) {
-    settings = rows[0];
+    settings = { ...rows[0], auto_backup_enabled: Boolean(rows[0].auto_backup_enabled) };
   }
 }
 
@@ -90,8 +104,16 @@ export async function updateSettings(changes: Partial<AppSettings>): Promise<voi
   const next = { ...settings, ...changes };
 
   await database.execute(
-    `UPDATE settings SET default_currency = ?, extra_character_rate = ? WHERE id = 1;`,
-    [next.default_currency, next.extra_character_rate],
+    `UPDATE settings SET default_currency = ?, extra_character_rate = ?, auto_backup_enabled = ?,
+       auto_backup_folder = ?, auto_backup_keep = ?, last_auto_backup = ? WHERE id = 1;`,
+    [
+      next.default_currency,
+      next.extra_character_rate,
+      next.auto_backup_enabled ? 1 : 0,
+      next.auto_backup_folder,
+      next.auto_backup_keep,
+      next.last_auto_backup,
+    ],
   );
   settings = next;
 }
@@ -108,6 +130,10 @@ export async function initializeDatabase() {
   `);
   await database.execute(`ALTER TABLE settings ADD COLUMN default_currency TEXT NOT NULL DEFAULT 'EUR';`).catch(() => {});
   await database.execute(`ALTER TABLE settings ADD COLUMN extra_character_rate REAL NOT NULL DEFAULT 0.5;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN auto_backup_enabled INTEGER NOT NULL DEFAULT 0;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN auto_backup_folder TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN auto_backup_keep INTEGER NOT NULL DEFAULT 7;`).catch(() => {});
+  await database.execute(`ALTER TABLE settings ADD COLUMN last_auto_backup TEXT;`).catch(() => {});
   await database.execute(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
   await loadSettings();
 

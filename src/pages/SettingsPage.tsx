@@ -1,7 +1,7 @@
 import PageHeader from "../components/PageHeader";
 import { Segmented } from "../components/BoardFilters";
 import { useEffect, useState } from "react";
-import { exportBackup, pickBackupFolder, restoreBackup } from "../lib/backup";
+import { backupBeforeCleanup, exportBackup, pickBackupFolder, pickFolder, restoreBackup, runAutoBackup } from "../lib/backup";
 import { applyTheme, getTheme, type ThemeChoice } from "../lib/theme";
 import {
   appSettings,
@@ -30,6 +30,40 @@ function SettingsPage() {
   const [currency, setCurrency] = useState(appSettings().default_currency);
   const [ratePercent, setRatePercent] = useState(String(Math.round(appSettings().extra_character_rate * 100)));
   const [platforms, setPlatforms] = useState<Omit<PaymentPlatform, "id">[]>([]);
+  const [auto, setAuto] = useState(appSettings());
+  const [autoMessage, setAutoMessage] = useState<string | null>(null);
+  const [autoRunning, setAutoRunning] = useState(false);
+
+  async function saveAuto(changes: Parameters<typeof updateSettings>[0]) {
+    await updateSettings(changes);
+    setAuto({ ...appSettings() });
+  }
+
+  async function handleToggleAuto(enabled: boolean) {
+    // Sin carpeta no hay dónde copiar: se pide al activarla
+    const folder = auto.auto_backup_folder ?? (enabled ? await pickFolder("Choose a folder for automatic backups") : null);
+
+    if (enabled && !folder) {
+      return;
+    }
+
+    await saveAuto({ auto_backup_enabled: enabled, auto_backup_folder: folder });
+  }
+
+  async function handleBackUpNow() {
+    try {
+      setAutoRunning(true);
+      setAutoMessage(null);
+      const path = await runAutoBackup(true);
+      setAutoMessage(`Backup saved to: ${path}`);
+      setAuto({ ...appSettings() });
+    } catch (error) {
+      console.error(error);
+      setAutoMessage(`Could not back up: ${error}`);
+    } finally {
+      setAutoRunning(false);
+    }
+  }
 
   useEffect(() => {
     getPaymentPlatforms().then(setPlatforms).catch(console.error);
@@ -89,6 +123,15 @@ function SettingsPage() {
     try {
       setCleaningUp(true);
       setCleanUpMessage(null);
+
+      // Si la copia previa falla no se borra nada
+      try {
+        await backupBeforeCleanup();
+      } catch (error) {
+        console.error(error);
+        setCleanUpMessage(`Could not back up first, so nothing was deleted: ${error}`);
+        return;
+      }
 
       const before = await getStorageStats();
       const usedPaths = await getAllUsedImagePaths();
@@ -283,6 +326,73 @@ function SettingsPage() {
                 {restoring ? "Restoring…" : "Restore…"}
               </button>
             </div>
+
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="font-semibold">Automatic backups</p>
+                  <p className="text-sm text-muted">
+                    A copy the first time you open ZeeBoard each day. Older copies are removed automatically.
+                  </p>
+                </div>
+                <Segmented
+                  options={[
+                    { value: "off", label: "Off" },
+                    { value: "on", label: "On" },
+                  ]}
+                  value={auto.auto_backup_enabled ? "on" : "off"}
+                  onChange={(value) => handleToggleAuto(value === "on").catch(console.error)}
+                />
+              </div>
+
+              {auto.auto_backup_folder && (
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted">Folder</span>
+                    <span className="min-w-0 flex-1 truncate font-semibold" title={auto.auto_backup_folder}>
+                      {auto.auto_backup_folder}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const folder = await pickFolder("Choose a folder for automatic backups");
+                        if (folder) await saveAuto({ auto_backup_folder: folder });
+                      }}
+                      className={ghostButton}
+                    >
+                      Change…
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted">Keep the last</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={auto.auto_backup_keep}
+                      onChange={(event) =>
+                        saveAuto({ auto_backup_keep: Math.max(1, Math.round(Number(event.target.value)) || 1) }).catch(
+                          console.error,
+                        )
+                      }
+                      className="w-16 rounded-md border border-line-strong bg-paper px-2 py-1 text-right font-bold outline-none focus:border-ink"
+                    />
+                    <span className="text-muted">copies</span>
+
+                    <span className="ml-auto text-xs text-faint">
+                      {auto.last_auto_backup
+                        ? `Last backup: ${new Date(auto.last_auto_backup).toLocaleString()}`
+                        : "No automatic backup yet"}
+                    </span>
+                    <button type="button" onClick={handleBackUpNow} disabled={autoRunning} className={ghostButton}>
+                      {autoRunning ? "Backing up…" : "Back up now"}
+                    </button>
+                  </div>
+
+                  {autoMessage && <p className="text-xs text-muted">{autoMessage}</p>}
+                </div>
+              )}
+            </div>
           </div>
 
           <h3 className={section}>Storage</h3>
@@ -362,7 +472,7 @@ A copy of your current data is saved first (in the app folder, "before-restore")
           eyebrow="Permanent action"
           eyebrowTone="danger"
           title="Clean up unused images"
-          message="This permanently deletes image files that are no longer linked to any commission or character. This cannot be undone. We recommend exporting a backup first."
+          message="This permanently deletes image files that are no longer linked to any commission or character. A full backup is saved first (in the app folder, 'before-cleanup', keeping the last 2), so you can restore from it if something was needed."
           confirmLabel="Delete unused images"
           onConfirm={() => {
             setShowCleanUpConfirmModal(false);

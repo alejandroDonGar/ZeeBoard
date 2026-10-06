@@ -1,44 +1,9 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import {
-  mkdir,
-  copyFile,
-  readDir,
-  exists,
-  BaseDirectory,
-} from "@tauri-apps/plugin-fs";
-import { join } from "@tauri-apps/api/path";
+import { appDataDir, join } from "@tauri-apps/api/path";
 import { invoke } from "@tauri-apps/api/core";
-import { closeDatabase, getDatabase } from "./database";
+import { appSettings, closeDatabase, getDatabase, updateSettings } from "./database";
 
 const DB_FILE_NAME = "zeeboard.db";
-const IMAGES_FOLDER = "images";
-const THUMBS_FOLDER = "images/thumbs";
-
-async function copyFolderFiles(folder: string, destination: string): Promise<void> {
-  const folderExists = await exists(folder, {
-    baseDir: BaseDirectory.AppData,
-  });
-
-  if (!folderExists) {
-    return;
-  }
-
-  await mkdir(destination, { recursive: true });
-
-  const entries = await readDir(folder, {
-    baseDir: BaseDirectory.AppData,
-  });
-
-  for (const entry of entries) {
-    if (entry.isFile) {
-      await copyFile(
-        `${folder}/${entry.name}`,
-        await join(destination, entry.name),
-        { fromPathBaseDir: BaseDirectory.AppData },
-      );
-    }
-  }
-}
 
 function getTimestampFolderName(): string {
   const now = new Date();
@@ -49,37 +14,73 @@ function getTimestampFolderName(): string {
   )}-${pad(now.getHours())}${pad(now.getMinutes())}`;
 }
 
-export async function exportBackup(): Promise<string | null> {
-  const destinationRoot = await open({
-    directory: true,
-    recursive: true,
-    title: "Choose a folder to save the backup",
-  });
+/**
+ * Hace una copia (base de datos + imágenes) en una carpeta con fecha dentro de `root`.
+ * Con `keep`, deja solo las `keep` copias más recientes de `root`.
+ * La base de datos se copia con VACUUM INTO (coherente aunque la app esté escribiendo);
+ * las imágenes y la rotación van en Rust, que no depende de los permisos del selector de carpetas.
+ */
+export async function createBackup(root: string, keep?: number): Promise<string> {
+  const backupPath = await join(root, getTimestampFolderName());
 
-  if (!destinationRoot || Array.isArray(destinationRoot)) {
-    return null;
+  await invoke("prepare_backup", { dir: backupPath });
+
+  try {
+    const database = await getDatabase();
+    await database.execute("VACUUM INTO ?;", [await join(backupPath, DB_FILE_NAME)]);
+  } catch (error) {
+    // finish_backup borra la carpeta a medias cuando falta la base de datos
+    await invoke("finish_backup", { dir: backupPath, keep: null }).catch(() => {});
+    throw error;
   }
 
-  const backupFolderName = getTimestampFolderName();
-  const backupPath = await join(destinationRoot, backupFolderName);
-  const backupImagesPath = await join(backupPath, IMAGES_FOLDER);
-
-  await mkdir(backupPath, { recursive: true });
-  await mkdir(backupImagesPath, { recursive: true });
-
-  // VACUUM INTO escribe una copia coherente aunque la app esté usando la base de datos
-  const database = await getDatabase();
-  await database.execute("VACUUM INTO ?;", [await join(backupPath, DB_FILE_NAME)]);
-
-  await copyFolderFiles(IMAGES_FOLDER, backupImagesPath);
-  await copyFolderFiles(THUMBS_FOLDER, await join(backupImagesPath, "thumbs"));
+  await invoke("finish_backup", { dir: backupPath, keep: keep ?? null });
 
   return backupPath;
 }
-/** Pide la carpeta de un backup hecho con "Export backup". */
-export async function pickBackupFolder(): Promise<string | null> {
-  const folder = await open({ directory: true, title: "Choose the backup folder to restore" });
+
+export async function exportBackup(): Promise<string | null> {
+  const destinationRoot = await pickFolder("Choose a folder to save the backup");
+
+  return destinationRoot ? await createBackup(destinationRoot) : null;
+}
+
+/** Copia automática: la primera vez que se abre la app cada día, si está activada y con carpeta. */
+export async function runAutoBackup(force = false): Promise<string | null> {
+  const settings = appSettings();
+
+  if (!settings.auto_backup_folder) {
+    if (force) throw new Error("Choose a folder for automatic backups first");
+    return null;
+  }
+
+  const doneToday =
+    settings.last_auto_backup !== null &&
+    new Date(settings.last_auto_backup).toDateString() === new Date().toDateString();
+
+  if (!force && (!settings.auto_backup_enabled || doneToday)) {
+    return null;
+  }
+
+  const path = await createBackup(settings.auto_backup_folder, settings.auto_backup_keep);
+  await updateSettings({ last_auto_backup: new Date().toISOString() });
+
+  return path;
+}
+
+/** Antes de borrar imágenes sin usar: copia completa en la carpeta de la app (se guardan las 2 últimas). */
+export async function backupBeforeCleanup(): Promise<void> {
+  await createBackup(await join(await appDataDir(), "before-cleanup"), 2);
+}
+
+export async function pickFolder(title: string): Promise<string | null> {
+  const folder = await open({ directory: true, title });
   return !folder || Array.isArray(folder) ? null : folder;
+}
+
+/** Pide la carpeta de un backup hecho con "Export backup". */
+export function pickBackupFolder(): Promise<string | null> {
+  return pickFolder("Choose the backup folder to restore");
 }
 
 /**

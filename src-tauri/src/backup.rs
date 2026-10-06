@@ -77,6 +77,90 @@ fn restore(backup_dir: &Path, data_dir: &Path, stamp: &str) -> Result<PathBuf, S
     Ok(safety_dir)
 }
 
+const BACKUP_PREFIX: &str = "zeeboard-backup-";
+
+/// Solo se rotan (borran) carpetas con el nombre exacto de las copias de ZeeBoard,
+/// p. ej. `zeeboard-backup-2026-10-06-1318`: nunca otra cosa que haya en esa carpeta.
+fn is_backup_name(name: &str) -> bool {
+    let Some(stamp) = name.strip_prefix(BACKUP_PREFIX) else {
+        return false;
+    };
+
+    stamp.len() == 15
+        && stamp.chars().enumerate().all(|(index, character)| {
+            if matches!(index, 4 | 7 | 10) { character == '-' } else { character.is_ascii_digit() }
+        })
+}
+
+/// Deja solo las `keep` copias más recientes de `root` (los nombres ordenan por fecha).
+fn prune_backups(root: &Path, keep: usize) -> u32 {
+    let Ok(entries) = fs::read_dir(root) else {
+        return 0;
+    };
+
+    let mut backups: Vec<PathBuf> = entries
+        .flatten()
+        // file_type no sigue enlaces simbólicos: un enlace nunca cuenta como carpeta
+        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
+        .filter(|entry| is_backup_name(&entry.file_name().to_string_lossy()))
+        .map(|entry| entry.path())
+        .collect();
+
+    backups.sort();
+    let excess = backups.len().saturating_sub(keep);
+
+    backups.iter().take(excess).filter(|path| fs::remove_dir_all(path).is_ok()).count() as u32
+}
+
+fn discard_backup(dir: &Path) {
+    if dir.file_name().is_some_and(|name| is_backup_name(&name.to_string_lossy())) {
+        let _ = fs::remove_dir_all(dir);
+    }
+}
+
+/// Segunda mitad de una copia: la base de datos ya está en `dir` (la copia SQLite `VACUUM INTO`
+/// la hace el frontend). Añade las imágenes y, si se pide, rota las copias antiguas.
+/// Si algo falla no deja una carpeta a medias que parezca una copia buena.
+fn finish(data_dir: &Path, dir: &Path, keep: Option<usize>) -> Result<u32, String> {
+    if !is_sqlite_file(&dir.join(DB_FILE)) {
+        discard_backup(dir);
+        return Err("The database copy failed, so the backup was discarded".to_string());
+    }
+
+    let images = copy_missing_files(&data_dir.join("images"), &dir.join("images"))
+        .and_then(|_| copy_missing_files(&data_dir.join("images").join("thumbs"), &dir.join("images").join("thumbs")));
+
+    if let Err(error) = images {
+        discard_backup(dir);
+        return Err(error);
+    }
+
+    Ok(match (keep, dir.parent()) {
+        // Con al menos 1, la copia que acaba de hacerse nunca se borra
+        (Some(keep), Some(root)) => prune_backups(root, keep.max(1)),
+        _ => 0,
+    })
+}
+
+/// Primera mitad de una copia: crea la carpeta (y las que falten por encima).
+#[tauri::command]
+pub fn prepare_backup(dir: String) -> Result<(), String> {
+    let dir = Path::new(&dir);
+
+    if dir.exists() {
+        return Err(format!("{} already exists. Wait a minute and try again", dir.display()));
+    }
+
+    fs::create_dir_all(dir).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn finish_backup(app: AppHandle, dir: String, keep: Option<usize>) -> Result<u32, String> {
+    let data_dir = app.path().app_data_dir().map_err(|error| error.to_string())?;
+
+    finish(&data_dir, Path::new(&dir), keep)
+}
+
 #[tauri::command]
 pub fn restore_backup(app: AppHandle, backup_dir: String, stamp: String) -> Result<String, String> {
     let data_dir = app.path().app_data_dir().map_err(|error| error.to_string())?;
@@ -130,5 +214,57 @@ mod tests {
         assert!(restore(&backup, &data, "test").is_err());
         assert_eq!(fs::read(data.join(DB_FILE)).unwrap(), b"SQLite format 3\0current");
         assert!(!data.join("before-restore").exists(), "nothing is touched when the backup is invalid");
+    }
+
+    #[test]
+    fn only_exact_backup_names_are_rotated() {
+        assert!(is_backup_name("zeeboard-backup-2026-10-06-1318"));
+        assert!(!is_backup_name("zeeboard-backup-2026-10-06"));
+        assert!(!is_backup_name("zeeboard-backup-2026-10-06-1318-old"));
+        assert!(!is_backup_name("my-photos"));
+    }
+
+    #[test]
+    fn prune_keeps_the_newest_and_never_touches_other_folders() {
+        let root = temp_dir("prune");
+
+        for name in ["zeeboard-backup-2026-10-01-0900", "zeeboard-backup-2026-10-03-0900", "zeeboard-backup-2026-10-05-0900"] {
+            fs::create_dir_all(root.join(name)).unwrap();
+        }
+        fs::create_dir_all(root.join("my-photos")).unwrap();
+        fs::write(root.join("notes.txt"), b"keep me").unwrap();
+
+        assert_eq!(prune_backups(&root, 2), 1);
+        assert!(!root.join("zeeboard-backup-2026-10-01-0900").exists(), "the oldest goes");
+        assert!(root.join("zeeboard-backup-2026-10-03-0900").exists());
+        assert!(root.join("zeeboard-backup-2026-10-05-0900").exists());
+        assert!(root.join("my-photos").exists() && root.join("notes.txt").exists());
+    }
+
+    #[test]
+    fn finish_adds_images_and_rotates_but_discards_a_backup_without_database() {
+        let data = temp_dir("finish-data");
+        let root = temp_dir("finish-root");
+        fs::create_dir_all(data.join("images/thumbs")).unwrap();
+        fs::write(data.join("images/a.webp"), b"a").unwrap();
+        fs::write(data.join("images/thumbs/a.webp"), b"t").unwrap();
+
+        let old = root.join("zeeboard-backup-2026-10-01-0900");
+        fs::create_dir_all(&old).unwrap();
+
+        let good = root.join("zeeboard-backup-2026-10-06-0900");
+        fs::create_dir_all(&good).unwrap();
+        fs::write(good.join(DB_FILE), b"SQLite format 3 db").unwrap();
+
+        assert_eq!(finish(&data, &good, Some(1)).unwrap(), 1);
+        assert!(good.join("images/a.webp").exists() && good.join("images/thumbs/a.webp").exists());
+        assert!(!old.exists(), "rotated away");
+
+        let broken = root.join("zeeboard-backup-2026-10-07-0900");
+        fs::create_dir_all(&broken).unwrap();
+
+        assert!(finish(&data, &broken, Some(1)).is_err());
+        assert!(!broken.exists(), "a half-made backup is removed");
+        assert!(good.exists(), "and the good one is untouched");
     }
 }

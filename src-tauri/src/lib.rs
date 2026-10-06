@@ -16,6 +16,8 @@ pub fn run() {
             images::cleanup_orphan_images,
             images::storage_stats,
             backup::restore_backup,
+            backup::prepare_backup,
+            backup::finish_backup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

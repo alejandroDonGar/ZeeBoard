@@ -9,7 +9,8 @@ import TemplatesPage from "./pages/TemplatesPage";
 import FinishedPage from "./pages/FinishedPage";
 import SettingsPage from "./pages/SettingsPage";
 import DashboardPage from "./pages/DashboardPage";
-import { ToastProvider } from "./context/ToastContext";
+import { ToastProvider, useToast } from "./context/ToastContext";
+import { runAutoBackup } from "./lib/backup";
 
 type Page = "dashboard" | "commissions" | "clients" | "tags" | "templates" | "finished" | "settings";
 
@@ -33,6 +34,28 @@ const startup = initImageUrls()
   .then(initializeDatabase)
   .then(migratePaymentTags)
   .then(() => migrateLegacyImages((done, total) => reportProgress({ done, total })));
+
+let autoBackupStarted = false;
+
+/** Una vez por arranque, ya con la app a la vista: si toca, hace la copia automática en segundo plano. */
+function AutoBackup() {
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (autoBackupStarted) {
+      return;
+    }
+
+    autoBackupStarted = true;
+
+    runAutoBackup().catch((error) => {
+      console.error(error);
+      showToast(`Automatic backup failed: ${error}. It will try again next time you open ZeeBoard.`, "error");
+    });
+  }, [showToast]);
+
+  return null;
+}
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
@@ -86,6 +109,7 @@ function App() {
 
   return (
     <ToastProvider>
+      <AutoBackup />
       <div className="h-screen overflow-hidden bg-canvas text-ink">
       <div className="flex h-full">
         <aside className="flex w-72 flex-col border-r border-line bg-paper px-5 py-6">

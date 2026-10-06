@@ -1,4 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
+import type { ImportedRequest } from "./formImport";
 import {
   deleteImageFiles,
   importImageFromDataDir,
@@ -200,6 +201,9 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL
     );
   `);
+  // De dónde viene una solicitud importada (para no importarla dos veces) y su correo
+  await database.execute(`ALTER TABLE commission_requests ADD COLUMN external_id TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE commission_requests ADD COLUMN email TEXT;`).catch(() => {});
   // Cuándo cambió una comisión de etapa por última vez: cuenta como movimiento para el aviso de comisión parada
   await database.execute(`ALTER TABLE commissions ADD COLUMN stage_changed_at TEXT;`).catch(() => {});
   await database.execute(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
@@ -1718,13 +1722,16 @@ export type CommissionRequest = {
   /** La comisión creada al aceptarla */
   commission_id: number | null;
   created_at: string;
+  external_id: string | null;
+  email: string | null;
 };
 
 export async function getRequests(): Promise<CommissionRequest[]> {
   const database = await getDatabase();
 
   return await database.select<CommissionRequest[]>(
-    `SELECT id, name, platform, contact, template_id, characters, details, status, commission_id, created_at
+    `SELECT id, name, platform, contact, template_id, characters, details, status, commission_id, created_at,
+       external_id, email
      FROM commission_requests ORDER BY created_at ASC, id ASC;`,
   );
 }
@@ -1772,4 +1779,46 @@ export async function deleteRequest(requestId: number): Promise<void> {
   const database = await getDatabase();
 
   await database.execute(`DELETE FROM commission_requests WHERE id = ?;`, [requestId]);
+}
+
+/** Guarda las solicitudes del formulario que aún no estén (se reconocen por su external_id). */
+export async function importRequests(items: ImportedRequest[]): Promise<{ added: number; skipped: number }> {
+  return await runSerialized(async (database) => {
+    const known = new Set(
+      (await database.select<{ external_id: string | null }[]>(`SELECT external_id FROM commission_requests;`)).map(
+        (row) => row.external_id,
+      ),
+    );
+    let added = 0;
+
+    for (const item of items) {
+      if (known.has(item.externalId)) {
+        continue;
+      }
+
+      await database.execute(
+        `INSERT INTO commission_requests
+           (name, platform, contact, template_id, characters, details, status, created_at, external_id, email)
+         VALUES (?, ?, ?, ?, 1, ?, 'new', ?, ?, ?);`,
+        [item.name, item.platform, item.contact, item.template_id, item.details, item.created_at, item.externalId, item.email],
+      );
+      known.add(item.externalId);
+      added += 1;
+    }
+
+    return { added, skipped: items.length - added };
+  });
+}
+
+export async function setRequestTemplate(requestId: number, templateId: number | null): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE commission_requests SET template_id = ? WHERE id = ?;`, [templateId, requestId]);
+}
+
+/** Guarda el correo del cliente solo si aún no tenía uno. */
+export async function setClientEmail(clientId: number, email: string): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE clients SET email = ? WHERE id = ? AND (email IS NULL OR email = '');`, [email, clientId]);
 }

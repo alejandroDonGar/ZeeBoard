@@ -8,12 +8,16 @@ import {
   getClients,
   getRequests,
   getTemplates,
+  importRequests,
+  setClientEmail,
   setRequestStatus,
+  setRequestTemplate,
   updateSettings,
   type CommissionRequest,
   type Template,
 } from "../lib/database";
 import { calculateCommissionPrice, formatMoney, loadOpenCommissions } from "../lib/commissionHelpers";
+import { normalizeHandle, parseResponses } from "../lib/formImport";
 import { hide } from "../lib/privacy";
 import { Segmented } from "../components/BoardFilters";
 import ConfirmModal from "../components/ConfirmModal";
@@ -84,9 +88,17 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
       setBusy(true);
 
       const clients = await getClients();
-      const existing = clients.find((client) => client.name.trim().toLowerCase() === request.name.trim().toLowerCase());
+      const handle = normalizeHandle(request.contact);
+      // Un cliente que ya tienes: por su usuario (lo más fiable) o, si no, por el nombre
+      const existing =
+        clients.find((client) => handle !== "" && normalizeHandle(client.handle) === handle) ??
+        clients.find((client) => client.name.trim().toLowerCase() === request.name.trim().toLowerCase());
       const platform = existing?.platform || request.platform || "Other";
       const clientId = existing?.id ?? (await createClient(request.name, platform, request.contact ?? "", ""));
+
+      if (request.email) {
+        await setClientEmail(clientId, request.email);
+      }
 
       const template = templates.find((item) => item.id === request.template_id);
       const price =
@@ -114,6 +126,34 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
     } catch (error) {
       console.error(error);
       showToast(`Could not accept: ${error instanceof Error ? error.message : error}`, "error");
+      setBusy(false);
+    }
+  }
+
+  async function handleImport(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    try {
+      setBusy(true);
+      const { requests: parsed, error } = parseResponses(await file.text(), templates);
+
+      if (error) {
+        showToast(error, "error");
+        return;
+      }
+
+      const { added, skipped } = await importRequests(parsed);
+      await load();
+      showToast(
+        added === 0 ? "No new responses: everything in that file was already imported." : `Imported ${added} new ${added === 1 ? "request" : "requests"}${skipped > 0 ? ` (${skipped} already there)` : ""}.`,
+        "success",
+      );
+    } catch (error) {
+      console.error(error);
+      showToast(`Could not import: ${error instanceof Error ? error.message : error}`, "error");
+    } finally {
       setBusy(false);
     }
   }
@@ -165,8 +205,27 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
           </p>
 
           <p className="mt-0.5 text-sm">
-            {template?.name ?? "No type"} · {request.characters} {request.characters === 1 ? "character" : "characters"}
+            {template ? (
+              template.name
+            ) : (
+              <select
+                value=""
+                onChange={(event) =>
+                  run(() => setRequestTemplate(request.id, Number(event.target.value)), "Could not set the type")
+                }
+                className="rounded-md border border-amber-400 bg-amber-100 px-2 py-0.5 text-sm font-semibold text-amber-900"
+              >
+                <option value="">Choose the type…</option>
+                {templates.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            )}{" "}
+            · {request.characters} {request.characters === 1 ? "character" : "characters"}
             {estimate && <span className="text-muted"> · ≈ {estimate}</span>}
+            {request.email && <span className="text-muted"> · {hide(request.email)}</span>}
           </p>
 
           {request.details && <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm text-muted">{request.details}</p>}
@@ -182,7 +241,13 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
 
           {(request.status === "new" || request.status === "waitlist") && (
             <>
-              <button type="button" onClick={() => startAccept(request)} disabled={busy} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50">
+              <button
+                type="button"
+                onClick={() => startAccept(request)}
+                disabled={busy || request.template_id === null}
+                title={request.template_id === null ? "Choose the type first" : undefined}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
+              >
                 Accept
               </button>
               {request.status === "new" && (
@@ -292,7 +357,23 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
           </div>
 
           <div>
-            <h3 className={heading}>New · {waiting.length}</h3>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-[11px] font-black uppercase tracking-[0.16em] text-faint">New · {waiting.length}</h3>
+
+              <label className={`${ghost} cursor-pointer ${busy ? "pointer-events-none opacity-50" : ""}`}>
+                Import responses…
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(event) => {
+                    handleImport(event.target.files?.[0]);
+                    // Permite elegir el mismo archivo otra vez
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
             {waiting.length === 0 ? (
               <p className="rounded-3xl border border-dashed border-line-strong px-5 py-6 text-center text-sm text-faint">
                 No new requests. Add one with "+ New request".

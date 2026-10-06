@@ -76,7 +76,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [ ] Estadísticas
 
 **Flujo de trabajo**
-- [ ] Recordatorios de fechas de entrega
+- [x] Recordatorios de fechas de entrega (también aviso de comisiones paradas)
 - [ ] Lista de espera y plazas abiertas
 - [ ] Mensajes predefinidos para clientes
 - [ ] Marca de agua al exportar WIPs

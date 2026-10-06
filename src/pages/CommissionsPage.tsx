@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
+import BoardFilters from "../components/BoardFilters";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
@@ -101,9 +102,18 @@ function CommissionsPage() {
         (commission.client_name ?? "").toLowerCase().includes(query);
 
     const tags = commissionTagsById[commission.id] ?? [];
-    const matchesTags =
-        filterTagIds.length === 0 ||
-        filterTagIds.every((tagId) => tags.some((tag) => tag.id === tagId));
+    // Dentro de una categoría basta con una etiqueta (Sketch o Full Colour); entre categorías, todas (y Paid)
+    const selectedTagsByCategory = Object.values(
+        allTags
+        .filter((tag) => filterTagIds.includes(tag.id))
+        .reduce<Record<string, number[]>>((groups, tag) => {
+            (groups[tag.category || "General"] ??= []).push(tag.id);
+            return groups;
+        }, {}),
+    );
+    const matchesTags = selectedTagsByCategory.every((tagIds) =>
+        tags.some((tag) => tagIds.includes(tag.id)),
+    );
 
     const isOverdue =
         commission.deadline !== null &&
@@ -117,8 +127,6 @@ function CommissionsPage() {
     return matchesSearch && matchesTags && matchesStatus;
     });
 
-    const hasActiveFilters =
-    searchQuery.trim() !== "" || filterTagIds.length > 0 || filterStatus !== "all";
 
   useEffect(() => {
     getTemplates()
@@ -760,129 +768,32 @@ function CommissionsPage() {
       />
 
       <section className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-5 p-5 pb-6">
-        <div className="h-full min-h-0 rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-black">
-                {activeCommission ? activeCommission.title : "Commission board"}
-              </h3>
+        <div className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
+          {activeCommission && (
+            <div className="mb-5">
+              <h3 className="text-xl font-black">{activeCommission.title}</h3>
 
               <p className="mt-1 text-sm text-muted">
-                {activeCommission
-                  ? `${activeCommission.client_name || "No client"} · ${
-                      activeCommission.platform || "No platform"
-                    }`
-                  : "Start with a template, then move each commission through its own stages."}
+                {`${activeCommission.client_name || "No client"} · ${
+                  activeCommission.platform || "No platform"
+                }`}
               </p>
             </div>
-          </div>
+          )}
 
-          <div className="h-[calc(100%-76px)] min-h-0 overflow-y-auto px-1 pt-2">
+          <div className="min-h-0 flex-1 overflow-y-auto px-1">
             {!activeCommission && commissions.length > 0 && (
-                <div className="mb-4 space-y-3">
-                    <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
-                        <input
-                        value={searchQuery}
-                        onChange={(event) => setSearchQuery(event.target.value)}
-                        placeholder="Search by title or client..."
-                        className="w-full rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm"
-                        />
-                    </div>
+              <BoardFilters
+                tags={allTags}
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+                filterTagIds={filterTagIds}
+                onFilterTagIdsChange={setFilterTagIds}
+                filterStatus={filterStatus}
+                onFilterStatusChange={setFilterStatus}
+              />
+            )}
 
-                    <select
-                        value={filterStatus}
-                        onChange={(event) =>
-                            setFilterStatus(event.target.value as typeof filterStatus)
-                        }
-                        className="rounded-2xl border border-line-strong bg-paper px-4 py-2 text-sm font-semibold"
-                        >
-                        <option value="all">All statuses</option>
-                        <option value="active">Active</option>
-                        <option value="overdue">Overdue</option>
-                    </select>
-
-                    {hasActiveFilters && (
-                        <button
-                        type="button"
-                        onClick={() => {
-                            setSearchQuery("");
-                            setFilterTagIds([]);
-                            setFilterStatus("all");
-                        }}
-                        className="flex items-center gap-1 rounded-2xl bg-primary px-4 py-2 text-xs font-black text-on-primary shadow-sm transition hover:-translate-y-0.5"
-                        >
-                        ✕ Clear filters
-                        </button>
-                    )}
-                    </div>
-
-                    {(() => {
-                    const filterableTags = allTags.filter((tag) => tag.category !== "Characters");
-
-                    const groupedFilterTags = filterableTags.reduce(
-                        (groups, tag) => {
-                        const category = tag.category || "General";
-
-                        if (!groups[category]) {
-                            groups[category] = [];
-                        }
-
-                        groups[category].push(tag);
-
-                        return groups;
-                        },
-                        {} as Record<string, Tag[]>,
-                    );
-
-                    const categories = Object.entries(groupedFilterTags);
-
-                    if (categories.length === 0) {
-                        return null;
-                    }
-
-                    return (
-                        <div className="flex flex-col gap-y-3 rounded-2xl border border-line bg-paper p-3">
-                        {categories.map(([category, categoryTags]) => (
-                            <div key={category} className="grid w-full grid-cols-[110px_1fr] items-center gap-2">
-                                <span className="whitespace-nowrap text-[10px] font-black uppercase tracking-[0.14em] text-faint">
-                                {category}
-                                </span>
-
-                                <div className="flex flex-wrap gap-2">
-                                {categoryTags.map((tag) => {
-                                    const selected = filterTagIds.includes(tag.id);
-
-                                    return (
-                                    <button
-                                        key={tag.id}
-                                        type="button"
-                                        onClick={() => {
-                                        setFilterTagIds((current) =>
-                                            selected
-                                            ? current.filter((id) => id !== tag.id)
-                                            : [...current, tag.id],
-                                        );
-                                        }}
-                                        className={
-                                        selected
-                                            ? "rounded-sm px-3 py-1 text-xs font-black text-white shadow-sm"
-                                            : "rounded-sm border border-line-strong bg-surface px-3 py-1 text-xs font-bold text-muted"
-                                        }
-                                        style={selected ? { backgroundColor: tag.color } : undefined}
-                                    >
-                                        {tag.name}
-                                    </button>
-                                    );
-                                })}
-                                </div>
-                            </div>
-                            ))}
-                        </div>
-                    );
-                    })()}
-                </div>
-                )}
             {activeCommission ? (
               <div className="flex h-full min-h-0 flex-col gap-5">
                 <aside className="shrink-0 rounded-3xl border border-line bg-paper p-5">

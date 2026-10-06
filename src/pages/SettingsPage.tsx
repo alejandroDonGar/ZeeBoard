@@ -3,7 +3,15 @@ import { Segmented } from "../components/BoardFilters";
 import { useEffect, useState } from "react";
 import { exportBackup, pickBackupFolder, restoreBackup } from "../lib/backup";
 import { applyTheme, getTheme, type ThemeChoice } from "../lib/theme";
-import { appSettings, getAllUsedImagePaths, updateSettings } from "../lib/database";
+import {
+  appSettings,
+  getAllUsedImagePaths,
+  getPaymentPlatforms,
+  savePaymentPlatforms,
+  updateSettings,
+  type PaymentPlatform,
+} from "../lib/database";
+import { formatMoney, receivedAfterFees } from "../lib/commissionHelpers";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { cleanUpOrphanedImages, getStorageStats, type StorageStats } from "../lib/images";
@@ -21,6 +29,20 @@ function SettingsPage() {
   const [theme, setTheme] = useState<ThemeChoice>(getTheme);
   const [currency, setCurrency] = useState(appSettings().default_currency);
   const [ratePercent, setRatePercent] = useState(String(Math.round(appSettings().extra_character_rate * 100)));
+  const [platforms, setPlatforms] = useState<Omit<PaymentPlatform, "id">[]>([]);
+
+  useEffect(() => {
+    getPaymentPlatforms().then(setPlatforms).catch(console.error);
+  }, []);
+
+  function updatePlatform(index: number, changes: Partial<Omit<PaymentPlatform, "id">>) {
+    setPlatforms((current) => current.map((item, i) => (i === index ? { ...item, ...changes } : item)));
+  }
+
+  function savePlatforms() {
+    // Se guarda al salir de cada campo; las filas sin nombre no se guardan
+    savePaymentPlatforms(platforms).catch(console.error);
+  }
   const [storage, setStorage] = useState<StorageStats | null>(null);
   const [imagesInUse, setImagesInUse] = useState(0);
 
@@ -166,6 +188,71 @@ function SettingsPage() {
                 />
                 %
               </label>
+            </div>
+
+            <div className="px-5 py-4">
+              <p className="font-semibold">Payment platforms</p>
+              <p className="text-sm text-muted">
+                Their fees, so "received" fills itself when you log a payment. Use your real rates.
+              </p>
+
+              {platforms.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {platforms.map((platform, index) => (
+                    <div key={index} className="flex items-center gap-2 text-sm">
+                      <input
+                        value={platform.name}
+                        onChange={(event) => updatePlatform(index, { name: event.target.value })}
+                        onBlur={savePlatforms}
+                        placeholder="PayPal"
+                        className="min-w-0 flex-1 rounded-md border border-line-strong bg-paper px-2 py-1.5 outline-none focus:border-ink"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={platform.percent}
+                        onChange={(event) => updatePlatform(index, { percent: Number(event.target.value) || 0 })}
+                        onBlur={savePlatforms}
+                        className="w-20 rounded-md border border-line-strong bg-paper px-2 py-1.5 text-right outline-none focus:border-ink"
+                      />
+                      <span className="text-muted">% +</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={platform.fixed}
+                        onChange={(event) => updatePlatform(index, { fixed: Number(event.target.value) || 0 })}
+                        onBlur={savePlatforms}
+                        className="w-20 rounded-md border border-line-strong bg-paper px-2 py-1.5 text-right outline-none focus:border-ink"
+                      />
+                      <span className="w-24 text-xs text-faint">
+                        200 → {formatMoney(receivedAfterFees(200, platform), currency)}
+                      </span>
+                      <button
+                        type="button"
+                        title="Remove platform"
+                        onClick={() => {
+                          const next = platforms.filter((_, i) => i !== index);
+                          setPlatforms(next);
+                          savePaymentPlatforms(next).catch(console.error);
+                        }}
+                        className="px-1 text-faint transition hover:text-red-500"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setPlatforms([...platforms, { name: "", percent: 0, fixed: 0 }])}
+                className="mt-3 text-sm font-semibold text-muted transition hover:text-ink"
+              >
+                + Add platform
+              </button>
             </div>
           </div>
 

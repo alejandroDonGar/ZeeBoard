@@ -1,6 +1,6 @@
 // Comprobación rápida de pagos y precios: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { calculateCommissionPrice, paymentSummary } from "../src/lib/commissionHelpers";
+import { calculateCommissionPrice, paymentSummary, receivedAfterFees } from "../src/lib/commissionHelpers";
 
 // PayPal: el cliente paga 200, te llegan 186,84
 let s = paymentSummary(200, [{ amount: 200, received: 186.84 }]);
@@ -28,3 +28,9 @@ assert.strictEqual(calculateCommissionPrice(99.99, 2, 0.5), 149.99);
 // Tarifa cambiada en Ajustes
 assert.strictEqual(calculateCommissionPrice(160, 2, 0.6), 256);
 console.log("prices ok");
+
+// Tarifa de plataforma: 3,4 % + 0,35 sobre 200 → 192,85; nunca negativo
+assert.strictEqual(receivedAfterFees(200, { percent: 3.4, fixed: 0.35 }), 192.85);
+assert.strictEqual(receivedAfterFees(200, { percent: 0, fixed: 0 }), 200);
+assert.strictEqual(receivedAfterFees(0.2, { percent: 3.4, fixed: 0.35 }), 0);
+console.log("fees ok");

@@ -268,6 +268,16 @@ export async function initializeDatabase() {
     );
   `);
 
+  // Tarifas de PayPal, Ko-fi…: lo recibido se calcula como importe − (importe × % + fijo)
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS payment_platforms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      percent REAL NOT NULL DEFAULT 0,
+      fixed REAL NOT NULL DEFAULT 0
+    );
+  `);
+
   // amount = lo que pagó el cliente; received = lo que te llegó (NULL = aún no lo has apuntado)
   await database.execute(`
     CREATE TABLE IF NOT EXISTS commission_payments (
@@ -1564,4 +1574,36 @@ export async function deleteCorrection(correctionId: number): Promise<void> {
   const database = await getDatabase();
 
   await database.execute(`DELETE FROM commission_corrections WHERE id = ?;`, [correctionId]);
+}
+
+export type PaymentPlatform = {
+  id: number;
+  name: string;
+  /** 3.4 = 3,4 % */
+  percent: number;
+  /** Parte fija por pago, en la moneda del pago */
+  fixed: number;
+};
+
+export async function getPaymentPlatforms(): Promise<PaymentPlatform[]> {
+  const database = await getDatabase();
+
+  return await database.select<PaymentPlatform[]>(
+    `SELECT id, name, percent, fixed FROM payment_platforms ORDER BY id ASC;`,
+  );
+}
+
+/** Se guarda la lista entera: ningún pago apunta a una plataforma por id (usan la nota) */
+export async function savePaymentPlatforms(platforms: Omit<PaymentPlatform, "id">[]): Promise<void> {
+  await runSerialized(async (database) => {
+    await database.execute(`DELETE FROM payment_platforms;`);
+
+    for (const platform of platforms.filter((item) => item.name.trim())) {
+      await database.execute(`INSERT INTO payment_platforms (name, percent, fixed) VALUES (?, ?, ?);`, [
+        platform.name.trim(),
+        platform.percent,
+        platform.fixed,
+      ]);
+    }
+  });
 }

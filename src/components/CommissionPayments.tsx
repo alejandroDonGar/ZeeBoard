@@ -1,15 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   addPayment,
   deletePayment,
   updatePaymentReceived,
+  getPaymentPlatforms,
   type Commission,
+  type PaymentPlatform,
   type CommissionPayment,
 } from "../lib/database";
-import { formatMoney, parsePrice, paymentSummary, PAYMENT_STATUS_STYLE } from "../lib/commissionHelpers";
+import { formatMoney, parsePrice, paymentSummary, receivedAfterFees, PAYMENT_STATUS_STYLE } from "../lib/commissionHelpers";
 import { useToast } from "../context/ToastContext";
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+function parsePriceOrNull(text: string): number | null {
+  try {
+    return parsePrice(text);
+  } catch {
+    return null;
+  }
+}
 const dateFormatter = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
 
 /** Bloque de pagos del detalle: precio, lo pagado, lo recibido y la comisión de la plataforma. */
@@ -31,6 +41,18 @@ function CommissionPayments({
   const [received, setReceived] = useState("");
   const [paidAt, setPaidAt] = useState(today);
   const [note, setNote] = useState("");
+  const [platforms, setPlatforms] = useState<PaymentPlatform[]>([]);
+  const [platformId, setPlatformId] = useState<number | null>(null);
+
+  useEffect(() => {
+    getPaymentPlatforms().then(setPlatforms).catch(console.error);
+  }, []);
+
+  const platform = platforms.find((item) => item.id === platformId) ?? null;
+  // Lo que pagó el cliente (o lo que falta) menos la tarifa de la plataforma elegida
+  const clientPaidDraft = amount === "" ? summary.remaining : parsePriceOrNull(amount);
+  const suggestedReceived =
+    platform && clientPaidDraft ? receivedAfterFees(clientPaidDraft, platform) : null;
   const [open, setOpen] = useState(false);
 
   async function run(action: () => Promise<void>) {
@@ -51,7 +73,8 @@ function CommissionPayments({
         throw new Error("Enter what the client paid");
       }
 
-      await addPayment(commission.id, clientPaid, parsePrice(received), paidAt, note);
+      // Sin "recibido" escrito, se usa el calculado con la tarifa de la plataforma (si hay)
+      await addPayment(commission.id, clientPaid, parsePrice(received) ?? suggestedReceived, paidAt, note);
       setAmount("");
       setReceived("");
       setNote("");
@@ -154,7 +177,8 @@ function CommissionPayments({
               <input
                 value={received}
                 onChange={(event) => setReceived(event.target.value)}
-                placeholder="Later"
+                placeholder={suggestedReceived !== null ? String(suggestedReceived).replace(".", ",") : "Later"}
+                title={platform ? `${platform.name}: ${platform.percent}% + ${platform.fixed}` : undefined}
                 inputMode="decimal"
                 className={field}
               />
@@ -167,12 +191,33 @@ function CommissionPayments({
                 +
               </button>
 
-              <input
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="Note: PayPal, deposit…"
-                className={`${field} col-span-full`}
-              />
+              <div className="col-span-full flex gap-2">
+                {platforms.length > 0 && (
+                  <select
+                    value={platformId ?? ""}
+                    onChange={(event) => {
+                      const next = platforms.find((item) => item.id === Number(event.target.value)) ?? null;
+                      // La nota toma el nombre de la plataforma si estaba vacía o era la anterior
+                      if (note === "" || note === platform?.name) setNote(next?.name ?? "");
+                      setPlatformId(next?.id ?? null);
+                    }}
+                    className={field}
+                  >
+                    <option value="">No fees</option>
+                    {platforms.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  placeholder="Note: PayPal, deposit…"
+                  className={`${field} flex-1`}
+                />
+              </div>
             </div>
             </div>
           </div>

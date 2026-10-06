@@ -144,6 +144,11 @@ export function calculateCommissionPrice(basePrice: number, characterCount: numb
   return round2(basePrice * (1 + extraCharacterRate * extraCharacters));
 }
 
+/** Lo que te llega de un pago tras la tarifa de la plataforma: importe − (importe × % + fijo) */
+export function receivedAfterFees(amount: number, platform: { percent: number; fixed: number }): number {
+  return round2(Math.max(amount - (amount * platform.percent) / 100 - platform.fixed, 0));
+}
+
 /** Lee un precio escrito a mano: acepta "186,84", "186.84" o "200". Vacío = sin precio. */
 export function parsePrice(text: string): number | null {
   const clean = text.trim().replace(/\s/g, "").replace(",", ".");

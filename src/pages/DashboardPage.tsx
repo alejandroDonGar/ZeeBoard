@@ -2,16 +2,18 @@ import { useEffect, useState } from "react";
 import {
   getCommissionCompletionPercentage,
   getDeadlineStatus,
-  getPaymentStatus,
+  paymentSummary,
   isCommissionCompleted as isCommissionCompletedHelper,
   loadStageImagesForCommissions,
   formatMoney,
 } from "../lib/commissionHelpers";
 import {
   getCommissions,
+  getAllPayments,
   getCommissionTags,
   getTemplateStages,
   type Commission,
+  type CommissionPayment,
   type CommissionStageImage,
   type Tag,
   type TemplateStage,
@@ -26,6 +28,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
   const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
   const [templateStagesByTemplateId, setTemplateStagesByTemplateId] = useState<Record<number, TemplateStage[]>>({});
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
+  const [payments, setPayments] = useState<CommissionPayment[]>([]);
 
   useEffect(() => {
     getCommissions()
@@ -46,6 +49,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
         setTemplateStagesByTemplateId(Object.fromEntries(stageEntries));
 
         setStageImagesByCommissionId(await loadStageImagesForCommissions(data));
+        setPayments(await getAllPayments());
       })
       .catch(console.error);
   }, []);
@@ -68,12 +72,24 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
     (commission) => commission.deadline !== null && daysUntil(commission.deadline) <= 7,
   ).length;
 
-  const withStatus = (status: "paid" | "unpaid") =>
-    commissions.filter((commission) => getPaymentStatus(commissionTagsById[commission.id] ?? []) === status);
   const sumPrices = (list: Commission[]) => list.reduce((sum, commission) => sum + (commission.price ?? 0), 0);
 
-  const unpaid = withStatus("unpaid");
-  const paid = withStatus("paid");
+  const summaryOf = (commission: Commission) =>
+    paymentSummary(
+      commission.price,
+      payments.filter((payment) => payment.commission_id === commission.id),
+    );
+
+  // Lo que falta por cobrar: sin pagar y parciales con precio
+  const unpaid = commissions
+    .map((commission) => ({ commission, remaining: summaryOf(commission).remaining }))
+    .filter((entry) => entry.remaining > 0);
+
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const receivedThisMonth = paymentSummary(
+    null,
+    payments.filter((payment) => payment.paid_at.startsWith(thisMonth)),
+  );
 
   const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
   const now = new Date();
@@ -110,11 +126,19 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
     },
     {
       label: "Waiting for payment",
-      value: formatMoney(sumPrices(unpaid)),
-      detail: `${unpaid.length} tagged Not Paid`,
+      value: formatMoney(unpaid.reduce((sum, entry) => sum + entry.remaining, 0)),
+      detail: `${unpaid.length} ${unpaid.length === 1 ? "commission" : "commissions"}`,
       className: unpaid.length > 0 ? "text-red-500" : "text-ink",
     },
-    { label: "Paid", value: formatMoney(sumPrices(paid)), detail: `${paid.length} tagged Paid`, className: "text-green-600" },
+    {
+      label: "Received this month",
+      value: formatMoney(receivedThisMonth.received),
+      detail:
+        receivedThisMonth.pendingReceived > 0
+          ? `${receivedThisMonth.pendingReceived} payments not entered yet`
+          : `${formatMoney(receivedThisMonth.fees)} in platform fees`,
+      className: "text-green-600",
+    },
   ];
 
   const panel = "rounded-3xl border border-line bg-surface p-5 shadow-sm";
@@ -205,7 +229,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
                 <p className="text-sm text-muted">All caught up.</p>
               ) : (
                 <div className="divide-y divide-line">
-                  {unpaid.map((commission) => (
+                  {unpaid.map(({ commission, remaining }) => (
                     <button
                       key={commission.id}
                       type="button"
@@ -214,7 +238,7 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
                     >
                       <span className="truncate">{commission.title}</span>
                       <span className="shrink-0 font-bold">
-                        {commission.price ? formatMoney(commission.price, commission.currency) : "—"}
+                        {formatMoney(remaining, commission.currency)}
                       </span>
                     </button>
                   ))}

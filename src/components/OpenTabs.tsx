@@ -1,10 +1,10 @@
-import type { Client, Commission, Tag } from "../lib/database";
+import type { Client, Commission } from "../lib/database";
+import { PAYMENT_STATUS_STYLE, type PaymentStatus } from "../lib/commissionHelpers";
 
 function OpenTabs({
   openCommissionTabs,
   activeCommissionId,
-  commissionTagsById,
-  getPaymentTag,
+  getPaymentStatus,
   onSelectCommission,
   onCloseCommission,
   onShowAllCommissions,
@@ -12,8 +12,7 @@ function OpenTabs({
 }: {
   openCommissionTabs: Commission[];
   activeCommissionId: number | null;
-  commissionTagsById: Record<number, Tag[]>;
-  getPaymentTag: (tags: Tag[]) => Tag | null;
+  getPaymentStatus: (commission: Commission) => PaymentStatus;
   onSelectCommission: (commissionId: number) => void;
   onCloseCommission: (commissionId: number) => void;
   onShowAllCommissions: () => void;
@@ -43,7 +42,7 @@ function OpenTabs({
           openCommissionTabs.map((commission) => {
             const client = clients.find((client) => client.id === commission.client_id) ?? null;
             const isActive = activeCommissionId === commission.id;
-            const paymentTag = getPaymentTag(commissionTagsById[commission.id] ?? [],);
+            const paymentStatus = PAYMENT_STATUS_STYLE[getPaymentStatus(commission)];
 
             return (
               <div
@@ -68,14 +67,9 @@ function OpenTabs({
                   {commission.client_name || "No client"} · {commission.title}
                 </button>
 
-                {paymentTag && (
-                  <span
-                    className="rounded-sm px-2 py-0.5 text-[10px] font-black text-white"
-                    style={{ backgroundColor: paymentTag.color }}
-                  >
-                    {paymentTag.name}
-                  </span>
-                )}
+                <span className={`rounded-sm px-2 py-0.5 text-[10px] font-bold ${paymentStatus.className}`}>
+                  {paymentStatus.label}
+                </span>
 
                 <button
                   onClick={() => onCloseCommission(commission.id)}

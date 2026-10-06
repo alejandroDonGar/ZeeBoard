@@ -96,16 +96,46 @@ export function getDeadlineStatus(deadline: string | null) {
     className: "bg-white text-[#7c7163]",
   };
 }
-/** "paid" / "unpaid" según las etiquetas de pago Paid y Not Paid (por nombre exacto, no "contiene"). */
-export function getPaymentStatus(tags: { category: string; name: string }[]): "paid" | "unpaid" | null {
-  const names = tags
-    .filter((tag) => tag.category === "Payment")
-    .map((tag) => tag.name.trim().toLowerCase());
+export type PaymentStatus = "unpaid" | "partial" | "paid";
 
-  if (names.includes("not paid")) return "unpaid";
-  if (names.includes("paid")) return "paid";
-  return null;
+export type PaymentSummary = {
+  /** Lo que han pagado los clientes */
+  paid: number;
+  /** Lo que te ha llegado, de los pagos donde ya lo apuntaste */
+  received: number;
+  /** Lo que se quedó la plataforma, de esos mismos pagos */
+  fees: number;
+  /** Lo que falta por cobrar del precio */
+  remaining: number;
+  /** Pagos de los que aún no apuntaste lo recibido */
+  pendingReceived: number;
+  status: PaymentStatus;
+};
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/** Estado de pago de una comisión a partir de sus pagos: lo usan todas las pantallas. */
+export function paymentSummary(
+  price: number | null,
+  payments: { amount: number; received: number | null }[],
+): PaymentSummary {
+  const paid = round2(payments.reduce((sum, payment) => sum + payment.amount, 0));
+  const withReceived = payments.filter((payment) => payment.received !== null);
+  const received = round2(withReceived.reduce((sum, payment) => sum + (payment.received ?? 0), 0));
+  const fees = round2(withReceived.reduce((sum, payment) => sum + payment.amount, 0) - received);
+  const remaining = round2(Math.max((price ?? 0) - paid, 0));
+
+  const status: PaymentStatus =
+    paid > 0 && (price === null || remaining === 0) ? "paid" : paid > 0 ? "partial" : "unpaid";
+
+  return { paid, received, fees, remaining, pendingReceived: payments.length - withReceived.length, status };
 }
+
+export const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; className: string }> = {
+  unpaid: { label: "Unpaid", className: "bg-red-50 text-red-600" },
+  partial: { label: "Partial", className: "bg-amber-100 text-amber-900" },
+  paid: { label: "Paid", className: "bg-green-50 text-green-700" },
+};
 
 /** Lee un precio escrito a mano: acepta "186,84", "186.84" o "200". Vacío = sin precio. */
 export function parsePrice(text: string): number | null {

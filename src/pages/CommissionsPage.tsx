@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
-import BoardFilters from "../components/BoardFilters";
+import BoardFilters, { type PaymentFilter } from "../components/BoardFilters";
+import CommissionPayments from "../components/CommissionPayments";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
@@ -10,12 +11,15 @@ import {
   getDeadlineStatus,
   formatMoney,
   parsePrice,
+  paymentSummary,
+  PAYMENT_STATUS_STYLE,
 } from "../lib/commissionHelpers";
 import {
   getTemplateStages,
   getTemplates,
   createCommission,
   getCommissions,
+  getAllPayments,
   updateCommissionStage,
   updateCommission,
   duplicateCommission,
@@ -36,6 +40,7 @@ import {
   type Client,
   type Tag,
   type Commission,
+  type CommissionPayment,
   type Template,
   type TemplateStage,
 } from "../lib/database";
@@ -89,6 +94,8 @@ function CommissionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTagIds, setFilterTagIds] = useState<number[]>([]);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "overdue">("all");
+  const [filterPayment, setFilterPayment] = useState<PaymentFilter>("all");
+  const [paymentsByCommissionId, setPaymentsByCommissionId] = useState<Record<number, CommissionPayment[]>>({});
   const { showToast } = useToast();
 
     const filteredCommissions = commissions.filter((commission) => {
@@ -126,7 +133,11 @@ function CommissionsPage() {
         (filterStatus === "active" && !isOverdue) ||
         (filterStatus === "overdue" && isOverdue);
 
-    return matchesSearch && matchesTags && matchesStatus;
+    const matchesPayment =
+        filterPayment === "all" ||
+        paymentSummary(commission.price, paymentsByCommissionId[commission.id] ?? []).status === filterPayment;
+
+    return matchesSearch && matchesTags && matchesStatus && matchesPayment;
     });
 
 
@@ -339,7 +350,21 @@ function CommissionsPage() {
     }
   }
 
+  async function loadPayments() {
+    const payments = await getAllPayments();
+    const grouped: Record<number, CommissionPayment[]> = {};
+
+    for (const payment of payments) {
+      (grouped[payment.commission_id] ??= []).push(payment);
+    }
+
+    setPaymentsByCommissionId(grouped);
+  }
+
   async function loadTagsForCommissions(data: Commission[]) {
+    // Los pagos se recargan en los mismos momentos que las etiquetas
+    loadPayments().catch(console.error);
+
     const entries = await Promise.all(
       data.map(async (commission) => {
         const tags = await getCommissionTags(commission.id);
@@ -730,10 +755,6 @@ function CommissionsPage() {
     return tag.category === "Payment";
   }
 
-  function getPaymentTag(tags: Tag[]) {
-    return tags.find(isPaymentTag) ?? null;
-  }
-
   function getNormalTags(tags: Tag[]) {
     return tags.filter((tag) => !isPaymentTag(tag));
   }
@@ -746,7 +767,6 @@ function CommissionsPage() {
     return isCommissionCompletedHelper(commission, templateStagesByTemplateId);
   }
 
-  const activePaymentTag = getPaymentTag(activeCommissionTags);
   const activeNormalTags = getNormalTags(activeCommissionTags);
 
   return (
@@ -762,9 +782,10 @@ function CommissionsPage() {
       <OpenTabs
         openCommissionTabs={openCommissionTabs}
         activeCommissionId={activeCommissionId}
-        commissionTagsById={commissionTagsById}
         clients={clients}
-        getPaymentTag={getPaymentTag}
+        getPaymentStatus={(commission: Commission) =>
+          paymentSummary(commission.price, paymentsByCommissionId[commission.id] ?? []).status
+        }
         onSelectCommission={(commissionId) => setActiveCommissionId(commissionId)}
         onShowAllCommissions={() => setActiveCommissionId(null)}
         onCloseCommission={handleCloseCommissionTab}
@@ -794,6 +815,8 @@ function CommissionsPage() {
                 onFilterTagIdsChange={setFilterTagIds}
                 filterStatus={filterStatus}
                 onFilterStatusChange={setFilterStatus}
+                filterPayment={filterPayment}
+                onFilterPaymentChange={setFilterPayment}
               />
             )}
 
@@ -835,21 +858,6 @@ function CommissionsPage() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center gap-3">
-                    {activePaymentTag && (
-                      <div className="rounded-2xl border border-line bg-surface px-3 py-2 shadow-sm">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-faint">
-                          Payment
-                        </p>
-
-                        <span
-                          className="mt-1 inline-flex rounded-sm px-3 py-1 text-xs font-black text-white"
-                          style={{ backgroundColor: activePaymentTag.color }}
-                        >
-                          {activePaymentTag.name}
-                        </span>
-                      </div>
-                    )}
-
                     {activeNormalTags.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {activeNormalTags.map((tag) => (
@@ -930,6 +938,12 @@ function CommissionsPage() {
                     </div>
                   </div>
                 </aside>
+
+                <CommissionPayments
+                  commission={activeCommission}
+                  payments={paymentsByCommissionId[activeCommission.id] ?? []}
+                  onChange={loadPayments}
+                />
 
                 <div className="shrink-0 rounded-3xl border border-line bg-paper p-5">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
@@ -1182,7 +1196,6 @@ function CommissionsPage() {
               <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
                 {filteredCommissions.map((commission) => {
                   const tags = commissionTagsById[commission.id] ?? [];
-                  const paymentTag = getPaymentTag(tags);
                   const normalTags = getNormalTags(tags);
                   const commissionImages = stageImagesByCommissionId[commission.id] ?? [];
                   const latestImage = commissionImages.length > 0 ? commissionImages[commissionImages.length - 1] : null;
@@ -1214,20 +1227,17 @@ function CommissionsPage() {
                           />
                         </div>
                       )}
-                      {paymentTag && (
-                        <div className="mt-3">
-                          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-faint">
-                            Payment
-                          </p>
+                      {(() => {
+                        const status = PAYMENT_STATUS_STYLE[
+                          paymentSummary(commission.price, paymentsByCommissionId[commission.id] ?? []).status
+                        ];
 
-                          <span
-                            className="inline-flex rounded-sm px-3 py-1 text-xs font-black text-white shadow-sm"
-                            style={{ backgroundColor: paymentTag.color }}
-                          >
-                            {paymentTag.name}
+                        return (
+                          <span className={`mb-2 inline-flex rounded-sm px-2 py-0.5 text-xs font-bold ${status.className}`}>
+                            {status.label}
                           </span>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       <h4 className="break-words font-black leading-tight">
                         {commission.title}

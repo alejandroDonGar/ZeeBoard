@@ -27,23 +27,16 @@ const PALETTE = [
   "#475569",
 ];
 
-// Clientes y Dashboard buscan "Paid" / "Not Paid" por nombre: esas dos solo pueden cambiar de color
-function isLockedTag(tag: Tag) {
-  return tag.category === "Payment" && ["paid", "not paid"].includes(tag.name.trim().toLowerCase());
-}
-
 type Draft = { name: string; color: string };
 
 /** Fila en modo edición: nombre, paleta y guardar/cancelar. Enter guarda, Esc cancela. */
 function TagEditor({
   initial,
-  nameLocked = false,
   saveLabel,
   onSave,
   onCancel,
 }: {
   initial: Draft;
-  nameLocked?: boolean;
   saveLabel: string;
   onSave: (draft: Draft) => Promise<void>;
   onCancel: () => void;
@@ -82,9 +75,8 @@ function TagEditor({
         </span>
 
         <input
-          autoFocus={!nameLocked}
+          autoFocus
           value={draft.name}
-          disabled={nameLocked}
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           placeholder="Tag name"
           className="min-w-0 flex-1 rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink disabled:opacity-60"
@@ -137,12 +129,6 @@ function TagEditor({
           </button>
         </div>
       </div>
-
-      {nameLocked && (
-        <p className="mt-2 text-[11px] text-faint">
-          "Paid" and "Not Paid" are used for payment stats, so only their colour can change.
-        </p>
-      )}
     </div>
   );
 }
@@ -324,7 +310,6 @@ function TagsPage() {
                         <div key={tag.id} className="py-2">
                           <TagEditor
                             initial={{ name: tag.name, color: tag.color }}
-                            nameLocked={isLockedTag(tag)}
                             saveLabel="Save"
                             onSave={(draft) => handleUpdateTag(tag.id, draft)}
                             onCancel={() => setEditingTagId(null)}
@@ -353,15 +338,13 @@ function TagsPage() {
                               Edit
                             </button>
 
-                            {!isLockedTag(tag) && (
-                              <button
-                                type="button"
-                                onClick={() => setTagToDelete(tag)}
-                                className="rounded-sm px-2 py-1 text-xs font-semibold text-red-500 hover:bg-red-50"
-                              >
-                                Delete
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => setTagToDelete(tag)}
+                              className="rounded-sm px-2 py-1 text-xs font-semibold text-red-500 hover:bg-red-50"
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
                       ),

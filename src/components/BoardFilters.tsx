@@ -2,10 +2,10 @@ import { useState } from "react";
 import type { Tag } from "../lib/database";
 
 export type StatusFilter = "all" | "active" | "overdue";
+export type PaymentFilter = "all" | "unpaid" | "partial" | "paid";
 
-const PAYMENT_CATEGORY = "Payment";
 // Los personajes se filtran desde Clientes, no aquí
-const HIDDEN_CATEGORIES = ["Characters", PAYMENT_CATEGORY];
+const HIDDEN_CATEGORIES = ["Characters"];
 
 export function Segmented<T extends string | number>({
   options,
@@ -45,6 +45,8 @@ function BoardFilters({
   onFilterTagIdsChange,
   filterStatus,
   onFilterStatusChange,
+  filterPayment,
+  onFilterPaymentChange,
 }: {
   tags: Tag[];
   searchQuery: string;
@@ -53,10 +55,11 @@ function BoardFilters({
   onFilterTagIdsChange: (tagIds: number[]) => void;
   filterStatus: StatusFilter;
   onFilterStatusChange: (status: StatusFilter) => void;
+  filterPayment: PaymentFilter;
+  onFilterPaymentChange: (payment: PaymentFilter) => void;
 }) {
   const [tagMenuOpen, setTagMenuOpen] = useState(false);
 
-  const paymentTags = tags.filter((tag) => tag.category === PAYMENT_CATEGORY);
   const menuTags = tags.filter((tag) => !HIDDEN_CATEGORIES.includes(tag.category || "General"));
   const menuCategories = Object.entries(
     menuTags.reduce<Record<string, Tag[]>>((groups, tag) => {
@@ -66,11 +69,10 @@ function BoardFilters({
     }, {}),
   );
 
-  const selectedPaymentId =
-    paymentTags.find((tag) => filterTagIds.includes(tag.id))?.id ?? 0;
   const selectedMenuCount = menuTags.filter((tag) => filterTagIds.includes(tag.id)).length;
   const selectedTags = tags.filter((tag) => filterTagIds.includes(tag.id));
-  const hasFilters = searchQuery.trim() !== "" || filterTagIds.length > 0 || filterStatus !== "all";
+  const hasFilters =
+    searchQuery.trim() !== "" || filterTagIds.length > 0 || filterStatus !== "all" || filterPayment !== "all";
 
   function toggleTag(tagId: number) {
     onFilterTagIdsChange(
@@ -78,13 +80,6 @@ function BoardFilters({
         ? filterTagIds.filter((id) => id !== tagId)
         : [...filterTagIds, tagId],
     );
-  }
-
-  function selectPayment(tagId: number) {
-    const withoutPayment = filterTagIds.filter(
-      (id) => !paymentTags.some((tag) => tag.id === id),
-    );
-    onFilterTagIdsChange(tagId === 0 ? withoutPayment : [...withoutPayment, tagId]);
   }
 
   return (
@@ -155,16 +150,16 @@ function BoardFilters({
           </div>
         )}
 
-        {paymentTags.length > 0 && (
-          <Segmented
-            options={[
-              { value: 0, label: "All" },
-              ...paymentTags.map((tag) => ({ value: tag.id, label: tag.name })),
-            ]}
-            value={selectedPaymentId}
-            onChange={selectPayment}
-          />
-        )}
+        <Segmented<PaymentFilter>
+          options={[
+            { value: "all", label: "All" },
+            { value: "unpaid", label: "Unpaid" },
+            { value: "partial", label: "Partial" },
+            { value: "paid", label: "Paid" },
+          ]}
+          value={filterPayment}
+          onChange={onFilterPaymentChange}
+        />
 
         <Segmented<StatusFilter>
           options={[
@@ -198,6 +193,7 @@ function BoardFilters({
               onSearchQueryChange("");
               onFilterTagIdsChange([]);
               onFilterStatusChange("all");
+              onFilterPaymentChange("all");
             }}
             className="px-1 text-xs font-semibold text-muted underline-offset-2 hover:text-ink hover:underline"
           >

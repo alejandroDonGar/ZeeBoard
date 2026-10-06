@@ -6,11 +6,12 @@ import {
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
   isCommissionCompleted as isCommissionCompletedHelper,
   formatMoney,
+  paymentSummary,
 } from "../lib/commissionHelpers";
 import {
   getTemplateStages,
   getCommissions,
-  getCommissionTags,
+  getAllPayments,
   getClients,
   createClient,
   deleteClient,
@@ -28,8 +29,8 @@ import {
   type CharacterReference,
   type CommissionStageImage,
   type Client,
-  type Tag,
   type Commission,
+  type CommissionPayment,
   type TemplateStage,
 } from "../lib/database";
 import PageHeader from "../components/PageHeader";
@@ -43,7 +44,7 @@ function ClientsPage({
 }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
-  const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
+  const [payments, setPayments] = useState<CommissionPayment[]>([]);
   const [clientName, setClientName] = useState("");
   const [clientPlatform, setClientPlatform] = useState("Twitter / X");
   const [clientHandle, setClientHandle] = useState("");
@@ -142,17 +143,6 @@ function ClientsPage({
     }
     }
 
-  async function loadClientCommissionTags(data: Commission[]) {
-    const entries = await Promise.all(
-      data.map(async (commission) => {
-        const tags = await getCommissionTags(commission.id);
-        return [commission.id, tags] as const;
-      }),
-    );
-
-    setCommissionTagsById(Object.fromEntries(entries));
-  }
-
   async function loadStageImagesForCommissions(data: Commission[]) {
     setStageImagesByCommissionId(await loadStageImagesForCommissionsHelper(data));
   }
@@ -211,7 +201,7 @@ function ClientsPage({
     getCommissions()
       .then(async (data) => {
         setCommissions(data);
-        await loadClientCommissionTags(data);
+        getAllPayments().then(setPayments).catch(console.error);
         await loadStageImagesForCommissions(data);
         await loadCharactersForCommissions(data);
 
@@ -494,21 +484,16 @@ function ClientsPage({
       ? Math.round(totalEarned / commissionsWithPrice.length)
       : 0;
 
-  const paidCommissionsCount = selectedClientCommissions.filter((commission) =>
-    (commissionTagsById[commission.id] ?? []).some(
-      (tag) =>
-        tag.category === "Payment" &&
-        tag.name.trim().toLowerCase() === "paid",
-    ),
-  ).length;
-
-  const unpaidCommissionsCount = selectedClientCommissions.filter((commission) =>
-    (commissionTagsById[commission.id] ?? []).some(
-      (tag) =>
-        tag.category === "Payment" &&
-        tag.name.trim().toLowerCase() === "not paid",
-    ),
-  ).length;
+  const paymentStatuses = selectedClientCommissions.map(
+    (commission) =>
+      paymentSummary(
+        commission.price,
+        payments.filter((payment) => payment.commission_id === commission.id),
+      ).status,
+  );
+  const paidCommissionsCount = paymentStatuses.filter((status) => status === "paid").length;
+  // Sin pagar o con pago parcial
+  const unpaidCommissionsCount = paymentStatuses.length - paidCommissionsCount;
 
   function handleOpenCommissionFromClient(commission: Commission) {
     localStorage.setItem(

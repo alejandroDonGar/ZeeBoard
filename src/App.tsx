@@ -1,6 +1,6 @@
 import "./App.css";
 import { useEffect, useState } from "react";
-import { initializeDatabase, migrateLegacyImages } from "./lib/database";
+import { initializeDatabase, migrateLegacyImages, migratePaymentTags } from "./lib/database";
 import { initImageUrls } from "./lib/images";
 import CommissionsPage from "./pages/CommissionsPage";
 import ClientsPage from "./pages/ClientsPage";
@@ -31,6 +31,7 @@ let reportProgress: (progress: Progress) => void = () => {};
 // Fuera del componente para que se ejecute una sola vez (StrictMode monta los efectos dos veces)
 const startup = initImageUrls()
   .then(initializeDatabase)
+  .then(migratePaymentTags)
   .then(() => migrateLegacyImages((done, total) => reportProgress({ done, total })));
 
 function App() {

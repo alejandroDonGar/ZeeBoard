@@ -202,6 +202,18 @@ export async function initializeDatabase() {
       PRIMARY KEY (commission_id, character_id)
     );
   `);
+
+  // amount = lo que pagó el cliente; received = lo que te llegó (NULL = aún no lo has apuntado)
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS commission_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      commission_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      received REAL,
+      paid_at TEXT NOT NULL,
+      note TEXT
+    );
+  `);
 }
 
 export async function getTemplates(): Promise<Template[]> {
@@ -643,6 +655,11 @@ export async function deleteCommission(
 
   await database.execute(
     `DELETE FROM commission_tags WHERE commission_id = ?;`,
+    [commissionId],
+  );
+
+  await database.execute(
+    `DELETE FROM commission_payments WHERE commission_id = ?;`,
     [commissionId],
   );
 
@@ -1335,4 +1352,95 @@ export async function migrateLegacyImages(
   }
 
   return { migrated, failed };
+}
+
+export type CommissionPayment = {
+  id: number;
+  commission_id: number;
+  amount: number;
+  received: number | null;
+  paid_at: string;
+  note: string | null;
+};
+
+export async function getAllPayments(): Promise<CommissionPayment[]> {
+  const database = await getDatabase();
+
+  return await database.select<CommissionPayment[]>(
+    `SELECT id, commission_id, amount, received, paid_at, note FROM commission_payments ORDER BY paid_at ASC, id ASC;`,
+  );
+}
+
+export async function addPayment(
+  commissionId: number,
+  amount: number,
+  received: number | null,
+  paidAt: string,
+  note: string,
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `INSERT INTO commission_payments (commission_id, amount, received, paid_at, note) VALUES (?, ?, ?, ?, ?);`,
+    [commissionId, amount, received, paidAt, note.trim() || null],
+  );
+}
+
+export async function updatePaymentReceived(paymentId: number, received: number | null): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE commission_payments SET received = ? WHERE id = ?;`, [received, paymentId]);
+}
+
+export async function deletePayment(paymentId: number): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`DELETE FROM commission_payments WHERE id = ?;`, [paymentId]);
+}
+
+/**
+ * Las etiquetas "Paid" / "Not Paid" se sustituyen por pagos: cada comisión con "Paid" recibe un pago
+ * por su precio (fechado el día de creación) y después se borran las etiquetas de pago.
+ * No hace nada si ya no quedan etiquetas de pago.
+ */
+export async function migratePaymentTags(): Promise<void> {
+  await runSerialized(async (database) => {
+    const paymentTags = await database.select<{ id: number; name: string }[]>(
+      `SELECT id, name FROM tags WHERE category = 'Payment';`,
+    );
+
+    if (paymentTags.length === 0) {
+      return;
+    }
+
+    const paidTagIds = paymentTags
+      .filter((tag) => tag.name.trim().toLowerCase() === "paid")
+      .map((tag) => tag.id);
+
+    for (const tagId of paidTagIds) {
+      const paidCommissions = await database.select<{ id: number; price: number | null; created_at: string }[]>(
+        `
+        SELECT c.id, c.price, c.created_at
+        FROM commissions c
+        JOIN commission_tags ct ON ct.commission_id = c.id
+        WHERE ct.tag_id = ?
+          AND c.price IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM commission_payments p WHERE p.commission_id = c.id);
+        `,
+        [tagId],
+      );
+
+      for (const commission of paidCommissions) {
+        await database.execute(
+          `INSERT INTO commission_payments (commission_id, amount, received, paid_at, note) VALUES (?, ?, NULL, ?, ?);`,
+          [commission.id, commission.price, commission.created_at.slice(0, 10), "Imported from Paid tag"],
+        );
+      }
+    }
+
+    for (const tag of paymentTags) {
+      await database.execute(`DELETE FROM commission_tags WHERE tag_id = ?;`, [tag.id]);
+      await database.execute(`DELETE FROM tags WHERE id = ?;`, [tag.id]);
+    }
+  });
 }

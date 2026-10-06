@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
 import BoardFilters, { type PaymentFilter } from "../components/BoardFilters";
@@ -83,7 +82,6 @@ function CommissionsPage() {
   const [savingCommission, setSavingCommission] = useState(false);
   const [commissionSaved, setCommissionSaved] = useState(false);
   const [duplicatingCommission, setDuplicatingCommission] = useState(false);
-  const [commissionDuplicated, setCommissionDuplicated] = useState(false);
   const [showDeleteCommissionModal, setShowDeleteCommissionModal] = useState(false);
   const [deletingCommission, setDeletingCommission] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -91,6 +89,9 @@ function CommissionsPage() {
   const [commissionTagsById, setCommissionTagsById] = useState<Record<number, Tag[]>>({});
   const [stageImagesByCommissionId, setStageImagesByCommissionId] = useState<Record<number, CommissionStageImage[]>>({});
   const [activeStageImageIndexByStageId, setActiveStageImageIndexByStageId] = useState<Record<number, number>>({});
+  // Etapa que se ve en el visor; null = la etapa actual de la comisión
+  const [viewedStageId, setViewedStageId] = useState<number | null>(null);
+  const [commissionMenuOpen, setCommissionMenuOpen] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [importingStageId, setImportingStageId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -426,7 +427,8 @@ function CommissionsPage() {
     setReferencesByCharacterId(Object.fromEntries(entries));
   }
 
-  async function handleMoveToNextStage() {
+  /** +1 avanza a la siguiente etapa, -1 vuelve a la anterior */
+  async function handleMoveStage(direction: 1 | -1) {
     if (!activeCommission || workflowStages.length === 0) {
       return;
     }
@@ -435,13 +437,15 @@ function CommissionsPage() {
       (stage) => stage.id === activeCommission.current_stage_id,
     );
 
-    const nextStage = workflowStages[currentStageIndex + 1];
+    const nextStage = workflowStages[currentStageIndex + direction];
 
     if (!nextStage) {
       return;
     }
 
     await updateCommissionStage(activeCommission.id, nextStage.id);
+    // El visor sigue a la etapa actual
+    setViewedStageId(null);
 
     const data = await getCommissions();
     setCommissions(data);
@@ -563,12 +567,7 @@ function CommissionsPage() {
         setActiveCommissionId(duplicatedCommission.id);
         }
 
-        setCommissionDuplicated(true);
-        showToast("Commission duplicated successfully.", "success");
-
-        setTimeout(() => {
-        setCommissionDuplicated(false);
-        }, 1800);
+        showToast("Commission duplicated.", "success");
     } catch (error) {
         console.error(error);
         showToast("Could not duplicate commission.", "error");
@@ -649,8 +648,8 @@ function CommissionsPage() {
     },
     // Ctrl+V añade la imagen a la etapa actual de la comisión abierta
     onPaste: (files) => {
-      if (activeCommission?.current_stage_id) {
-        handleAddStageImages(activeCommission.current_stage_id, files);
+      if (activeCommission && viewedStage) {
+        handleAddStageImages(viewedStage.id, files);
       }
     },
   });
@@ -679,32 +678,6 @@ function CommissionsPage() {
     return Math.min(index, images.length - 1);
   }
 
-  function handlePreviousStageImage(stageId: number, images: CommissionStageImage[]) {
-    setActiveStageImageIndexByStageId((current) => {
-      const currentIndex = getActiveStageImageIndex(stageId, images);
-      const nextIndex =
-        currentIndex === 0 ? images.length - 1 : currentIndex - 1;
-
-      return {
-        ...current,
-        [stageId]: nextIndex,
-      };
-    });
-  }
-
-  function handleNextStageImage(stageId: number, images: CommissionStageImage[]) {
-    setActiveStageImageIndexByStageId((current) => {
-      const currentIndex = getActiveStageImageIndex(stageId, images);
-      const nextIndex =
-        currentIndex === images.length - 1 ? 0 : currentIndex + 1;
-
-      return {
-        ...current,
-        [stageId]: nextIndex,
-      };
-    });
-  }
-
   const currentStageIndex = workflowStages.findIndex(
     (stage) => stage.id === activeCommission?.current_stage_id,
   );
@@ -713,19 +686,24 @@ function CommissionsPage() {
     workflowStages.length > 0 &&
     currentStageIndex === workflowStages.length - 1;
 
-  const currentStageName =
-    currentStageIndex >= 0
-      ? workflowStages[currentStageIndex]?.name
-      : workflowStages.length > 0
-        ? `Working on ${workflowStages[0].name}`
-        : "No stage";
+  const activeDeadlineStatus = activeCommission ? getDeadlineStatus(activeCommission.deadline) : null;
+  const activePaymentStatus =
+    PAYMENT_STATUS_STYLE[
+      activeCommission
+        ? paymentSummary(activeCommission.price, paymentsByCommissionId[activeCommission.id] ?? []).status
+        : "unpaid"
+    ];
+  const activeCharacters = activeCommission
+    ? Object.values(charactersByClientId)
+        .flat()
+        .filter((character) => (commissionCharactersById[activeCommission.id] ?? []).includes(character.id))
+    : [];
 
-  const progressText =
-    currentStageIndex >= 0
-      ? `${currentStageIndex + 1} / ${workflowStages.length}`
-      : workflowStages.length > 0
-        ? `0 / ${workflowStages.length}`
-        : "No workflow";
+  const viewedStage =
+    workflowStages.find((stage) => stage.id === viewedStageId) ??
+    workflowStages[currentStageIndex] ??
+    workflowStages[0] ??
+    null;
 
   const today = new Date();
   const currentMonth = today.toLocaleString("en-US", {
@@ -812,20 +790,12 @@ function CommissionsPage() {
         onCloseCommission={handleCloseCommissionTab}
       />
 
-      <section className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-5 p-5 pb-6">
+      <section
+        className={`grid min-h-0 flex-1 gap-5 p-5 pb-6 ${
+          activeCommission ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_320px]"
+        }`}
+      >
         <div className="flex h-full min-h-0 flex-col rounded-3xl border border-line bg-surface p-5 shadow-sm">
-          {activeCommission && (
-            <div className="mb-5">
-              <h3 className="text-xl font-black">{activeCommission.title}</h3>
-
-              <p className="mt-1 text-sm text-muted">
-                {`${activeCommission.client_name || "No client"} · ${
-                  activeCommission.platform || "No platform"
-                }`}
-              </p>
-            </div>
-          )}
-
           <div className="min-h-0 flex-1 overflow-y-auto px-1">
             {!activeCommission && commissions.length > 0 && (
               <BoardFilters
@@ -843,356 +813,359 @@ function CommissionsPage() {
 
             {activeCommission ? (
               <div className="flex h-full min-h-0 flex-col gap-5">
-                <aside className="shrink-0 rounded-3xl border border-line bg-paper p-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-                    Commission detail
-                  </p>
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={handleOpenEditCommission}
-                      className="rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink"
-                    >
-                      Edit
-                    </button>
+                {/* Cabecera: todo lo importante en una línea */}
+                <div className="flex items-start gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-2xl font-black">{activeCommission.title}</h3>
+                    <p className="mt-1 text-sm text-muted">
+                      {[
+                        activeCommission.client_name || "No client",
+                        activeCommission.platform,
+                        templates.find((template) => template.id === activeCommission.template_id)?.name,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {activeDeadlineStatus && (
+                        <span className={`ml-2 rounded-sm px-2 py-0.5 text-xs font-bold ${activeDeadlineStatus.className}`}>
+                          {activeDeadlineStatus.label}
+                        </span>
+                      )}
+                    </p>
 
-                    <button
-                      onClick={handleDuplicateCommission}
-                      disabled={duplicatingCommission}
-                      className={
-                        commissionDuplicated
-                          ? "rounded-2xl bg-green-600 px-4 py-2 text-sm font-bold text-white transition-all duration-300"
-                          : "rounded-2xl border border-line-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition hover:border-ink disabled:opacity-70"
-                      }
-                    >
-                      {duplicatingCommission
-                        ? "Duplicating..."
-                        : commissionDuplicated
-                          ? "✓ Duplicated"
-                          : "Duplicate"}
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteCommissionModal(true)}
-                      className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 transition hover:border-red-400"
-                    >
-                      Delete
-                    </button>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className={`rounded-sm px-2 py-0.5 text-xs font-bold ${activePaymentStatus.className}`}>
+                        {activePaymentStatus.label}
+                      </span>
+                      {activeNormalTags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="rounded-sm px-2 py-0.5 text-xs font-bold text-white"
+                          style={{ backgroundColor: tag.color }}
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    {activeNormalTags.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {activeNormalTags.map((tag) => (
-                          <span
-                            key={tag.id}
-                            className="rounded-sm px-4 py-2 text-sm font-black text-white shadow-sm"
-                            style={{ backgroundColor: tag.color }}
+                  <button
+                    onClick={handleOpenEditCommission}
+                    className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
+                  >
+                    Edit
+                  </button>
+
+                  <div className="relative">
+                    <button
+                      type="button"
+                      title="More actions"
+                      onClick={() => setCommissionMenuOpen((open) => !open)}
+                      className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-ink"
+                    >
+                      ···
+                    </button>
+
+                    {commissionMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={() => setCommissionMenuOpen(false)} />
+                        <div className="absolute right-0 top-full z-40 mt-1 w-40 rounded-md border border-line bg-surface p-1 shadow-lg">
+                          <button
+                            type="button"
+                            disabled={duplicatingCommission}
+                            onClick={() => {
+                              setCommissionMenuOpen(false);
+                              handleDuplicateCommission();
+                            }}
+                            className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-highlight"
                           >
-                            {tag.name}
-                          </span>
-                        ))}
-                      </div>
+                            {duplicatingCommission ? "Duplicating…" : "Duplicate"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCommissionMenuOpen(false);
+                              setShowDeleteCommissionModal(true);
+                            }}
+                            className="block w-full rounded-sm px-3 py-2 text-left text-sm text-red-500 hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
+                </div>
 
-                  <div className="mt-4 grid grid-cols-7 gap-4">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                        Title
-                      </p>
-                      <p className="mt-2 font-bold">{activeCommission.title}</p>
+                <div className="grid min-h-0 flex-1 grid-cols-[290px_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-x-6 gap-y-5 min-[1400px]:grid-cols-[220px_minmax(0,1fr)_340px] min-[1400px]:grid-rows-[minmax(0,1fr)]">
+                {workflowStages.length === 0 ? (
+                  <p className="col-start-1 row-start-1 rounded-md border border-dashed border-line-strong p-6 text-center text-sm text-faint">
+                    This commission has no template, so it has no stages. Edit it to pick one.
+                  </p>
+                ) : (
+                  <>
+                    {/* Línea de tiempo: el historial del dibujo */}
+                    <div className="col-start-1 row-start-1 min-h-0 overflow-y-auto">
+                      <ol>
+                        {workflowStages.map((stage, index) => {
+                          const stageImages = getStageImages(activeCommission.id, stage.id);
+                          const latest = stageImages[stageImages.length - 1] ?? null;
+                          const isDone = index < currentStageIndex;
+                          const isCurrent = index === currentStageIndex;
+                          const isViewed = stage.id === viewedStage?.id;
+
+                          return (
+                            <li key={stage.id} className="relative">
+                              {index < workflowStages.length - 1 && (
+                                <span
+                                  className={`absolute left-[19px] top-9 h-[calc(100%-20px)] w-px ${
+                                    isDone ? "bg-green-500" : "bg-line-strong"
+                                  }`}
+                                />
+                              )}
+
+                              <button
+                                type="button"
+                                data-image-drop={`stage:${stage.id}`}
+                                onClick={() => setViewedStageId(stage.id)}
+                                className={`relative flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition ${
+                                  dragZoneId === `stage:${stage.id}`
+                                    ? "bg-highlight ring-1 ring-ink"
+                                    : isViewed
+                                      ? "bg-highlight"
+                                      : "hover:bg-paper"
+                                }`}
+                              >
+                                <span
+                                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                                    isDone
+                                      ? "bg-green-600 text-white"
+                                      : isCurrent
+                                        ? "bg-primary text-on-primary"
+                                        : "border border-line-strong text-faint"
+                                  }`}
+                                >
+                                  {isDone ? "✓" : index + 1}
+                                </span>
+
+                                {latest ? (
+                                  <img
+                                    src={thumbUrl(latest.image_data_url)}
+                                    loading="lazy" decoding="async"
+                                    alt=""
+                                    className="h-9 w-9 shrink-0 rounded-sm object-cover"
+                                  />
+                                ) : (
+                                  <span className="h-9 w-9 shrink-0 rounded-sm bg-paper" />
+                                )}
+
+                                <span className="min-w-0">
+                                  <span className={`block truncate text-sm ${isCurrent ? "font-black" : "font-semibold"} ${!isDone && !isCurrent ? "text-muted" : ""}`}>
+                                    {stage.name}
+                                  </span>
+                                  <span className="block text-[11px] text-faint">
+                                    {importingStageId === stage.id
+                                      ? "Optimizing…"
+                                      : stageImages.length === 0
+                                        ? "No images"
+                                        : stageImages.length === 1
+                                          ? "1 image"
+                                          : `${stageImages.length} images`}
+                                  </span>
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ol>
+
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          title="Back to the previous stage"
+                          onClick={() => handleMoveStage(-1)}
+                          disabled={currentStageIndex <= 0}
+                          className="rounded-md border border-line-strong px-3 py-2 text-sm text-muted transition hover:border-ink hover:text-ink disabled:opacity-30"
+                        >
+                          ‹
+                        </button>
+
+                        {isLastStage ? (
+                          <span className="flex-1 rounded-md bg-green-600 px-3 py-2 text-center text-sm font-bold text-white">
+                            ✓ Finished
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleMoveStage(1)}
+                            className="min-w-0 flex-1 truncate rounded-md bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary-hover"
+                          >
+                            {currentStageIndex < 0
+                              ? `Start ${workflowStages[0].name}`
+                              : `${workflowStages[currentStageIndex].name} done →`}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                        Client
-                      </p>
-                      <p className="mt-2 font-bold">
-                        {activeCommission.client_name || "No client"}
-                      </p>
-                    </div>
+                    {/* Visor de la etapa elegida */}
+                    {viewedStage && (() => {
+                      const stageImages = getStageImages(activeCommission.id, viewedStage.id);
+                      const imageIndex = getActiveStageImageIndex(viewedStage.id, stageImages);
+                      const mainImage = stageImages[imageIndex] ?? null;
+                      const dropId = `stage:${viewedStage.id}`;
 
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                        Platform
-                      </p>
-                      <p className="mt-2 font-bold">
-                        {activeCommission.platform || "No platform"}
-                      </p>
-                    </div>
+                      return (
+                        <div className="col-start-2 row-span-2 row-start-1 flex min-h-0 min-w-0 flex-col min-[1400px]:row-span-1">
+                          <div className="mb-2 flex items-baseline justify-between gap-3">
+                            <p className="text-sm font-black">
+                              {viewedStage.name}
+                              <span className="ml-2 text-xs font-normal text-faint">
+                                Stage {workflowStages.indexOf(viewedStage) + 1} of {workflowStages.length}
+                                {mainImage && ` · ${mainImage.label}`}
+                              </span>
+                            </p>
 
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                        Price
-                      </p>
-                      <p className="mt-2 font-bold">
-                        {activeCommission.price
-                          ? formatMoney(activeCommission.price, activeCommission.currency)
-                          : "No price"}
-                      </p>
-                    </div>
+                            {mainImage && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteStageImage(mainImage.id)}
+                                className="rounded-sm px-2 py-1 text-xs font-semibold text-red-500 transition hover:bg-red-50"
+                              >
+                                Remove image
+                              </button>
+                            )}
+                          </div>
 
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                        Deadline
-                      </p>
-                      <p className="mt-2 font-bold">
-                        {activeCommission.deadline || "No deadline"}
-                      </p>
-                    </div>
+                          {mainImage ? (
+                            <button
+                              type="button"
+                              title="View full size"
+                              onClick={() => setZoomedImage(imageUrl(mainImage.image_data_url))}
+                              className="flex min-h-0 w-full flex-1 cursor-zoom-in items-center justify-center rounded-md bg-paper p-2"
+                            >
+                              <img
+                                src={imageUrl(mainImage.image_data_url)}
+                                alt={mainImage.label}
+                                className="max-h-full max-w-full rounded-sm object-contain"
+                              />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              data-image-drop={dropId}
+                              disabled={importingStageId !== null}
+                              onClick={() => handleAddStageImages(viewedStage.id)}
+                              className={`flex min-h-48 w-full flex-1 flex-col items-center justify-center rounded-md border border-dashed text-sm transition ${
+                                dragZoneId === dropId
+                                  ? "border-ink bg-highlight text-ink"
+                                  : "border-line-strong text-muted hover:border-ink hover:text-ink"
+                              }`}
+                            >
+                              <span className="text-2xl">+</span>
+                              {importingStageId === viewedStage.id
+                                ? "Optimizing…"
+                                : "Click, drop images here or paste with Ctrl+V"}
+                            </button>
+                          )}
 
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                        Current stage
-                      </p>
-                      <p className="mt-2 font-bold">
-                        {currentStageName}
-                      </p>
-                    </div>
+                          {stageImages.length > 0 && (
+                            <div className="mt-2 flex shrink-0 flex-wrap gap-2 p-1">
+                              {stageImages.map((image, index) => (
+                                <button
+                                  key={image.id}
+                                  type="button"
+                                  title={image.label}
+                                  onClick={() =>
+                                    setActiveStageImageIndexByStageId((current) => ({
+                                      ...current,
+                                      [viewedStage.id]: index,
+                                    }))
+                                  }
+                                  className={`h-14 w-14 overflow-hidden rounded-sm transition ${
+                                    index === imageIndex ? "ring-2 ring-ink ring-offset-2 ring-offset-surface" : "opacity-70 hover:opacity-100"
+                                  }`}
+                                >
+                                  <img
+                                    src={thumbUrl(image.image_data_url)}
+                                    loading="lazy" decoding="async"
+                                    alt={image.label}
+                                    className="h-full w-full object-cover"
+                                  />
+                                </button>
+                              ))}
 
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">
-                        Progress
-                      </p>
-                      <p className="mt-2 font-bold">
-                        {progressText}
-                      </p>
-                    </div>
-                  </div>
-                </aside>
+                              <button
+                                type="button"
+                                data-image-drop={`${dropId}:alt`}
+                                title="Add images: click, drop or Ctrl+V"
+                                disabled={importingStageId !== null}
+                                onClick={() => handleAddStageImages(viewedStage.id)}
+                                className={`flex h-14 w-14 items-center justify-center rounded-sm border border-dashed text-lg transition ${
+                                  dragZoneId === `${dropId}:alt`
+                                    ? "border-ink bg-highlight text-ink"
+                                    : "border-line-strong text-faint hover:border-ink hover:text-ink"
+                                }`}
+                              >
+                                {importingStageId === viewedStage.id ? "…" : "+"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
 
+                {/* Pago, notas y personajes: debajo en ventanas estrechas, columna propia en anchas */}
+                <div className="col-start-1 row-start-2 min-h-0 space-y-5 overflow-y-auto min-[1400px]:col-start-3 min-[1400px]:row-start-1">
                 <CommissionPayments
                   commission={activeCommission}
                   payments={paymentsByCommissionId[activeCommission.id] ?? []}
                   onChange={loadPayments}
                 />
 
-                <div className="shrink-0 rounded-3xl border border-line bg-paper p-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-                    Workflow
-                  </p>
-
-                  <div className="mt-4 flex min-h-[220px] items-start gap-3 overflow-x-auto pb-3">
-                    {workflowStages.length === 0 ? (
-                      <div className="rounded-3xl border border-dashed border-line-strong bg-surface p-4 text-sm text-faint">
-                        No template assigned.
+                {(activeCommission.notes || activeCharacters.length > 0) && (
+                  <div className="space-y-5">
+                    {activeCommission.notes && (
+                      <div>
+                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Notes</p>
+                        <p className="whitespace-pre-wrap text-sm text-muted">{activeCommission.notes}</p>
                       </div>
-                    ) : (
-                      workflowStages.map((stage, index) => {
-                        const stageImages = activeCommission
-                          ? getStageImages(activeCommission.id, stage.id)
-                          : [];
+                    )}
 
-                        const activeImageIndex = getActiveStageImageIndex(stage.id, stageImages);
-                        const mainStageImage = stageImages[activeImageIndex] ?? null;
-                        const previousStageImage =
-                          stageImages.length > 1
-                            ? stageImages[
-                                activeImageIndex === 0
-                                  ? stageImages.length - 1
-                                  : activeImageIndex - 1
-                              ]
-                            : null;
-
-                        const nextStageImage =
-                          stageImages.length > 1
-                            ? stageImages[
-                                activeImageIndex === stageImages.length - 1
-                                  ? 0
-                                  : activeImageIndex + 1
-                              ]
-                            : null;
-
-                        return (
-                          <div
-                            key={stage.id}
-                            className={
-                              index < currentStageIndex
-                                ? "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-green-300 bg-green-100 p-4 text-green-900 shadow-sm"
-                                : index === currentStageIndex
-                                  ? "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-amber-300 bg-amber-100 p-4 text-amber-900 shadow-sm"
-                                  : "min-w-[320px] flex-shrink-0 self-start rounded-3xl border border-line bg-surface p-4 shadow-sm"
-                            }
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={
-                                  index < currentStageIndex
-                                    ? "flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-xs font-black text-white"
-                                    : index === currentStageIndex
-                                      ? "flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white"
-                                      : "flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-black text-on-primary"
-                                }
-                              >
-                                {index < currentStageIndex ? "✓" : index + 1}
-                              </div>
-
-                              <div>
-                                <p className="font-bold">{stage.name}</p>
-                                <p className="text-xs text-faint">Stage {index + 1}</p>
+                    {activeCharacters.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-faint">Characters</p>
+                        <div className="space-y-2">
+                          {activeCharacters.map((character) => (
+                            <div key={character.id} className="flex items-center gap-2">
+                              <span className="w-24 shrink-0 truncate text-sm font-semibold">{character.name}</span>
+                              <div className="flex flex-wrap gap-1">
+                                {(referencesByCharacterId[character.id] ?? []).map((reference) => (
+                                  <button
+                                    key={reference.id}
+                                    type="button"
+                                    title={reference.label}
+                                    onClick={() => setZoomedImage(imageUrl(reference.image_data_url))}
+                                    className="cursor-zoom-in"
+                                  >
+                                    <img
+                                      src={thumbUrl(reference.image_data_url)}
+                                      loading="lazy" decoding="async"
+                                      alt={reference.label}
+                                      className="h-10 w-10 rounded-sm object-cover"
+                                    />
+                                  </button>
+                                ))}
                               </div>
                             </div>
-
-                            {mainStageImage && (
-                              <div className="relative mt-4 overflow-hidden rounded-3xl border border-white/60 bg-surface p-3 shadow-sm">
-                                <div className="relative z-10">
-                                  <div className="mb-2 flex items-center justify-between">
-                                    <span className="rounded-sm bg-surface/90 px-3 py-1 text-[10px] font-black text-muted shadow-sm">
-                                      {mainStageImage.label}
-                                    </span>
-
-                                    <span className="rounded-sm bg-surface/90 px-3 py-1 text-[10px] font-black text-faint shadow-sm">
-                                      {activeImageIndex + 1} / {stageImages.length}
-                                    </span>
-                                  </div>
-
-                                  <div className="relative flex min-h-[220px] items-center justify-center">
-                                    {stageImages.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handlePreviousStageImage(stage.id, stageImages)}
-                                        className="absolute left-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-black text-on-primary shadow-lg transition hover:scale-105"
-                                      >
-                                        ‹
-                                      </button>
-                                    )}
-                                    {previousStageImage && (
-                                      <img
-                                        src={thumbUrl(previousStageImage.image_data_url)}
-                                        loading="lazy" decoding="async"
-                                        alt=""
-                                        className="
-                                          absolute
-                                          left-4
-                                          z-0
-                                          max-h-[260px]
-                                          scale-75
-                                          rounded-2xl
-                                          opacity-20
-                                          blur-sm
-                                          object-contain
-                                          pointer-events-none
-                                        "
-                                      />
-                                    )}
-
-                                    {nextStageImage && (
-                                      <img
-                                        src={thumbUrl(nextStageImage.image_data_url)}
-                                        loading="lazy" decoding="async"
-                                        alt=""
-                                        className="
-                                          absolute
-                                          right-4
-                                          z-0
-                                          max-h-[260px]
-                                          scale-75
-                                          rounded-2xl
-                                          opacity-20
-                                          blur-sm
-                                          object-contain
-                                          pointer-events-none
-                                        "
-                                      />
-                                    )}
-                                    <AnimatePresence mode="wait">
-                                      <motion.img
-                                        key={mainStageImage.id}
-                                        src={imageUrl(mainStageImage.image_data_url)}
-                                        alt={mainStageImage.label}
-                                        initial={{
-                                          opacity: 0,
-                                          scale: 0.96,
-                                          filter: "blur(6px)",
-                                          x: 20,
-                                        }}
-                                        animate={{
-                                          opacity: 1,
-                                          scale: 1,
-                                          filter: "blur(0px)",
-                                          x: 0,
-                                        }}
-                                        exit={{
-                                          opacity: 0,
-                                          scale: 0.96,
-                                          filter: "blur(6px)",
-                                          x: -20,
-                                        }}
-                                        transition={{
-                                          duration: 0.15,
-                                          ease: "easeOut",
-                                        }}
-                                        className="mx-auto max-h-[360px] w-auto rounded-2xl object-contain shadow-sm"
-                                      />
-                                    </AnimatePresence>
-
-                                    {stageImages.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleNextStageImage(stage.id, stageImages)}
-                                        className="absolute right-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg font-black text-on-primary shadow-lg transition hover:scale-105"
-                                      >
-                                        ›
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  <div className="mt-3 flex items-center justify-between">
-                                    <p className="text-xs font-bold text-muted">
-                                      {stageImages.length === 1 ? "1 alt" : `${stageImages.length} alts`}
-                                    </p>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteStageImage(mainStageImage.id)}
-                                      className="rounded-sm bg-red-50 px-3 py-1 text-xs font-black text-red-500 transition hover:bg-red-100"
-                                    >
-                                      Remove current
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            <button
-                              type="button"
-                              data-image-drop={`stage:${stage.id}`}
-                              title={
-                                stage.id === activeCommission?.current_stage_id
-                                  ? "Click, drop images here or paste with Ctrl+V"
-                                  : "Click or drop images here"
-                              }
-                              disabled={importingStageId !== null}
-                              onClick={() => handleAddStageImages(stage.id)}
-                              className={`mt-4 block w-full cursor-pointer rounded-2xl border border-dashed px-3 py-3 text-center text-xs font-black transition hover:border-ink disabled:cursor-wait disabled:opacity-60 ${
-                                dragZoneId === `stage:${stage.id}`
-                                  ? "scale-[1.02] border-ink bg-highlight text-ink"
-                                  : "border-line-strong bg-surface text-muted"
-                              }`}
-                            >
-                              {importingStageId === stage.id
-                                ? "Optimizing…"
-                                : dragZoneId === `stage:${stage.id}`
-                                  ? "Drop to add"
-                                  : stageImages.length === 0
-                                    ? "Add image"
-                                    : "Add alt"}
-                            </button>
-                          </div>
-                        );
-                      })
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <button
-                    onClick={handleMoveToNextStage}
-                    disabled={isLastStage}
-                    className={
-                      isLastStage
-                        ? "mt-5 rounded-2xl bg-green-600 px-5 py-3 text-sm font-bold text-white shadow-md"
-                        : "mt-5 rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-on-primary shadow-md transition hover:-translate-y-0.5 hover:shadow-lg"
-                    }
-                  >
-                    {isLastStage ? "✓ Finished" : "Move to next stage"}
-                  </button>
+                )}
+                </div>
                 </div>
               </div>
             ) : commissions.length === 0 ? (
@@ -1359,6 +1332,7 @@ function CommissionsPage() {
           </div>
         </div>
 
+        {!activeCommission && (
         <aside className="h-full min-h-0 overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-sm">
           <div className="max-h-full overflow-y-auto rounded-3xl border border-line bg-paper p-4">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
@@ -1490,6 +1464,7 @@ function CommissionsPage() {
             )}
           </div>
         </aside>
+        )}
       </section>
       {showNewCommissionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">

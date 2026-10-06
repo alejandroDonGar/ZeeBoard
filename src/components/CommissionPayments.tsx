@@ -62,13 +62,13 @@ function CommissionPayments({
   const field = "min-w-0 rounded-md border border-line-strong bg-surface px-2 py-1.5 text-sm outline-none focus:border-ink";
 
   return (
-    <div className="rounded-3xl border border-line bg-surface p-5">
+    <div className="@container rounded-3xl border border-line bg-surface p-5">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-[11px] font-black uppercase tracking-[0.16em] text-faint">Payment</p>
         <span className={`rounded-sm px-2 py-0.5 text-xs font-bold ${status.className}`}>{status.label}</span>
       </div>
 
-      <dl className="grid grid-cols-4 gap-3">
+      <dl className="grid grid-cols-2 gap-3 @xl:grid-cols-4">
         {[
           { label: "Price", value: commission.price !== null ? formatMoney(commission.price, currency) : "—" },
           {
@@ -93,16 +93,15 @@ function CommissionPayments({
       </dl>
 
       <div className="mt-4 divide-y divide-line border-y border-line text-sm">
-        <div className="grid grid-cols-[110px_1fr_1fr_1.4fr_28px] gap-2 py-1.5 text-[11px] text-faint">
+        <div className="grid grid-cols-[minmax(0,1.1fr)_1fr_1fr_24px] gap-2 py-1.5 text-[11px] text-faint">
           <span>Date</span>
           <span>Client paid</span>
           <span>You received</span>
-          <span>Note</span>
           <span />
         </div>
 
         {payments.map((payment) => (
-          <div key={payment.id} className="group grid grid-cols-[110px_1fr_1fr_1.4fr_28px] items-center gap-2 py-1.5">
+          <div key={payment.id} className="group grid grid-cols-[minmax(0,1.1fr)_1fr_1fr_24px] items-center gap-x-2 py-1.5">
             <span>{dateFormatter.format(new Date(`${payment.paid_at}T00:00:00`))}</span>
             <span className="font-semibold">{formatMoney(payment.amount, currency)}</span>
 
@@ -122,8 +121,6 @@ function CommissionPayments({
               className={`${field} border-transparent bg-transparent hover:border-line`}
             />
 
-            <span className="truncate text-muted">{payment.note}</span>
-
             <button
               type="button"
               title="Remove payment"
@@ -132,11 +129,13 @@ function CommissionPayments({
             >
               ×
             </button>
+
+            {payment.note && <span className="col-span-full truncate text-xs text-muted">{payment.note}</span>}
           </div>
         ))}
 
         <div
-          className="grid grid-cols-[110px_1fr_1fr_1.4fr_28px] items-center gap-2 py-1.5"
+          className="grid grid-cols-[minmax(0,1.1fr)_1fr_1fr_24px] items-center gap-2 py-1.5"
           onKeyDown={(event) => {
             if (event.key === "Enter") handleAdd();
           }}
@@ -156,20 +155,21 @@ function CommissionPayments({
             inputMode="decimal"
             className={field}
           />
-          <input
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="PayPal, deposit…"
-            className={field}
-          />
           <button
             type="button"
             title="Add payment"
             onClick={handleAdd}
-            className="rounded-sm bg-primary text-on-primary transition hover:bg-primary-hover"
+            className="h-full rounded-sm bg-primary text-on-primary transition hover:bg-primary-hover"
           >
             +
           </button>
+
+          <input
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="Note: PayPal, deposit…"
+            className={`${field} col-span-full`}
+          />
         </div>
       </div>
     </div>

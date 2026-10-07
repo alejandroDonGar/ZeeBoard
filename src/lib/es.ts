@@ -147,7 +147,7 @@ export const es: Record<string, string> = {
   "All caught up.": "Todo al día.",
   "Most used tags": "Etiquetas más usadas",
   "No tags in use yet.": "Aún no hay etiquetas en uso.",
-  "Booked per month · by commission start date": "Reservado por mes · según el inicio de la comisión",
+  "Received per month · after platform fees": "Recibido por mes · tras las tarifas",
   "{n} day overdue": "{n} día de retraso",
   "{n} days overdue": "{n} días de retraso",
   "Due today": "Vence hoy",

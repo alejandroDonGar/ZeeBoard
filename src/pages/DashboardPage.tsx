@@ -81,8 +81,6 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
     (commission) => commission.deadline !== null && daysUntil(commission.deadline) <= 7,
   ).length;
 
-  const sumPrices = (list: Commission[]) => list.reduce((sum, commission) => sum + (commission.price ?? 0), 0);
-
   const summaryOf = (commission: Commission) =>
     paymentSummary(
       commission.price,
@@ -102,17 +100,16 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
 
   const monthFormatter = new Intl.DateTimeFormat(locale, { month: "short" });
   const now = new Date();
-  const bookedByMonth = Array.from({ length: 6 }, (_, index) => {
+  const receivedByMonth = Array.from({ length: 6 }, (_, index) => {
     const month = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
-    const total = sumPrices(
-      commissions.filter((commission) => {
-        const created = new Date(commission.created_at);
-        return created.getFullYear() === month.getFullYear() && created.getMonth() === month.getMonth();
-      }),
+    const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+    const summary = paymentSummary(
+      null,
+      payments.filter((payment) => payment.paid_at.startsWith(key)),
     );
-    return { label: monthFormatter.format(month), total };
+    return { label: monthFormatter.format(month), total: summary.received, pending: summary.pendingReceived };
   });
-  const maxBooked = Math.max(...bookedByMonth.map((entry) => entry.total), 1);
+  const maxReceived = Math.max(...receivedByMonth.map((entry) => entry.total), 1);
 
   const tagCounts = new Map<number, { tag: Tag; count: number }>();
   Object.values(commissionTagsById)
@@ -299,26 +296,28 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
         </div>
 
         <section className={panel}>
-          <h3 className={heading}>{t("Booked per month · by commission start date")}</h3>
+          <h3 className={heading}>{t("Received per month · after platform fees")}</h3>
 
           <div className="flex h-36 items-end gap-3 border-b border-line">
-            {bookedByMonth.map((entry) => (
+            {receivedByMonth.map((entry) => (
               // ponytail: native tooltip (title); a custom one if more detail is needed
               <div
                 key={entry.label}
-                title={`${entry.label}: ${formatMoney(entry.total)}`}
+                title={`${entry.label}: ${formatMoney(entry.total)}${
+                  entry.pending > 0 ? ` · ${t("{n} not entered", { n: entry.pending })}` : ""
+                }`}
                 className="flex h-full flex-1 flex-col justify-end"
               >
                 <div
                   className="min-h-px rounded-t-sm bg-primary transition hover:bg-primary-hover"
-                  style={{ height: `${(entry.total / maxBooked) * 100}%` }}
+                  style={{ height: `${(entry.total / maxReceived) * 100}%` }}
                 />
               </div>
             ))}
           </div>
 
           <div className="mt-1 flex gap-3">
-            {bookedByMonth.map((entry) => (
+            {receivedByMonth.map((entry) => (
               <div key={entry.label} className="flex-1 text-center text-[11px] text-faint">
                 {entry.label}
                 <span className="block font-semibold text-muted">{formatMoney(entry.total)}</span>

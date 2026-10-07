@@ -81,7 +81,7 @@ What is on your desk today, at a glance.
 - **Four counters**: commissions in progress, due within 7 days (overdue included), what is still waiting for payment, and what you received this month (with the platform fees).
 - **In progress**: every open commission with its current stage, progress bar and deadline. Click one to open it.
 - **Not paid yet**: what each commission still owes.
-- **Most used tags** and **Booked per month**, a six-month chart by the date each commission started.
+- **Most used tags** and **Received per month**, a six-month chart of the money that actually reached you (net of platform fees, by payment date).
 
 ## Commissions
 

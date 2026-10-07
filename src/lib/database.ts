@@ -1,7 +1,7 @@
 import { t } from "./i18n";
 import Database from "@tauri-apps/plugin-sql";
 import type { ImportedRequest } from "./formImport";
-import { adaptCommission, COMMISSION_CHILDREN, imagePathsOf, insertStatement, type Snapshot } from "./trash";
+import { adaptCommission, COMMISSION_CHILDREN, imagePathsOf, insertStatement, TRASH_DAYS, type Snapshot } from "./trash";
 import {
   deleteImageFiles,
   importImageFromDataDir,
@@ -937,6 +937,44 @@ export async function restoreTrash(trashId: number): Promise<string | null> {
   await database.execute(`DELETE FROM trash WHERE id = ?;`, [trashId]);
 
   return entry.label;
+}
+
+export type TrashEntry = { id: number; kind: string; label: string; deleted_at: string };
+
+export async function getTrash(): Promise<TrashEntry[]> {
+  const database = await getDatabase();
+
+  return database.select<TrashEntry[]>(`SELECT id, kind, label, deleted_at FROM trash ORDER BY id DESC;`);
+}
+
+/**
+ * Removes trash entries for good, then the image files nobody else uses.
+ * The rows go first, so their images no longer count as in use.
+ */
+async function purgeTrashWhere(where: string, params: unknown[] = []): Promise<number> {
+  const database = await getDatabase();
+  const entries = await database.select<{ payload: string }[]>(`SELECT payload FROM trash WHERE ${where};`, params);
+
+  await database.execute(`DELETE FROM trash WHERE ${where};`, params);
+
+  const used = new Set(await getAllUsedImagePaths());
+  const unused = [...new Set(entries.flatMap((entry) => imagePathsOf(JSON.parse(entry.payload) as Snapshot)))].filter(
+    (path) => !used.has(path),
+  );
+
+  await deleteImageFiles(unused);
+
+  return entries.length;
+}
+
+export const purgeTrashEntry = (trashId: number) => purgeTrashWhere("id = ?", [trashId]);
+export const emptyTrash = () => purgeTrashWhere("1 = 1");
+
+/** On startup: what has been in the trash longer than TRASH_DAYS goes for good. */
+export function purgeOldTrash(): Promise<number> {
+  const limit = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
+
+  return purgeTrashWhere("deleted_at < ?", [limit]);
 }
 
 /** Ctrl+Z: restores the most recently deleted item; null when the trash is empty. */

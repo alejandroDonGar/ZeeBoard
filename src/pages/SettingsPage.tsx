@@ -5,13 +5,20 @@ import { backupBeforeCleanup, exportBackup, pickBackupFolder, pickFolder, restor
 import { applyTheme, getTheme, type ThemeChoice } from "../lib/theme";
 import {
   appSettings,
+  emptyTrash,
   getAllUsedImagePaths,
   getLastImportedPaymentDate,
   getPaymentPlatforms,
+  getTrash,
+  purgeTrashEntry,
+  restoreTrash,
   savePaymentPlatforms,
   updateSettings,
   type PaymentPlatform,
+  type TrashEntry,
 } from "../lib/database";
+import { TRASH_DAYS } from "../lib/trash";
+import { useToast } from "../context/ToastContext";
 import { formatMoney, isoDay, receivedAfterFees } from "../lib/commissionHelpers";
 import { exportCsv, type ExportKind } from "../lib/export";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -134,6 +141,42 @@ function SettingsPage() {
   useEffect(() => {
     loadStorage().catch(console.error);
   }, []);
+
+  const { showToast } = useToast();
+  const [trash, setTrash] = useState<TrashEntry[]>([]);
+  // What the confirm modal is about: one entry, or null for the whole trash
+  const [purging, setPurging] = useState<{ entry: TrashEntry | null } | null>(null);
+
+  const loadTrash = () => getTrash().then(setTrash).catch(console.error);
+
+  useEffect(() => {
+    loadTrash();
+  }, []);
+
+  async function handleRestore(entry: TrashEntry) {
+    try {
+      const label = await restoreTrash(entry.id);
+      showToast(label === null ? "Nothing to undo." : t("Restored “{name}”.", { name: label }), label === null ? "error" : "success");
+    } catch (error) {
+      console.error(error);
+      showToast("Could not undo.", "error");
+    }
+    loadTrash();
+  }
+
+  async function handlePurge(entry: TrashEntry | null) {
+    try {
+      await (entry ? purgeTrashEntry(entry.id) : emptyTrash());
+      showToast(entry ? "Deleted for good." : "Trash emptied.", "success");
+    } catch (error) {
+      console.error(error);
+      showToast("Could not delete.", "error");
+    }
+    loadTrash();
+    loadStorage().catch(console.error);
+  }
+
+  const daysAgo = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 
   const [exporting, setExporting] = useState(false);
   const [backupMessage, setBackupMessage] = useState<string | null>(null);
@@ -586,6 +629,47 @@ function SettingsPage() {
             </p>
           </div>
 
+          <h3 className={section}>{t("Trash")}</h3>
+          <div className={panel}>
+            {trash.length === 0 ? (
+              <p className={`${row} text-sm text-muted`}>
+                {t("The trash is empty. Deleted commissions stay here for {days} days.", { days: TRASH_DAYS })}
+              </p>
+            ) : (
+              <>
+                {trash.map((entry) => {
+                  const days = daysAgo(entry.deleted_at);
+
+                  return (
+                    <div key={entry.id} className={row}>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{entry.label}</p>
+                        <p className="text-xs text-muted">
+                          {t("Commission")} ·{" "}
+                          {days === 0 ? t("today") : t(days === 1 ? "{n} day ago" : "{n} days ago", { n: days })}
+                        </p>
+                      </div>
+                      <button type="button" onClick={() => handleRestore(entry)} className={ghostButton}>
+                        {t("Restore")}
+                      </button>
+                      <button type="button" onClick={() => setPurging({ entry })} className={ghostButton}>
+                        {t("Delete forever")}
+                      </button>
+                    </div>
+                  );
+                })}
+                <div className={row}>
+                  <p className="flex-1 text-sm text-muted">
+                    {t("Items are removed for good after {days} days.", { days: TRASH_DAYS })}
+                  </p>
+                  <button type="button" onClick={() => setPurging({ entry: null })} className={ghostButton}>
+                    {t("Empty trash")}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           <h3 className={section}>{t("Storage")}</h3>
           <div className={panel}>
             <div className={row}>
@@ -662,6 +746,22 @@ function SettingsPage() {
             }
           }}
           onCancel={() => setRestoreFolder(null)}
+        />
+      )}
+
+      {purging && (
+        <ConfirmModal
+          eyebrow="Permanent action"
+          eyebrowTone="danger"
+          title={purging.entry ? purging.entry.label : "Empty the trash"}
+          message="This permanently deletes it, including its image files. It can't be undone."
+          confirmLabel={purging.entry ? "Delete forever" : "Empty trash"}
+          onConfirm={() => {
+            const { entry } = purging;
+            setPurging(null);
+            handlePurge(entry);
+          }}
+          onCancel={() => setPurging(null)}
         />
       )}
 

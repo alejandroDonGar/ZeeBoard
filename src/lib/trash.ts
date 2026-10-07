@@ -3,6 +3,9 @@
 /** Rows of one deleted item, by table: the item itself plus everything that hung from it */
 export type Snapshot = Record<string, Record<string, unknown>[]>;
 
+/** Days an item stays in the trash before it is removed for good */
+export const TRASH_DAYS = 30;
+
 export const COMMISSION_CHILDREN = [
   "commission_tags",
   "commission_payments",

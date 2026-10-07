@@ -1,6 +1,6 @@
 import "./App.css";
 import { useCallback, useEffect, useState } from "react";
-import { initializeDatabase, migrateLegacyImages, migratePaymentTags, restoreLastTrash } from "./lib/database";
+import { initializeDatabase, migrateLegacyImages, migratePaymentTags, purgeOldTrash, restoreLastTrash } from "./lib/database";
 import { initImageUrls } from "./lib/images";
 import CommissionsPage from "./pages/CommissionsPage";
 import ClientsPage from "./pages/ClientsPage";
@@ -56,6 +56,7 @@ let reportProgress: (progress: Progress) => void = () => {};
 const startup = initImageUrls()
   .then(initializeDatabase)
   .then(migratePaymentTags)
+  .then(() => purgeOldTrash().catch(console.error))
   .then(() => migrateLegacyImages((done, total) => reportProgress({ done, total })));
 
 /** Delivery and stalled-commission alerts: on open and every 30 minutes while the app is open. */

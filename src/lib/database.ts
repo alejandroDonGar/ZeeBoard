@@ -677,6 +677,8 @@ export type Commission = {
   deadline: string | null;
   notes: string | null;
   created_at: string;
+  /** When it last changed stage (ISO); older finished commissions use it as their delivery day */
+  stage_changed_at: string | null;
   /** Set when it is marked as finished: delivery date (YYYY-MM-DD), hours spent and closing notes */
   delivered_at: string | null;
   hours: number | null;

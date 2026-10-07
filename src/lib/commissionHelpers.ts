@@ -140,6 +140,28 @@ export function paymentSummary(
   return { paid, received, fees, remaining, pendingReceived: payments.length - withReceived.length, status };
 }
 
+/** What reached you: net of fees where the net is entered, what the client paid where it isn't yet. */
+export function netIncome(summary: PaymentSummary): number {
+  return round2(summary.paid - summary.fees);
+}
+
+/** Euros per hour over the entries that have hours (total income / total hours, so long pieces weigh more). */
+export function ratePerHour(entries: { net: number; hours: number | null }[]): number | null {
+  const withHours = entries.filter((entry) => entry.hours !== null && entry.hours > 0);
+  const hours = withHours.reduce((sum, entry) => sum + (entry.hours ?? 0), 0);
+
+  return hours > 0 ? round2(withHours.reduce((sum, entry) => sum + entry.net, 0) / hours) : null;
+}
+
+/** Day (YYYY-MM-DD) it was delivered: the date typed when marking it finished, else when it reached its last stage. */
+export function deliveryDay(commission: Commission): string {
+  if (commission.delivered_at) {
+    return commission.delivered_at;
+  }
+
+  return commission.stage_changed_at ? isoDay(new Date(commission.stage_changed_at)) : commission.created_at.slice(0, 10);
+}
+
 export const PAYMENT_STATUS_STYLE: Record<PaymentStatus, { label: string; className: string }> = {
   unpaid: { label: t("Unpaid"), className: "bg-red-50 text-red-600" },
   partial: { label: t("Partial"), className: "bg-amber-100 text-amber-900" },

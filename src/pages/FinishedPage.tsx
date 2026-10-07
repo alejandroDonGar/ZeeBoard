@@ -2,15 +2,23 @@ import { locale, t } from "../lib/i18n";
 import { useEffect, useState } from "react";
 import { imageUrl, thumbUrl } from "../lib/images";
 import {
+  deliveryDay,
   isCommissionCompleted as isCommissionCompletedHelper,
   loadStageImagesForCommissions,
   formatMoney,
+  netIncome,
+  paymentSummary,
+  ratePerHour,
 } from "../lib/commissionHelpers";
 import {
+  getAllPayments,
   getCommissions,
+  getTemplates,
   getTemplateStages,
   type Commission,
+  type CommissionPayment,
   type CommissionStageImage,
+  type Template,
   type TemplateStage,
 } from "../lib/database";
 import { hide } from "../lib/privacy";
@@ -37,6 +45,13 @@ function FinishedPage({
   const [groupMode, setGroupMode] = useState<"month" | "client">("month");
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [payments, setPayments] = useState<CommissionPayment[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+
+  useEffect(() => {
+    getAllPayments().then(setPayments).catch(console.error);
+    getTemplates().then(setTemplates).catch(console.error);
+  }, []);
 
   useEffect(() => {
     getCommissions()
@@ -89,13 +104,13 @@ function FinishedPage({
       commission.title.toLowerCase().includes(query) ||
       (commission.client_name ?? "").toLowerCase().includes(query);
 
-    const createdAt = new Date(commission.created_at);
+    const delivered = new Date(`${deliveryDay(commission)}T12:00:00`);
 
     const matchesFrom =
-      dateFrom === "" || createdAt >= new Date(`${dateFrom}T00:00:00`);
+      dateFrom === "" || delivered >= new Date(`${dateFrom}T00:00:00`);
 
     const matchesTo =
-      dateTo === "" || createdAt <= new Date(`${dateTo}T23:59:59`);
+      dateTo === "" || delivered <= new Date(`${dateTo}T23:59:59`);
 
     return matchesSearch && matchesFrom && matchesTo;
   });
@@ -104,6 +119,23 @@ function FinishedPage({
     (sum, commission) => sum + (commission.price ?? 0),
     0,
   );
+
+  // What each finished commission brought in per hour (only those with hours)
+  const net = (commission: Commission) =>
+    netIncome(paymentSummary(commission.price, payments.filter((payment) => payment.commission_id === commission.id)));
+  const rateOf = (commission: Commission) => ratePerHour([{ net: net(commission), hours: commission.hours }]);
+  const overallRate = ratePerHour(filteredCompleted.map((commission) => ({ net: net(commission), hours: commission.hours })));
+  const rateByTemplate = templates
+    .map((template) => ({
+      name: template.name,
+      rate: ratePerHour(
+        filteredCompleted
+          .filter((commission) => commission.template_id === template.id)
+          .map((commission) => ({ net: net(commission), hours: commission.hours })),
+      ),
+    }))
+    .filter((entry): entry is { name: string; rate: number } => entry.rate !== null)
+    .sort((a, b) => b.rate - a.rate);
 
   const monthFormatter = new Intl.DateTimeFormat(locale, {
     month: "long",
@@ -114,7 +146,7 @@ function FinishedPage({
     const groupsMap = new Map<string, FinishedGroup>();
 
     filteredCompleted.forEach((commission) => {
-      const date = new Date(commission.created_at);
+      const date = new Date(`${deliveryDay(commission)}T12:00:00`);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 
       if (!groupsMap.has(key)) {
@@ -166,7 +198,7 @@ function FinishedPage({
       <PageHeader
         label={t("Archive")}
         title={t("Finished commissions")}
-        description={t("Everything you've delivered, grouped by month or by client.")}
+        description={t("Everything you've delivered, grouped by delivery month or by client.")}
       />
 
       <section className="h-[calc(100vh-117px)] min-h-0 p-5 pb-6">
@@ -218,8 +250,20 @@ function FinishedPage({
 
             <span className="ml-auto text-sm font-bold">
               {t("{n} finished · {amount}", { n: filteredCompleted.length, amount: formatMoney(totalEarnings) })}
+              {overallRate !== null && ` · ${formatMoney(overallRate)}/h`}
             </span>
           </div>
+
+          {rateByTemplate.length > 0 && (
+            <p className="mb-4 text-xs text-muted">
+              <span className="font-black uppercase tracking-[0.16em] text-faint">{t("Per hour")}</span>
+              {rateByTemplate.map((entry) => (
+                <span key={entry.name} className="ml-3">
+                  {entry.name} <span className="font-bold text-ink">{formatMoney(entry.rate)}</span>
+                </span>
+              ))}
+            </p>
+          )}
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {!ready ? null : filteredCompleted.length === 0 ? (
@@ -229,7 +273,7 @@ function FinishedPage({
                 </p>
                 <p className="mt-1 text-sm text-muted">
                   {completedCommissions.length === 0
-                    ? t("Commissions land here when they reach their last stage.")
+                    ? t("Commissions land here when you mark them as finished.")
                     : t("Try another search or date range.")}
                 </p>
               </div>
@@ -254,7 +298,7 @@ function FinishedPage({
 
                       <div className="divide-y divide-line border-y border-line">
                         {[...group.commissions]
-                          .sort((a, b) => b.created_at.localeCompare(a.created_at))
+                          .sort((a, b) => deliveryDay(b).localeCompare(deliveryDay(a)))
                           .map((commission) => {
                             const images = stageImagesByCommissionId[commission.id] ?? [];
                             const latestImage = images[images.length - 1] ?? null;
@@ -264,7 +308,7 @@ function FinishedPage({
                                 key={commission.id}
                                 onClick={() => handleOpenCommission(commission)}
                                 title={t("Open commission")}
-                                className="grid cursor-pointer grid-cols-[48px_minmax(0,1fr)_160px_80px_100px] items-center gap-4 px-2 py-2 transition hover:bg-paper"
+                                className="grid cursor-pointer grid-cols-[48px_minmax(0,1fr)_160px_80px_130px_100px] items-center gap-4 px-2 py-2 transition hover:bg-paper"
                               >
                                 {latestImage ? (
                                   <button
@@ -292,7 +336,12 @@ function FinishedPage({
                                   {hide(commission.client_name || t("No client"))}
                                 </span>
                                 <span className="text-sm text-faint">
-                                  {dateFormatter.format(new Date(commission.created_at))}
+                                  {dateFormatter.format(new Date(`${deliveryDay(commission)}T12:00:00`))}
+                                </span>
+                                <span className="text-right text-xs text-faint">
+                                  {commission.hours !== null && commission.hours > 0
+                                    ? `${commission.hours} h${rateOf(commission) !== null ? ` · ${formatMoney(rateOf(commission) as number)}/h` : ""}`
+                                    : "—"}
                                 </span>
                                 <span className="text-right text-sm font-bold">
                                   {commission.price

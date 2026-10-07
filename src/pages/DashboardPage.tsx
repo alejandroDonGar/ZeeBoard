@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   getCommissionCompletionPercentage,
+  deliveryDay,
   getDeadlineStatus,
+  isoDay,
+  netIncome,
   paymentSummary,
+  ratePerHour,
   isCommissionCompleted as isCommissionCompletedHelper,
   loadStageImagesForCommissions,
   formatMoney,
@@ -109,6 +113,20 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
     );
     return { label: monthFormatter.format(month), total: summary.received, pending: summary.pendingReceived };
   });
+  // Hourly rate of what you delivered in the last 90 days (only pieces with hours)
+  const since = isoDay(new Date(Date.now() - 90 * DAY));
+  const recent = commissions.filter(
+    (commission) =>
+      isCommissionCompletedHelper(commission, templateStagesByTemplateId) &&
+      deliveryDay(commission) >= since &&
+      commission.hours !== null &&
+      commission.hours > 0,
+  );
+  const recentRate = ratePerHour(
+    recent.map((commission) => ({ net: netIncome(summaryOf(commission)), hours: commission.hours })),
+  );
+  const recentHours = recent.reduce((sum, commission) => sum + (commission.hours ?? 0), 0);
+
   const maxReceived = Math.max(...receivedByMonth.map((entry) => entry.total), 1);
 
   const tagCounts = new Map<number, { tag: Tag; count: number }>();
@@ -273,6 +291,19 @@ function DashboardPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () =>
                 </div>
               )}
             </section>
+
+            {recentRate !== null && (
+              <section className={panel}>
+                <h3 className={heading}>{t("Your hourly rate · last 90 days")}</h3>
+                <p className="text-3xl font-black text-green-600">{formatMoney(recentRate)}/h</p>
+                <p className="mt-1 text-xs text-muted">
+                  {t(recent.length === 1 ? "{n} piece · {hours} h" : "{n} pieces · {hours} h", {
+                    n: recent.length,
+                    hours: Math.round(recentHours * 10) / 10,
+                  })}
+                </p>
+              </section>
+            )}
 
             <section className={panel}>
               <h3 className={heading}>{t("Most used tags")}</h3>

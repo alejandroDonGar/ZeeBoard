@@ -61,7 +61,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 
 **Prioritarias**
 - [x] Papelera con deshacer (Ctrl+Z): comisiones, clientes, personajes, plantillas, etiquetas, solicitudes, pagos y correcciones; pantalla en Ajustes y purga a los 30 días
-- [ ] Cronómetro por comisión y etapa, con el precio real por hora
+- [x] Horas por comisión (se apuntan al marcarla como terminada) y precio real por hora
 - [x] Modo privado para directos (ocultar clientes y precios)
 - [ ] Anotaciones de correcciones sobre las imágenes
 

@@ -1,6 +1,7 @@
 // Quick check of payments and prices: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { calculateCommissionPrice, formatMoney, invoiceDescription, paymentSummary, receivedAfterFees } from "../src/lib/commissionHelpers";
+import { calculateCommissionPrice, deliveryDay, formatMoney, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
+import type { Commission } from "../src/lib/database";
 import { HIDDEN, hide, setPrivate } from "../src/lib/privacy";
 
 // PayPal: the client pays 200, you receive 186.84
@@ -51,3 +52,22 @@ assert.strictEqual(invoiceDescription("Rendered", ["Ana", "Beto"]), "Rendered, 2
 assert.strictEqual(invoiceDescription("Sketch", ["Ana"]), "Sketch, 1 character (Ana) - @AverageZebraBoy");
 assert.strictEqual(invoiceDescription(null, []), "@AverageZebraBoy");
 console.log("description ok");
+
+// ---- Hourly rate ----
+// Net: where the received amount is entered it counts, otherwise what the client paid
+assert.strictEqual(netIncome(paymentSummary(200, [{ amount: 200, received: 186.84 }])), 186.84);
+assert.strictEqual(netIncome(paymentSummary(240, [{ amount: 120, received: 111 }, { amount: 120, received: null }])), 231);
+
+// Total income / total hours; entries without hours are ignored
+assert.strictEqual(ratePerHour([{ net: 100, hours: 4 }, { net: 200, hours: 4 }]), 37.5);
+assert.strictEqual(ratePerHour([{ net: 100, hours: 4 }, { net: 999, hours: null }, { net: 50, hours: 0 }]), 25);
+assert.strictEqual(ratePerHour([{ net: 100, hours: null }]), null);
+assert.strictEqual(ratePerHour([]), null);
+
+// Delivery day: the typed date, else when it reached the last stage, else when it was created
+const base = { created_at: "2026-05-01T10:00:00.000Z", stage_changed_at: null, delivered_at: null } as Commission;
+assert.strictEqual(deliveryDay({ ...base, delivered_at: "2026-07-20" }), "2026-07-20");
+assert.strictEqual(deliveryDay({ ...base, stage_changed_at: "2026-06-15T12:00:00.000Z" }), "2026-06-15");
+assert.strictEqual(deliveryDay(base), "2026-05-01");
+
+console.log("hourly rate ok");

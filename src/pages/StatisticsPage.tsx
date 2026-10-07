@@ -1,0 +1,187 @@
+import { useEffect, useMemo, useState } from "react";
+import PageHeader from "../components/PageHeader";
+import { Segmented } from "../components/BoardFilters";
+import { formatMoney } from "../lib/commissionHelpers";
+import {
+  appSettings,
+  getAllPayments,
+  getCommissions,
+  getTemplates,
+  getTemplateStages,
+  type Commission,
+  type CommissionPayment,
+  type Template,
+  type TemplateStage,
+} from "../lib/database";
+import { locale, t } from "../lib/i18n";
+import { changePercent, computeStats, type Period } from "../lib/stats";
+
+const panel = "rounded-3xl border border-line bg-surface p-5 shadow-sm";
+const heading = "mb-3 text-[11px] font-black uppercase tracking-[0.16em] text-faint";
+
+/** ▲ 12 % / ▼ 5 % against the previous period (nothing when there is nothing to compare) */
+function Change({ now, before }: { now: number | null; before: number | null }) {
+  const change = changePercent(now, before);
+
+  if (change === null) {
+    return null;
+  }
+
+  return (
+    <span className={change >= 0 ? "text-green-600" : "text-red-500"}>
+      {change >= 0 ? "▲" : "▼"} {Math.abs(change)} %
+    </span>
+  );
+}
+
+function StatisticsPage() {
+  const [period, setPeriod] = useState<Period>("year");
+  const [data, setData] = useState<{
+    commissions: Commission[];
+    payments: CommissionPayment[];
+    templates: Template[];
+    stages: Record<number, TemplateStage[]>;
+  } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const [commissions, payments, templates] = await Promise.all([getCommissions(), getAllPayments(), getTemplates()]);
+      const stages = Object.fromEntries(
+        await Promise.all(templates.map(async (template) => [template.id, await getTemplateStages(template.id)] as const)),
+      );
+
+      setData({ commissions, payments, templates, stages });
+    })().catch(console.error);
+  }, []);
+
+  const stats = useMemo(
+    () => (data ? computeStats({ ...data, currency: appSettings().default_currency, now: new Date() }, period) : null),
+    [data, period],
+  );
+
+  const monthFormatter = new Intl.DateTimeFormat(locale, { month: "short" });
+  const maxMonth = Math.max(...(stats?.months.map((month) => month.total) ?? []), 1);
+  const noData = stats !== null && stats.current.pieces === 0 && stats.current.received === 0;
+
+  const tiles = stats && [
+    {
+      label: t("Received"),
+      value: formatMoney(stats.current.received),
+      change: <Change now={stats.current.received} before={stats.previous?.received ?? null} />,
+      className: "text-green-600",
+    },
+    {
+      label: t("Pieces delivered"),
+      value: stats.current.pieces,
+      change: <Change now={stats.current.pieces} before={stats.previous?.pieces ?? null} />,
+      className: "text-ink",
+    },
+    {
+      label: t("Average per piece"),
+      value: stats.current.avgPerPiece === null ? "—" : formatMoney(stats.current.avgPerPiece),
+      change: <Change now={stats.current.avgPerPiece} before={stats.previous?.avgPerPiece ?? null} />,
+      className: "text-ink",
+    },
+    {
+      label: t("Per hour"),
+      value: stats.current.rate === null ? "—" : `${formatMoney(stats.current.rate)}/h`,
+      change: <Change now={stats.current.rate} before={stats.previous?.rate ?? null} />,
+      className: "text-ink",
+    },
+  ];
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto">
+      <PageHeader label="Business" title="Statistics" description="How your commissions are doing." />
+
+      <div className="space-y-5 p-5 pb-10">
+        <div className="flex items-center gap-3">
+          <Segmented
+            options={[
+              { value: "year", label: "This year" },
+              { value: "12m", label: "Last 12 months" },
+              { value: "all", label: "All time" },
+            ]}
+            value={period}
+            onChange={setPeriod}
+          />
+          {stats && stats.excluded > 0 && (
+            <span className="text-xs text-faint">
+              {t(stats.excluded === 1 ? "{n} commission in another currency isn't counted." : "{n} commissions in another currency aren't counted.", { n: stats.excluded })}
+            </span>
+          )}
+        </div>
+
+        {noData && <p className={`${panel} text-sm text-muted`}>{t("Nothing in this period yet.")}</p>}
+
+        {tiles && (
+          <dl className="grid grid-cols-4 gap-4">
+            {tiles.map((tile) => (
+              <div key={tile.label} className={panel}>
+                <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">{tile.label}</dt>
+                <dd className={`mt-1 text-2xl font-black ${tile.className}`}>{tile.value}</dd>
+                <dd className="text-xs">{tile.change}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        {stats && (
+          <section className={panel}>
+            <h3 className={heading}>{t("Received per month · after platform fees")}</h3>
+
+            <div className="flex h-36 items-end gap-3 border-b border-line">
+              {stats.months.map((month) => (
+                <div key={month.key} title={`${month.key}: ${formatMoney(month.total)}`} className="flex h-full flex-1 flex-col justify-end">
+                  <div
+                    className="min-h-px rounded-t-sm bg-primary transition hover:bg-primary-hover"
+                    style={{ height: `${(month.total / maxMonth) * 100}%` }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-1 flex gap-3">
+              {stats.months.map((month) => (
+                <div key={month.key} className="flex-1 text-center text-[11px] text-faint">
+                  {monthFormatter.format(new Date(`${month.key}-01T12:00:00`))}
+                  <span className="block font-semibold text-muted">{formatMoney(month.total)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {stats && stats.byTemplate.length > 0 && (
+          <section className={panel}>
+            <h3 className={heading}>{t("By type of commission")}</h3>
+
+            <div className="grid grid-cols-[minmax(0,1fr)_70px_100px_100px_80px_110px] gap-4 px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-faint">
+              <span>{t("Template")}</span>
+              <span className="text-right">{t("Pieces")}</span>
+              <span className="text-right">{t("Received")}</span>
+              <span className="text-right">{t("Average")}</span>
+              <span className="text-right">{t("Hours")}</span>
+              <span className="text-right">{t("Per hour")}</span>
+            </div>
+
+            <div className="divide-y divide-line border-y border-line">
+              {stats.byTemplate.map((row) => (
+                <div key={row.name} className="grid grid-cols-[minmax(0,1fr)_70px_100px_100px_80px_110px] items-center gap-4 px-2 py-2 text-sm">
+                  <span className="truncate font-bold">{row.name || t("No template")}</span>
+                  <span className="text-right text-muted">{row.pieces}</span>
+                  <span className="text-right font-bold">{formatMoney(row.net)}</span>
+                  <span className="text-right text-muted">{formatMoney(row.avgNet)}</span>
+                  <span className="text-right text-muted">{row.avgHours ?? "—"}</span>
+                  <span className="text-right font-bold">{row.rate === null ? "—" : `${formatMoney(row.rate)}/h`}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default StatisticsPage;

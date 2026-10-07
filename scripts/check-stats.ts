@@ -1,0 +1,75 @@
+// Quick check of the statistics numbers: npx tsx scripts/check-stats.ts
+import assert from "node:assert";
+import { changePercent, computeStats, periodRanges } from "../src/lib/stats";
+import type { Commission, CommissionPayment, TemplateStage } from "../src/lib/database";
+
+const now = new Date(2026, 9, 7); // 7 Oct 2026
+
+// ---- Periods ----
+assert.deepStrictEqual(periodRanges("year", now), {
+  current: { from: "2026-01-01", to: "2026-12-31" },
+  previous: { from: "2025-01-01", to: "2025-12-31" },
+});
+assert.deepStrictEqual(periodRanges("12m", now), {
+  current: { from: "2025-10-08", to: "2026-10-07" },
+  previous: { from: "2024-10-08", to: "2025-10-07" },
+});
+assert.strictEqual(periodRanges("all", now).previous, null);
+
+// ---- Numbers ----
+// Template 1: stages 10 > 11 (last = finished). Commission 1 and 2 are finished, 3 is open, 4 is in USD.
+const stages: Record<number, TemplateStage[]> = {
+  1: [
+    { id: 10, template_id: 1, name: "Sketch", stage_order: 1 },
+    { id: 11, template_id: 1, name: "Delivery", stage_order: 2 },
+  ],
+};
+const commission = (id: number, extra: Partial<Commission>) =>
+  ({ id, title: `c${id}`, template_id: 1, current_stage_id: 11, price: 100, currency: "EUR", created_at: "2026-01-01T10:00:00.000Z", stage_changed_at: null, delivered_at: null, hours: null, ...extra }) as Commission;
+const payment = (id: number, commission_id: number, amount: number, received: number | null, paid_at: string) =>
+  ({ id, commission_id, amount, received, paid_at, note: null }) as CommissionPayment;
+
+const commissions = [
+  commission(1, { delivered_at: "2026-03-10", hours: 4 }),
+  commission(2, { delivered_at: "2026-08-20", price: 200, hours: 8 }),
+  commission(3, { current_stage_id: 10 }),
+  commission(4, { currency: "USD", delivered_at: "2026-04-01" }),
+  commission(5, { delivered_at: "2025-06-01", hours: 5 }),
+];
+const payments = [
+  payment(1, 1, 100, 90, "2026-03-05"), // net 90
+  payment(2, 2, 200, null, "2026-08-25"), // net not entered: counts what was paid
+  payment(3, 3, 50, 45, "2026-08-01"), // an open commission still brought money in
+  payment(4, 4, 500, 500, "2026-04-02"), // other currency: left out
+  payment(5, 5, 100, 100, "2025-06-02"),
+];
+
+const stats = computeStats({ commissions, payments, templates: [{ id: 1, name: "Flat" }], stages, currency: "EUR", now }, "year");
+
+assert.strictEqual(stats.excluded, 1);
+// Received = cash in the year: 90 + 200 + 45
+assert.strictEqual(stats.current.received, 335);
+// Delivered pieces in the year: #1 (90) and #2 (200)
+assert.strictEqual(stats.current.pieces, 2);
+assert.strictEqual(stats.current.avgPerPiece, 145);
+// (90 + 200) / (4 + 8) hours
+assert.strictEqual(stats.current.rate, 24.17);
+assert.deepStrictEqual(stats.previous, { received: 100, pieces: 1, avgPerPiece: 100, rate: 20 });
+
+assert.strictEqual(stats.months.length, 12);
+assert.strictEqual(stats.months[0].key, "2026-01");
+assert.strictEqual(stats.months[7].total, 245); // August: 200 + 45
+assert.strictEqual(stats.months[3].total, 0, "the USD payment is not counted");
+
+assert.deepStrictEqual(stats.byTemplate, [{ name: "Flat", pieces: 2, net: 290, avgNet: 145, avgHours: 6, rate: 24.17 }]);
+
+assert.strictEqual(computeStats({ commissions, payments, templates: [], stages, currency: "EUR", now }, "all").previous, null);
+assert.strictEqual(computeStats({ commissions: [], payments: [], templates: [], stages, currency: "EUR", now }, "year").current.rate, null);
+
+// ---- Change against the previous period ----
+assert.strictEqual(changePercent(112, 100), 12);
+assert.strictEqual(changePercent(95, 100), -5);
+assert.strictEqual(changePercent(50, 0), null);
+assert.strictEqual(changePercent(null, 100), null);
+
+console.log("stats ok");

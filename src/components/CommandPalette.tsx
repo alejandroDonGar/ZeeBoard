@@ -53,7 +53,7 @@ type Data = {
 
 const SHORTCUTS: [string, string][] = [
   ["Ctrl+K", "Search and actions"],
-  ["Ctrl+1 … 8", "Go to a screen (menu order)"],
+  ["Ctrl+1 … 9", "Go to a screen (menu order)"],
   ["Ctrl+N", "New commission"],
   ["Ctrl+Z", "Restore what you just deleted"],
   ["Ctrl+Shift+P", "Toggle private mode"],

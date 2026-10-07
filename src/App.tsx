@@ -8,6 +8,7 @@ import TagsPage from "./pages/TagsPage";
 import TemplatesPage from "./pages/TemplatesPage";
 import FinishedPage from "./pages/FinishedPage";
 import SettingsPage from "./pages/SettingsPage";
+import StatisticsPage from "./pages/StatisticsPage";
 import DashboardPage from "./pages/DashboardPage";
 import RequestsPage from "./pages/RequestsPage";
 import { ToastProvider, useToast } from "./context/ToastContext";
@@ -29,13 +30,14 @@ import {
   IconInbox,
   IconLayoutDashboard,
   IconListDetails,
+  IconChartBar,
   IconSettings,
   IconTags,
   IconUsers,
   type Icon,
 } from "@tabler/icons-react";
 
-type Page = "dashboard" | "commissions" | "requests" | "clients" | "tags" | "templates" | "finished" | "settings";
+type Page = "dashboard" | "commissions" | "requests" | "clients" | "tags" | "templates" | "finished" | "statistics" | "settings";
 
 const navigationItems: { id: Page; label: string; icon: Icon }[] = [
   { id: "dashboard", label: "Dashboard", icon: IconLayoutDashboard },
@@ -45,6 +47,7 @@ const navigationItems: { id: Page; label: string; icon: Icon }[] = [
   { id: "tags", label: "Tags", icon: IconTags },
   { id: "templates", label: "Templates", icon: IconListDetails },
   { id: "finished", label: "Finished", icon: IconCircleCheck },
+  { id: "statistics", label: "Statistics", icon: IconChartBar },
   { id: "settings", label: "Settings", icon: IconSettings },
 ];
 
@@ -201,7 +204,7 @@ function App() {
       } else if (mod && !event.shiftKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPaletteOpen((open) => !open);
-      } else if (mod && !event.shiftKey && /^[1-8]$/.test(event.key)) {
+      } else if (mod && !event.shiftKey && /^[1-9]$/.test(event.key)) {
         event.preventDefault();
         go(navigationItems[Number(event.key) - 1].id);
       } else if (mod && !event.shiftKey && event.key.toLowerCase() === "n") {
@@ -341,7 +344,7 @@ function App() {
           <div className="mt-3 rounded-3xl border border-line bg-surface p-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">{t("Shortcuts")}</p>
             <div className="mt-2 space-y-1.5 text-xs text-muted">
-              {([["Ctrl+K", "Search"], ["Ctrl+1…8", "Screens"], ["Ctrl+N", "New commission"], ["Ctrl+Z", "Undo delete"]] as const).map(([keys, label]) => (
+              {([["Ctrl+K", "Search"], ["Ctrl+1…9", "Screens"], ["Ctrl+N", "New commission"], ["Ctrl+Z", "Undo delete"]] as const).map(([keys, label]) => (
                 <div key={keys} className="flex items-center justify-between">
                   <span>{t(label)}</span>
                   <kbd className="rounded-sm border border-line-strong bg-paper px-1.5 py-0.5 text-[11px] font-bold">{keys}</kbd>
@@ -367,6 +370,7 @@ function App() {
           {currentPage === "requests" && (
             <RequestsPage onOpenCommissionsPage={() => setCurrentPage("commissions")} />
           )}
+          {currentPage === "statistics" && <StatisticsPage />}
           {currentPage === "settings" && <SettingsPage />}
         </main>
       </div>

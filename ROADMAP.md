@@ -77,6 +77,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [x] Idioma ES/EN en todas las pantallas (diccionario en src/lib/es.ts, comprobación con scripts/check-i18n.ts)
 - [x] Comentarios del código en inglés y concisos
 - [x] Iconos en el menú lateral y tipografía (Fraunces en títulos, Manrope en el resto)
+- [x] Logo propio (Z de rayas): menú lateral, pantalla de carga, iconos de la app y pestaña
 - [x] Contador de revisiones incluidas (correcciones por etapa)
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real

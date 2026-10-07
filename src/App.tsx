@@ -17,6 +17,7 @@ import { loadAttention, notifyNew } from "./lib/reminders";
 import { REQUESTS_CHANGED, syncFormResponses } from "./lib/formSync";
 import { getRequests } from "./lib/database";
 import { t } from "./lib/i18n";
+import Logo from "./components/Logo";
 import {
   IconBrush,
   IconCircleCheck,
@@ -161,7 +162,9 @@ function App() {
     return (
       <div className="flex h-screen items-center justify-center bg-canvas text-ink">
         <div className="text-center">
-          <p className="text-4xl">🦓</p>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1f2933] ring-1 ring-white/10">
+            <Logo className="h-9 w-9 bg-[#f6f3ee]" />
+          </div>
           <p className="mt-3 text-sm font-bold text-muted">
             {progress
               ? progress.done < progress.total
@@ -199,12 +202,15 @@ function App() {
         <aside className="flex w-72 flex-col border-r border-line bg-paper px-5 py-6">
           <div className="mb-10">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-2xl shadow-md">
-                🦓
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#1f2933] shadow-md ring-1 ring-white/10">
+                <Logo className="h-7 w-7 bg-[#f6f3ee]" />
               </div>
 
               <div>
-                <h1 className="font-display text-2xl font-semibold">ZeeBoard</h1>
+                <h1 className="text-2xl tracking-tight">
+                  <b className="font-extrabold">Zee</b>
+                  <span className="font-medium">Board</span>
+                </h1>
                 <p className="text-xs font-medium text-muted">
                   {t("Commission workspace")}
                 </p>

@@ -76,6 +76,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [x] Aviso en Ajustes del último cobro de PayPal importado y desde qué fecha descargar
 - [x] Idioma ES/EN en todas las pantallas (diccionario en src/lib/es.ts, comprobación con scripts/check-i18n.ts)
 - [x] Comentarios del código en inglés y concisos
+- [x] Iconos en el menú lateral y tipografía (Fraunces en títulos, Manrope en el resto)
 - [x] Contador de revisiones incluidas (correcciones por etapa)
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real

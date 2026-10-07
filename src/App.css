@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-display: "Fraunces Variable", Georgia, serif;
+}
+
 /*
  * Colores de la app. Se usan con su nombre en las clases: bg-canvas, text-muted, border-line…
  * Los valores viven en variables CSS para poder cambiarlos con el tema (claro / oscuro).

@@ -10,7 +10,7 @@ export const es: Record<string, string> = {
   Settings: "Ajustes",
   "Commission workspace": "Espacio de comisiones",
   "Hide client names and prices while streaming (Ctrl+Shift+P)": "Oculta nombres de clientes y precios en directo (Ctrl+Shift+P)",
-  "● Private mode on": "● Modo privado activo",
+  "Private mode on": "Modo privado activo",
   "Private mode": "Modo privado",
   "Current theme": "Tema actual",
   "A soft workspace for tracking commissions, clients and deadlines.": "Un espacio suave para seguir comisiones, clientes y entregas.",

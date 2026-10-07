@@ -17,18 +17,31 @@ import { loadAttention, notifyNew } from "./lib/reminders";
 import { REQUESTS_CHANGED, syncFormResponses } from "./lib/formSync";
 import { getRequests } from "./lib/database";
 import { t } from "./lib/i18n";
+import {
+  IconBrush,
+  IconCircleCheck,
+  IconEye,
+  IconEyeOff,
+  IconInbox,
+  IconLayoutDashboard,
+  IconListDetails,
+  IconSettings,
+  IconTags,
+  IconUsers,
+  type Icon,
+} from "@tabler/icons-react";
 
 type Page = "dashboard" | "commissions" | "requests" | "clients" | "tags" | "templates" | "finished" | "settings";
 
-const navigationItems: { id: Page; label: string }[] = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "commissions", label: "Commissions" },
-  { id: "requests", label: "Requests" },
-  { id: "clients", label: "Clients" },
-  { id: "tags", label: "Tags" },
-  { id: "templates", label: "Templates" },
-  { id: "finished", label: "Finished" },
-  { id: "settings", label: "Settings" },
+const navigationItems: { id: Page; label: string; icon: Icon }[] = [
+  { id: "dashboard", label: "Dashboard", icon: IconLayoutDashboard },
+  { id: "commissions", label: "Commissions", icon: IconBrush },
+  { id: "requests", label: "Requests", icon: IconInbox },
+  { id: "clients", label: "Clients", icon: IconUsers },
+  { id: "tags", label: "Tags", icon: IconTags },
+  { id: "templates", label: "Templates", icon: IconListDetails },
+  { id: "finished", label: "Finished", icon: IconCircleCheck },
+  { id: "settings", label: "Settings", icon: IconSettings },
 ];
 
 type Progress = { done: number; total: number };
@@ -191,7 +204,7 @@ function App() {
               </div>
 
               <div>
-                <h1 className="text-2xl font-black tracking-tight">ZeeBoard</h1>
+                <h1 className="font-display text-2xl font-semibold">ZeeBoard</h1>
                 <p className="text-xs font-medium text-muted">
                   {t("Commission workspace")}
                 </p>
@@ -209,10 +222,11 @@ function App() {
                   onClick={() => setCurrentPage(item.id)}
                   className={
                     isActive
-                      ? "w-full rounded-2xl bg-primary px-4 py-3 text-left text-sm font-bold text-on-primary shadow-md"
-                      : "w-full rounded-2xl px-4 py-3 text-left text-sm font-semibold text-muted transition hover:bg-highlight hover:text-ink"
+                      ? "flex w-full items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-left text-sm font-bold text-on-primary shadow-md"
+                      : "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-muted transition hover:bg-highlight hover:text-ink"
                   }
                 >
+                  <item.icon size={18} stroke={1.75} aria-hidden="true" />
                   {t(item.label)}
                   {item.id === "requests" && newRequests > 0 && (
                     <span className="ml-2 rounded-sm bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">
@@ -234,7 +248,10 @@ function App() {
                 : "border-line bg-surface text-muted hover:border-ink hover:text-ink"
             }`}
           >
-            {privateMode ? t("● Private mode on") : t("Private mode")}
+            <span className="flex items-center gap-3">
+              {privateMode ? <IconEyeOff size={18} stroke={1.75} aria-hidden="true" /> : <IconEye size={18} stroke={1.75} aria-hidden="true" />}
+              {privateMode ? t("Private mode on") : t("Private mode")}
+            </span>
             <span className="text-[11px] font-semibold opacity-70">Ctrl+Shift+P</span>
           </button>
 

@@ -20,7 +20,7 @@ function PageHeader({
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-faint">
             {t(label)}
           </p>
-          <h2 className="mt-1 text-3xl font-black">{t(title)}</h2>
+          <h2 className="mt-1 font-display text-3xl font-semibold">{t(title)}</h2>
           <p className="mt-1 text-sm text-muted">{t(description)}</p>
         </div>
 

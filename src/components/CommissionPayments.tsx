@@ -10,6 +10,7 @@ import {
   type CommissionPayment,
 } from "../lib/database";
 import { formatMoney, parsePrice, paymentSummary, receivedAfterFees, PAYMENT_STATUS_STYLE } from "../lib/commissionHelpers";
+import { undoToast } from "../lib/undo";
 import { useToast } from "../context/ToastContext";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -152,7 +153,7 @@ function CommissionPayments({
                 <button
                   type="button"
                   title={t("Remove payment")}
-                  onClick={() => run(() => deletePayment(payment.id))}
+                  onClick={() => run(async () => undoToast(showToast, "Payment removed.", await deletePayment(payment.id)))}
                   className="rounded-sm text-faint opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
                 >
                   ×

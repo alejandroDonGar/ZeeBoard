@@ -43,6 +43,7 @@ import {
 import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
+import { undoToast } from "../lib/undo";
 
 function ClientsPage({
   onOpenCommissionsPage,
@@ -155,10 +156,10 @@ function ClientsPage({
 
     async function handleDeleteClient(clientId: number) {
     try {
-        await deleteClient(clientId);
+        const trashId = await deleteClient(clientId);
         await loadClients();
         setSelectedClientId(null);
-        showToast("Client deleted.", "success");
+        undoToast(showToast, "Client deleted.", trashId);
     } catch (error) {
         console.error(error);
         showToast("Could not delete client.", "error");
@@ -414,10 +415,10 @@ function ClientsPage({
     }
 
     try {
-      await deleteClientCharacter(characterId);
+      const trashId = await deleteClientCharacter(characterId);
       await reloadCharacters(selectedClient.id);
       setExpandedCharacterId(null);
-      showToast("Character deleted.", "success");
+      undoToast(showToast, "Character deleted.", trashId);
     } catch (error) {
       console.error(error);
       showToast("Could not delete character.", "error");
@@ -1228,7 +1229,7 @@ function ClientsPage({
         <ConfirmModal
           eyebrow={t("Delete character")}
           title={characterToDelete.name}
-          message={t("Its references are deleted too, and it's removed from any commissions. This can't be undone.")}
+          message={t("Its references are deleted too, and it's removed from any commissions. You can undo it right after with Ctrl+Z.")}
           confirmLabel={t("Delete")}
           onConfirm={async () => {
             await handleDeleteCharacter(characterToDelete.id);
@@ -1242,7 +1243,7 @@ function ClientsPage({
         <ConfirmModal
             eyebrow={t("Delete client")}
             title={clientToDelete.name}
-            message={t("This action cannot be undone.")}
+            message={t("You can undo it right after with Ctrl+Z.")}
             confirmLabel={t("Delete")}
             onConfirm={async () => {
             await handleDeleteClient(clientToDelete.id);

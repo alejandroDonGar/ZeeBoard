@@ -1,7 +1,17 @@
 import { t } from "./i18n";
 import Database from "@tauri-apps/plugin-sql";
 import type { ImportedRequest } from "./formImport";
-import { adaptCommission, COMMISSION_CHILDREN, imagePathsOf, insertStatement, TRASH_DAYS, type Snapshot } from "./trash";
+import {
+  imagePathsOf,
+  insertStatement,
+  KINDS,
+  planRestore,
+  REFERENCED_TABLES,
+  TRASH_DAYS,
+  type Existing,
+  type Snapshot,
+  type TrashKind,
+} from "./trash";
 import {
   deleteImageFiles,
   importImageFromDataDir,
@@ -479,7 +489,7 @@ export async function createTemplate(name: string, stages: string[]): Promise<vo
   });
 }
 
-export async function deleteTemplate(templateId: number): Promise<void> {
+export async function deleteTemplate(templateId: number): Promise<number> {
   const database = await getDatabase();
 
   // Finished ones too: without their stages they'd stop counting as finished and lose their images
@@ -494,6 +504,8 @@ export async function deleteTemplate(templateId: number): Promise<void> {
     );
   }
 
+  const trashId = await moveToTrash("template", templateId);
+
   await database.execute(
     `DELETE FROM template_stages WHERE template_id = ?;`,
     [templateId],
@@ -503,6 +515,8 @@ export async function deleteTemplate(templateId: number): Promise<void> {
     `DELETE FROM templates WHERE id = ?;`,
     [templateId],
   );
+
+  return trashId;
 }
 
 export async function duplicateTemplate(templateId: number): Promise<void> {
@@ -865,39 +879,47 @@ export async function duplicateCommission(
   return result[0].id;
 }
 
-/** Moves a commission to the trash and returns the trash id (to undo). Image files stay on disk until it is purged. */
-export async function deleteCommission(
-  commissionId: number,
-): Promise<number> {
+/**
+ * Saves what is about to be deleted (the item and everything hanging from it) in the trash and returns
+ * the trash id. Call it BEFORE deleting: image files of trashed items then count as in use and stay on disk.
+ */
+async function moveToTrash(kind: TrashKind, id: number): Promise<number> {
   const database = await getDatabase();
+  const { parts, title } = KINDS[kind];
+  const snapshot: Snapshot = {};
 
-  const [commission] = await database.select<{ title: string }[]>(
-    `SELECT * FROM commissions WHERE id = ?;`,
-    [commissionId],
-  );
-
-  if (!commission) {
-    throw new Error("Commission not found");
+  for (const [key, sql] of parts) {
+    snapshot[key] = await database.select<Record<string, unknown>[]>(`${sql};`, [id]);
   }
 
-  const snapshot: Snapshot = { commissions: [commission] };
+  const [main] = snapshot[parts[0][0]];
 
-  for (const table of COMMISSION_CHILDREN) {
-    snapshot[table] = await database.select(`SELECT * FROM ${table} WHERE commission_id = ?;`, [commissionId]);
+  if (!main) {
+    throw new Error("Nothing to delete");
   }
 
   const saved = await database.execute(
-    `INSERT INTO trash (kind, label, payload, deleted_at) VALUES ('commission', ?, ?, ?);`,
-    [commission.title, JSON.stringify(snapshot), new Date().toISOString()],
+    `INSERT INTO trash (kind, label, payload, deleted_at) VALUES (?, ?, ?, ?);`,
+    [kind, title(main), JSON.stringify(snapshot), new Date().toISOString()],
   );
 
-  for (const table of COMMISSION_CHILDREN) {
+  return Number(saved.lastInsertId);
+}
+
+/** Moves a commission to the trash and returns the trash id (to undo). */
+export async function deleteCommission(
+  commissionId: number,
+): Promise<number> {
+  const trashId = await moveToTrash("commission", commissionId);
+  const database = await getDatabase();
+
+  for (const table of ["commission_tags", "commission_payments", "commission_corrections", "commission_stage_images", "commission_characters"]) {
     await database.execute(`DELETE FROM ${table} WHERE commission_id = ?;`, [commissionId]);
   }
 
   await database.execute(`DELETE FROM commissions WHERE id = ?;`, [commissionId]);
 
-  return Number(saved.lastInsertId);
+  return trashId;
 }
 
 async function existingIds(table: string): Promise<Set<number>> {
@@ -907,12 +929,12 @@ async function existingIds(table: string): Promise<Set<number>> {
   return new Set(rows.map((row) => row.id));
 }
 
-/** Puts a trashed commission back; null when that entry no longer exists (already restored). */
+/** Puts a trashed item back; null when that entry no longer exists (already restored). */
 export async function restoreTrash(trashId: number): Promise<string | null> {
   const database = await getDatabase();
 
-  const [entry] = await database.select<{ label: string; payload: string }[]>(
-    `SELECT label, payload FROM trash WHERE id = ?;`,
+  const [entry] = await database.select<{ kind: TrashKind; label: string; payload: string }[]>(
+    `SELECT kind, label, payload FROM trash WHERE id = ?;`,
     [trashId],
   );
 
@@ -920,18 +942,15 @@ export async function restoreTrash(trashId: number): Promise<string | null> {
     return null;
   }
 
-  const snapshot = adaptCommission(JSON.parse(entry.payload) as Snapshot, {
-    clients: await existingIds("clients"),
-    templates: await existingIds("templates"),
-    tags: await existingIds("tags"),
-    characters: await existingIds("client_characters"),
-  });
+  const existing = {} as Existing;
 
-  for (const table of ["commissions", ...COMMISSION_CHILDREN]) {
-    for (const row of snapshot[table] ?? []) {
-      const [sql, params] = insertStatement(table, row);
-      await database.execute(sql, params);
-    }
+  for (const table of REFERENCED_TABLES) {
+    existing[table] = await existingIds(table);
+  }
+
+  for (const [table, row] of planRestore(entry.kind, JSON.parse(entry.payload) as Snapshot, existing)) {
+    const [sql, params] = insertStatement(table, row);
+    await database.execute(sql, params);
   }
 
   await database.execute(`DELETE FROM trash WHERE id = ?;`, [trashId]);
@@ -1024,11 +1043,15 @@ export async function createTag(
   );
 }
 
-export async function deleteTag(tagId: number): Promise<void> {
-  await runSerialized(async (database) => {
+export async function deleteTag(tagId: number): Promise<number> {
+  return runSerialized(async (database) => {
+    const trashId = await moveToTrash("tag", tagId);
+
     // Also removed from the commissions that had it
     await database.execute(`DELETE FROM commission_tags WHERE tag_id = ?;`, [tagId]);
     await database.execute(`DELETE FROM tags WHERE id = ?;`, [tagId]);
+
+    return trashId;
   });
 }
 
@@ -1188,7 +1211,8 @@ export async function createClient(
   return Number(result.lastInsertId);
 }
 
-export async function deleteClient(clientId: number): Promise<void> {
+export async function deleteClient(clientId: number): Promise<number> {
+  const trashId = await moveToTrash("client", clientId);
   const database = await getDatabase();
 
   const characters = await database.select<{ id: number }[]>(
@@ -1222,6 +1246,8 @@ export async function deleteClient(clientId: number): Promise<void> {
     `DELETE FROM clients WHERE id = ?;`,
     [clientId],
   );
+
+  return trashId;
 }
 
 export async function updateClient(
@@ -1325,7 +1351,8 @@ export async function createClientCharacter(
 
 export async function deleteClientCharacter(
   characterId: number,
-): Promise<void> {
+): Promise<number> {
+  const trashId = await moveToTrash("character", characterId);
   const database = await getDatabase();
 
   const references = await database.select<{ image_data_url: string }[]>(
@@ -1339,10 +1366,12 @@ export async function deleteClientCharacter(
     await serialized.execute(`DELETE FROM client_characters WHERE id = ?;`, [characterId]);
   });
 
-  // Its images are deleted from disk if nobody else uses them
+  // Its images are deleted from disk if nobody else uses them (the trash counts as a user)
   for (const reference of references) {
     await deleteImageIfUnused(reference.image_data_url);
   }
+
+  return trashId;
 }
 
 export async function updateClientCharacter(
@@ -1735,10 +1764,13 @@ export async function updatePaymentReceived(paymentId: number, received: number 
   await database.execute(`UPDATE commission_payments SET received = ? WHERE id = ?;`, [received, paymentId]);
 }
 
-export async function deletePayment(paymentId: number): Promise<void> {
+export async function deletePayment(paymentId: number): Promise<number> {
+  const trashId = await moveToTrash("payment", paymentId);
   const database = await getDatabase();
 
   await database.execute(`DELETE FROM commission_payments WHERE id = ?;`, [paymentId]);
+
+  return trashId;
 }
 
 /**
@@ -1818,10 +1850,13 @@ export async function addCorrection(commissionId: number, stageId: number, text:
   );
 }
 
-export async function deleteCorrection(correctionId: number): Promise<void> {
+export async function deleteCorrection(correctionId: number): Promise<number> {
+  const trashId = await moveToTrash("correction", correctionId);
   const database = await getDatabase();
 
   await database.execute(`DELETE FROM commission_corrections WHERE id = ?;`, [correctionId]);
+
+  return trashId;
 }
 
 export type PaymentPlatform = {
@@ -1925,10 +1960,13 @@ export async function setRequestStatus(
   ]);
 }
 
-export async function deleteRequest(requestId: number): Promise<void> {
+export async function deleteRequest(requestId: number): Promise<number> {
+  const trashId = await moveToTrash("request", requestId);
   const database = await getDatabase();
 
   await database.execute(`DELETE FROM commission_requests WHERE id = ?;`, [requestId]);
+
+  return trashId;
 }
 
 /** Saves form requests not already stored (recognized by external_id). */

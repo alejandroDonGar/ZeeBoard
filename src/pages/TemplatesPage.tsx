@@ -20,6 +20,7 @@ import { formatMoney, parsePrice } from "../lib/commissionHelpers";
 import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
+import { undoToast } from "../lib/undo";
 
 // `key` only serves the draggable list: new stages have no id yet
 type EditableStage = StageDraft & { key: string };
@@ -207,10 +208,11 @@ function TemplatesPage() {
     }
 
     try {
-      await deleteTemplate(templateToDelete.id);
+      const trashId = await deleteTemplate(templateToDelete.id);
       setTemplateToDelete(null);
       setSelectedTemplateId(null);
       await loadTemplates(-1);
+      undoToast(showToast, "Template deleted.", trashId);
     } catch (error) {
       console.error(error);
       setTemplateToDelete(null);
@@ -398,7 +400,7 @@ function TemplatesPage() {
         <ConfirmModal
           eyebrow={t("Delete template")}
           title={templateToDelete.name}
-          message={t("Its stages are deleted too. This can't be undone.")}
+          message={t("Its stages are deleted too. You can undo it right after with Ctrl+Z.")}
           confirmLabel={t("Delete")}
           onConfirm={confirmDelete}
           onCancel={() => setTemplateToDelete(null)}

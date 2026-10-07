@@ -32,6 +32,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import Linkified from "../components/Linkified";
 import PageHeader from "../components/PageHeader";
 import { useToast } from "../context/ToastContext";
+import { undoToast } from "../lib/undo";
 
 const PLATFORMS = ["Twitter / X", "Bluesky", "Discord", "Telegram", "Email", "Other"];
 
@@ -364,7 +365,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
             <button
               type="button"
               title={t("Remove from the list")}
-              onClick={() => run(() => deleteRequest(request.id), "Could not remove it")}
+              onClick={() => run(async () => undoToast(showToast, "Removed from the list.", await deleteRequest(request.id)), "Could not remove it")}
               className="px-1 text-faint transition hover:text-red-500"
             >
               ×

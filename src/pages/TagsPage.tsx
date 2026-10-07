@@ -11,6 +11,7 @@ import {
 import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
+import { undoToast } from "../lib/undo";
 
 // Colors that read well under white text and match the app
 const PALETTE = [
@@ -216,9 +217,9 @@ function TagsPage() {
 
   async function handleDeleteTag(tagId: number) {
     try {
-      await deleteTag(tagId);
+      const trashId = await deleteTag(tagId);
       await loadTags();
-      showToast("Tag deleted.", "success");
+      undoToast(showToast, "Tag deleted.", trashId);
     } catch (error) {
       console.error(error);
       showToast("Could not delete tag.", "error");
@@ -390,8 +391,8 @@ function TagsPage() {
           title={tagToDelete.name}
           message={
             usageByTagId[tagToDelete.id]
-              ? t("It will be removed from {usage}. This can't be undone.", { usage: usageLabel(tagToDelete.id).toLowerCase() })
-              : t("This can't be undone.")
+              ? t("It will be removed from {usage}. You can undo it right after with Ctrl+Z.", { usage: usageLabel(tagToDelete.id).toLowerCase() })
+              : t("You can undo it right after with Ctrl+Z.")
           }
           confirmLabel={t("Delete")}
           onConfirm={async () => {

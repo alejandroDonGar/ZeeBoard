@@ -17,7 +17,7 @@ import {
   type PaymentPlatform,
   type TrashEntry,
 } from "../lib/database";
-import { TRASH_DAYS } from "../lib/trash";
+import { KINDS, TRASH_DAYS, type TrashKind } from "../lib/trash";
 import { useToast } from "../context/ToastContext";
 import { formatMoney, isoDay, receivedAfterFees } from "../lib/commissionHelpers";
 import { exportCsv, type ExportKind } from "../lib/export";
@@ -633,7 +633,7 @@ function SettingsPage() {
           <div className={panel}>
             {trash.length === 0 ? (
               <p className={`${row} text-sm text-muted`}>
-                {t("The trash is empty. Deleted commissions stay here for {days} days.", { days: TRASH_DAYS })}
+                {t("The trash is empty. Deleted items stay here for {days} days.", { days: TRASH_DAYS })}
               </p>
             ) : (
               <>
@@ -645,7 +645,7 @@ function SettingsPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{entry.label}</p>
                         <p className="text-xs text-muted">
-                          {t("Commission")} ·{" "}
+                          {t(KINDS[entry.kind as TrashKind]?.label ?? entry.kind)} ·{" "}
                           {days === 0 ? t("today") : t(days === 1 ? "{n} day ago" : "{n} days ago", { n: days })}
                         </p>
                       </div>

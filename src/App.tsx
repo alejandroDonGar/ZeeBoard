@@ -16,6 +16,7 @@ import { setPrivate, usePrivacy } from "./lib/privacy";
 import { loadAttention, notifyNew } from "./lib/reminders";
 import { REQUESTS_CHANGED, syncFormResponses } from "./lib/formSync";
 import { getRequests } from "./lib/database";
+import { announceRestored, DATA_RESTORED } from "./lib/undo";
 import { t } from "./lib/i18n";
 import Logo from "./components/Logo";
 import CommandPalette, { ShortcutsHelp } from "./components/CommandPalette";
@@ -89,7 +90,7 @@ function FormSync() {
 }
 
 /** Ctrl+Z outside text fields: restores the last deleted item and repaints the screen. */
-function UndoShortcut({ onRestored }: { onRestored: () => void }) {
+function UndoShortcut() {
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -109,7 +110,7 @@ function UndoShortcut({ onRestored }: { onRestored: () => void }) {
             return;
           }
           showToast(t("Restored “{name}”.", { name: label }), "success");
-          onRestored();
+          announceRestored();
         })
         .catch((error) => {
           console.error(error);
@@ -119,7 +120,7 @@ function UndoShortcut({ onRestored }: { onRestored: () => void }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onRestored, showToast]);
+  }, [showToast]);
 
   return null;
 }
@@ -164,6 +165,12 @@ function App() {
   const go = useCallback((page: string) => {
     setCurrentPage(page as Page);
     setNavKey((key) => key + 1);
+  }, []);
+  useEffect(() => {
+    const repaint = () => setNavKey((key) => key + 1);
+
+    window.addEventListener(DATA_RESTORED, repaint);
+    return () => window.removeEventListener(DATA_RESTORED, repaint);
   }, []);
   const closePalette = useCallback(() => setPaletteOpen(false), []);
   const showShortcuts = useCallback(() => setHelpOpen(true), []);
@@ -264,7 +271,7 @@ function App() {
       <AutoBackup />
       <Reminders />
       <FormSync />
-      <UndoShortcut onRestored={() => setNavKey((key) => key + 1)} />
+      <UndoShortcut />
       {paletteOpen && <CommandPalette pages={navigationItems} onGo={go} onClose={closePalette} onShowShortcuts={showShortcuts} />}
       {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
       <div className="h-screen overflow-hidden bg-canvas text-ink">

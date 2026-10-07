@@ -35,7 +35,6 @@ import {
   updateCommission,
   duplicateCommission,
   deleteCommission,
-  restoreTrash,
   getCommissionTags,
   replaceCommissionTags,
   getClients,
@@ -60,6 +59,7 @@ import {
 import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
+import { undoToast } from "../lib/undo";
 
 function CommissionsPage() {
   // A single form to create and edit: null = closed
@@ -519,25 +519,7 @@ function CommissionsPage() {
 
 
         setActiveCommissionId(null);
-        showToast("Commission deleted.", "success", {
-          label: "Undo",
-          onClick: () => {
-            restoreTrash(trashId)
-              .then(async (label) => {
-                if (label === null) {
-                  return;
-                }
-                const restored = await getCommissions();
-                setCommissions(restored);
-                await loadTagsForCommissions(restored);
-                showToast(t("Restored “{name}”.", { name: label }), "success");
-              })
-              .catch((error) => {
-                console.error(error);
-                showToast("Could not undo.", "error");
-              });
-          },
-        });
+        undoToast(showToast, "Commission deleted.", trashId);
 
         setShowDeleteCommissionModal(false);
     } catch (error) {
@@ -1246,8 +1228,9 @@ function CommissionsPage() {
                                 type="button"
                                 title={t("Remove correction")}
                                 onClick={async () => {
-                                  await deleteCorrection(correction.id);
+                                  const trashId = await deleteCorrection(correction.id);
                                   setCorrections(await getAllCorrections());
+                                  undoToast(showToast, "Correction removed.", trashId);
                                 }}
                                 className="text-faint opacity-0 transition hover:text-red-500 group-hover:opacity-100"
                               >

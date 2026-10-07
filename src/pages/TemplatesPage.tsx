@@ -381,7 +381,7 @@ function TemplatesPage() {
               </div>
 
               <div className="mt-4 flex items-center justify-end gap-3">
-                <p className="text-xs text-faint">{t("The last stage marks the commission as finished.")}</p>
+                <p className="text-xs text-faint">{t("The last stage stays hidden until you press “Mark as finished” on the commission.")}</p>
                 <button
                   type="button"
                   onClick={handleSave}

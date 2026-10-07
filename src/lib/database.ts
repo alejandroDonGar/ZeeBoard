@@ -234,6 +234,9 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE clients ADD COLUMN tag_handle TEXT;`).catch(() => {});
   // When a commission last changed stage: counts as activity for the stalled alert
   await database.execute(`ALTER TABLE commissions ADD COLUMN stage_changed_at TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE commissions ADD COLUMN delivered_at TEXT;`).catch(() => {});
+  await database.execute(`ALTER TABLE commissions ADD COLUMN hours REAL;`).catch(() => {});
+  await database.execute(`ALTER TABLE commissions ADD COLUMN final_notes TEXT;`).catch(() => {});
   await database.execute(`INSERT OR IGNORE INTO settings (id) VALUES (1);`);
   await loadSettings();
 
@@ -674,6 +677,10 @@ export type Commission = {
   deadline: string | null;
   notes: string | null;
   created_at: string;
+  /** Set when it is marked as finished: delivery date (YYYY-MM-DD), hours spent and closing notes */
+  delivered_at: string | null;
+  hours: number | null;
+  final_notes: string | null;
 };
 
 export async function getCommissions(): Promise<Commission[]> {
@@ -745,6 +752,24 @@ export async function createCommission(
   );
 
   return Number(result.lastInsertId);
+}
+
+/** "Mark as finished": moves it to the template's last stage and saves the closing details. */
+export async function finishCommission(
+  commissionId: number,
+  lastStageId: number,
+  details: { deliveredAt: string; hours: number | null; notes: string },
+): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(
+    `
+    UPDATE commissions
+    SET current_stage_id = ?, stage_changed_at = ?, delivered_at = ?, hours = ?, final_notes = ?
+    WHERE id = ?;
+    `,
+    [lastStageId, new Date().toISOString(), details.deliveredAt, details.hours, details.notes || null, commissionId],
+  );
 }
 
 export async function updateCommissionStage(

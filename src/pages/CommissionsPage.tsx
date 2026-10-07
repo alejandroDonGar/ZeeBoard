@@ -32,6 +32,7 @@ import {
   addCorrection,
   deleteCorrection,
   updateCommissionStage,
+  finishCommission,
   updateCommission,
   duplicateCommission,
   deleteCommission,
@@ -60,6 +61,7 @@ import PageHeader from "../components/PageHeader";
 import ConfirmModal from "../components/ConfirmModal";
 import { useToast } from "../context/ToastContext";
 import { undoToast } from "../lib/undo";
+import FinishCommissionModal, { type FinishDetails } from "../components/FinishCommissionModal";
 
 function CommissionsPage() {
   // A single form to create and edit: null = closed
@@ -90,6 +92,8 @@ function CommissionsPage() {
   const [savingCommission, setSavingCommission] = useState(false);
   const [duplicatingCommission, setDuplicatingCommission] = useState(false);
   const [showDeleteCommissionModal, setShowDeleteCommissionModal] = useState(false);
+  const [showFinishModal, setShowFinishModal] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const [deletingCommission, setDeletingCommission] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
@@ -400,6 +404,33 @@ function CommissionsPage() {
 
   }
 
+  /** Saves the final image, delivery date, hours and notes, then moves to the (until now hidden) last stage. */
+  async function handleFinishCommission(details: FinishDetails) {
+    const lastStage = workflowStages[workflowStages.length - 1];
+
+    if (!activeCommission || !lastStage) {
+      return;
+    }
+
+    try {
+      setFinishing(true);
+
+      if (details.imagePaths.length > 0) {
+        await handleAddStageImages(lastStage.id, details.imagePaths);
+      }
+
+      await finishCommission(activeCommission.id, lastStage.id, details);
+      setCommissions(await getCommissions());
+      setShowFinishModal(false);
+      showToast("Commission finished.", "success");
+    } catch (error) {
+      console.error(error);
+      showToast("Could not finish the commission.", "error");
+    } finally {
+      setFinishing(false);
+    }
+  }
+
   async function handleOpenEditCommission() {
     if (!activeCommission) {
       return;
@@ -609,6 +640,11 @@ function CommissionsPage() {
     workflowStages.length > 0 &&
     currentStageIndex === workflowStages.length - 1;
 
+  // The last stage ("finished") only shows once the commission is marked as finished.
+  // ponytail: a template with a single stage keeps it visible and works as before.
+  const visibleStages = workflowStages.length > 1 && !isLastStage ? workflowStages.slice(0, -1) : workflowStages;
+  const nextIsFinish = workflowStages.length > 1 && currentStageIndex === workflowStages.length - 2;
+
   // Inbox: those already in a stage, and queued ones not started yet; nearest delivery first
   const byDeadline = (a: Commission, b: Commission) => (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999");
   const inboxGroups = [
@@ -691,7 +727,7 @@ function CommissionsPage() {
 
   // Focus mode: all images from all stages, in order
   const focusImages = activeCommission
-    ? workflowStages.flatMap((stage) =>
+    ? visibleStages.flatMap((stage) =>
         getStageImages(activeCommission.id, stage.id).map((image) => ({ image, stage })),
       )
     : [];
@@ -1058,7 +1094,7 @@ function CommissionsPage() {
                       }}
                       className="flex min-h-48 flex-1 gap-4 overflow-x-auto"
                     >
-                      {workflowStages.map((stage, index) => {
+                      {visibleStages.map((stage, index) => {
                         const stageImages = getStageImages(activeCommission.id, stage.id);
                         const imageIndex = getActiveStageImageIndex(stage.id, stageImages);
                         const image = stageImages[imageIndex] ?? null;
@@ -1273,7 +1309,29 @@ function CommissionsPage() {
                       </button>
 
                       {isLastStage ? (
-                        <span className="rounded-md bg-green-600 px-4 py-1.5 text-sm font-bold text-white">{t("✓ Finished")}</span>
+                        <>
+                          <span className="rounded-md bg-green-600 px-4 py-1.5 text-sm font-bold text-white">
+                            {t("✓ Finished")}
+                            {activeCommission.delivered_at && ` · ${new Date(`${activeCommission.delivered_at}T12:00:00`).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}`}
+                            {activeCommission.hours !== null && ` · ${activeCommission.hours} h`}
+                          </span>
+                          <button
+                            type="button"
+                            title={t("Finish it again with a new delivery date")}
+                            onClick={() => setShowFinishModal(true)}
+                            className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-muted transition hover:border-ink hover:text-ink"
+                          >
+                            {t("Edit delivery")}
+                          </button>
+                        </>
+                      ) : nextIsFinish ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowFinishModal(true)}
+                          className="rounded-md bg-primary px-4 py-1.5 text-sm font-bold text-on-primary transition hover:bg-primary-hover"
+                        >
+                          {t("Mark as finished")}
+                        </button>
                       ) : (
                         <button
                           type="button"
@@ -1295,13 +1353,21 @@ function CommissionsPage() {
                   </>
                 )}
 
-                {(activeCommission.notes || activeCharacters.length > 0) && (
+                {(activeCommission.notes || activeCommission.final_notes || activeCharacters.length > 0) && (
                   <div className="grid shrink-0 grid-cols-2 gap-6 border-t border-line pt-4">
                     <div>
                       <p className="mb-1 text-[11px] font-black uppercase tracking-[0.16em] text-faint">{t("Notes")}</p>
                       <p className="line-clamp-4 whitespace-pre-wrap text-sm text-muted">
                         {activeCommission.notes ? <Linkified text={activeCommission.notes} /> : t("No notes.")}
                       </p>
+                      {isLastStage && activeCommission.final_notes && (
+                        <>
+                          <p className="mb-1 mt-3 text-[11px] font-black uppercase tracking-[0.16em] text-faint">{t("Final notes")}</p>
+                          <p className="line-clamp-4 whitespace-pre-wrap text-sm text-muted">
+                            <Linkified text={activeCommission.final_notes} />
+                          </p>
+                        </>
+                      )}
                     </div>
 
                     <div>
@@ -1935,6 +2001,17 @@ function CommissionsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showFinishModal && activeCommission && (
+        <FinishCommissionModal
+          title={activeCommission.title}
+          hours={activeCommission.hours}
+          notes={activeCommission.final_notes}
+          isSaving={finishing}
+          onConfirm={handleFinishCommission}
+          onCancel={() => setShowFinishModal(false)}
+        />
       )}
 
       {showDeleteCommissionModal && (

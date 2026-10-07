@@ -1,5 +1,5 @@
 import "./App.css";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { initializeDatabase, migrateLegacyImages, migratePaymentTags } from "./lib/database";
 import { initImageUrls } from "./lib/images";
 import CommissionsPage from "./pages/CommissionsPage";
@@ -18,6 +18,8 @@ import { REQUESTS_CHANGED, syncFormResponses } from "./lib/formSync";
 import { getRequests } from "./lib/database";
 import { t } from "./lib/i18n";
 import Logo from "./components/Logo";
+import CommandPalette, { ShortcutsHelp } from "./components/CommandPalette";
+import { requestAction } from "./lib/actions";
 import {
   IconBrush,
   IconCircleCheck,
@@ -116,6 +118,18 @@ function App() {
   useEffect(() => {
     sessionStorage.setItem("zeeboard-page", currentPage);
   }, [currentPage]);
+
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [navKey, setNavKey] = useState(0);
+
+  // Remounts the screen so it re-reads what the search stored for it (commission, client, pending action)
+  const go = useCallback((page: string) => {
+    setCurrentPage(page as Page);
+    setNavKey((key) => key + 1);
+  }, []);
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
+  const showShortcuts = useCallback(() => setHelpOpen(true), []);
   // On change the whole app repaints with data hidden or visible
   const privateMode = usePrivacy();
   const [newRequests, setNewRequests] = useState(0);
@@ -133,15 +147,31 @@ function App() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+      const mod = event.ctrlKey || event.metaKey;
+      const target = event.target as HTMLElement;
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable;
+
+      if (mod && event.shiftKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
         setPrivate(!privateMode);
+      } else if (mod && !event.shiftKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      } else if (mod && !event.shiftKey && /^[1-8]$/.test(event.key)) {
+        event.preventDefault();
+        go(navigationItems[Number(event.key) - 1].id);
+      } else if (mod && !event.shiftKey && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        requestAction("new-commission");
+        go("commissions");
+      } else if (!mod && !typing && event.key === "?") {
+        setHelpOpen(true);
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [privateMode]);
+  }, [privateMode, go]);
   const [ready, setReady] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
 
@@ -197,6 +227,8 @@ function App() {
       <AutoBackup />
       <Reminders />
       <FormSync />
+      {paletteOpen && <CommandPalette pages={navigationItems} onGo={go} onClose={closePalette} onShowShortcuts={showShortcuts} />}
+      {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
       <div className="h-screen overflow-hidden bg-canvas text-ink">
       <div className="flex h-full">
         <aside className="flex w-72 flex-col border-r border-line bg-paper px-5 py-6">
@@ -262,17 +294,19 @@ function App() {
           </button>
 
           <div className="mt-3 rounded-3xl border border-line bg-surface p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">
-              {t("Current theme")}
-            </p>
-            <p className="mt-2 text-sm font-bold">Zebra Light</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              {t("A soft workspace for tracking commissions, clients and deadlines.")}
-            </p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">{t("Shortcuts")}</p>
+            <div className="mt-2 space-y-1.5 text-xs text-muted">
+              {([["Ctrl+K", "Search"], ["Ctrl+1…8", "Screens"], ["Ctrl+N", "New commission"]] as const).map(([keys, label]) => (
+                <div key={keys} className="flex items-center justify-between">
+                  <span>{t(label)}</span>
+                  <kbd className="rounded-sm border border-line-strong bg-paper px-1.5 py-0.5 text-[11px] font-bold">{keys}</kbd>
+                </div>
+              ))}
+            </div>
           </div>
         </aside>
 
-        <main className="flex-1 overflow-hidden">
+        <main key={navKey} className="flex-1 overflow-hidden">
           {currentPage === "dashboard" && (
             <DashboardPage onOpenCommissionsPage={() => setCurrentPage("commissions")} />
           )}

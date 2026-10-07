@@ -1,4 +1,5 @@
 import { locale, t } from "../lib/i18n";
+import { takeAction } from "../lib/actions";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { imageUrl, thumbUrl, importImage, pickImagePaths } from "../lib/images";
 import { useImageInput } from "../lib/useImageInput";
@@ -231,6 +232,12 @@ function CommissionsPage() {
     setCharacterSearch("");
     setFormMode("new");
   }
+
+  useEffect(() => {
+    if (takeAction("new-commission")) {
+      openNewCommissionForm();
+    }
+  }, []);
 
   useEffect(() => {
     const savedActiveId = localStorage.getItem("zeeboard-active-commission-id");

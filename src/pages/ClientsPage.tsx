@@ -1,4 +1,5 @@
 import { t } from "../lib/i18n";
+import { takeAction } from "../lib/actions";
 import { useEffect, useState } from "react";
 import { hide, isPrivate } from "../lib/privacy";
 import { parseTagAccount } from "../lib/formImport";
@@ -112,6 +113,12 @@ function ClientsPage({
     setClientForm("new");
   }
 
+  useEffect(() => {
+    if (takeAction("new-client")) {
+      handleOpenNewClient();
+    }
+  }, []);
+
   async function handleCreateClient() {
     try {
       setSavingClient(true);
@@ -195,9 +202,11 @@ function ClientsPage({
 
       setClients(data);
       setClientsReady(true);
-      // Opens the first client alphabetically
+      // Opens the client picked from search, else the first one alphabetically
+      const wanted = Number(sessionStorage.getItem("zeeboard-active-client-id"));
+      sessionStorage.removeItem("zeeboard-active-client-id");
       setSelectedClientId(
-        [...data].sort((a, b) => a.name.localeCompare(b.name))[0]?.id ?? null,
+        data.find((client) => client.id === wanted)?.id ?? [...data].sort((a, b) => a.name.localeCompare(b.name))[0]?.id ?? null,
       );
 
       const characterEntries = await Promise.all(

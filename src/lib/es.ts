@@ -12,8 +12,9 @@ export const es: Record<string, string> = {
   "Hide client names and prices while streaming (Ctrl+Shift+P)": "Oculta nombres de clientes y precios en directo (Ctrl+Shift+P)",
   "Private mode on": "Modo privado activo",
   "Private mode": "Modo privado",
-  "Current theme": "Tema actual",
-  "A soft workspace for tracking commissions, clients and deadlines.": "Un espacio suave para seguir comisiones, clientes y entregas.",
+  Shortcuts: "Atajos",
+  Search: "Buscar",
+  Screens: "Pantallas",
 
   // Settings
   Preferences: "Preferencias",
@@ -498,6 +499,26 @@ export const es: Record<string, string> = {
   "The request needs a name": "La solicitud necesita un nombre",
   "This template is used by one or more commissions (active or finished), so it can't be deleted. Duplicate it if you want a variation.": "Esta plantilla la usan una o más comisiones (activas o terminadas), así que no se puede borrar. Duplícala si quieres una variación.",
   "\"{name}\" is in use by a commission (current stage, images or corrections), so it can't be removed.": "\"{name}\" la usa una comisión (etapa actual, imágenes o correcciones), así que no se puede quitar.",
+
+  // Search and shortcuts
+  "Keyboard shortcuts": "Atajos de teclado",
+  "Search and actions": "Buscador y acciones",
+  "Go to a screen (menu order)": "Ir a una pantalla (orden del menú)",
+  "New commission": "Nueva comisión",
+  "Toggle private mode": "Activar o quitar el modo privado",
+  "Show this list": "Mostrar esta lista",
+  Close: "Cerrar",
+  "Search commissions, clients, screens and actions…": "Busca comisiones, clientes, pantallas y acciones…",
+  "No results": "Sin resultados",
+  "Loading…": "Cargando…",
+  "↑ ↓ to move": "↑ ↓ para moverte",
+  "Enter to open": "Enter para abrir",
+  "Esc to close": "Esc para cerrar",
+  "Go to": "Ir a",
+  Actions: "Acciones",
+  "Switch language": "Cambiar de idioma",
+  "Switch to light theme": "Cambiar al tema claro",
+  "Switch to dark theme": "Cambiar al tema oscuro",
 
   // Filters shared by several screens
   All: "Todas",

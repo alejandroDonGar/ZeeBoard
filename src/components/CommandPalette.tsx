@@ -55,6 +55,7 @@ const SHORTCUTS: [string, string][] = [
   ["Ctrl+K", "Search and actions"],
   ["Ctrl+1 … 8", "Go to a screen (menu order)"],
   ["Ctrl+N", "New commission"],
+  ["Ctrl+Z", "Restore what you just deleted"],
   ["Ctrl+Shift+P", "Toggle private mode"],
   ["?", "Show this list"],
   ["Esc", "Close"],

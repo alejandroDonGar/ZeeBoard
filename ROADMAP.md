@@ -60,7 +60,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 ## Ideas para ir incorporando
 
 **Prioritarias**
-- [ ] Papelera con deshacer (Ctrl+Z)
+- [ ] Papelera con deshacer (Ctrl+Z) — hecho para comisiones; faltan la pantalla en Ajustes y el resto de elementos
 - [ ] Cronómetro por comisión y etapa, con el precio real por hora
 - [x] Modo privado para directos (ocultar clientes y precios)
 - [ ] Anotaciones de correcciones sobre las imágenes

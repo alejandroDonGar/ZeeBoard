@@ -1,6 +1,7 @@
 import { t } from "./i18n";
 import Database from "@tauri-apps/plugin-sql";
 import type { ImportedRequest } from "./formImport";
+import { adaptCommission, COMMISSION_CHILDREN, imagePathsOf, insertStatement, type Snapshot } from "./trash";
 import {
   deleteImageFiles,
   importImageFromDataDir,
@@ -402,6 +403,17 @@ export async function initializeDatabase() {
       received REAL,
       paid_at TEXT NOT NULL,
       note TEXT
+    );
+  `);
+
+  // Deleted items, stored as JSON so they can be restored (see deleteCommission / restoreTrash)
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS trash (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL,
+      label TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      deleted_at TEXT NOT NULL
     );
   `);
 }
@@ -853,49 +865,86 @@ export async function duplicateCommission(
   return result[0].id;
 }
 
+/** Moves a commission to the trash and returns the trash id (to undo). Image files stay on disk until it is purged. */
 export async function deleteCommission(
   commissionId: number,
-): Promise<void> {
+): Promise<number> {
   const database = await getDatabase();
 
-  await database.execute(
-    `DELETE FROM commission_tags WHERE commission_id = ?;`,
+  const [commission] = await database.select<{ title: string }[]>(
+    `SELECT * FROM commissions WHERE id = ?;`,
     [commissionId],
   );
 
-  await database.execute(
-    `DELETE FROM commission_payments WHERE commission_id = ?;`,
-    [commissionId],
-  );
-
-  await database.execute(
-    `DELETE FROM commission_corrections WHERE commission_id = ?;`,
-    [commissionId],
-  );
-
-  const images = await database.select<{ image_data_url: string }[]>(
-    `SELECT image_data_url FROM commission_stage_images WHERE commission_id = ?;`,
-    [commissionId],
-  );
-
-  await database.execute(
-    `DELETE FROM commission_stage_images WHERE commission_id = ?;`,
-    [commissionId],
-  );
-
-  for (const image of images) {
-    await deleteImageIfUnused(image.image_data_url);
+  if (!commission) {
+    throw new Error("Commission not found");
   }
 
-  await database.execute(
-    `DELETE FROM commission_characters WHERE commission_id = ?;`,
-    [commissionId],
+  const snapshot: Snapshot = { commissions: [commission] };
+
+  for (const table of COMMISSION_CHILDREN) {
+    snapshot[table] = await database.select(`SELECT * FROM ${table} WHERE commission_id = ?;`, [commissionId]);
+  }
+
+  const saved = await database.execute(
+    `INSERT INTO trash (kind, label, payload, deleted_at) VALUES ('commission', ?, ?, ?);`,
+    [commission.title, JSON.stringify(snapshot), new Date().toISOString()],
   );
 
-  await database.execute(
-    `DELETE FROM commissions WHERE id = ?;`,
-    [commissionId],
+  for (const table of COMMISSION_CHILDREN) {
+    await database.execute(`DELETE FROM ${table} WHERE commission_id = ?;`, [commissionId]);
+  }
+
+  await database.execute(`DELETE FROM commissions WHERE id = ?;`, [commissionId]);
+
+  return Number(saved.lastInsertId);
+}
+
+async function existingIds(table: string): Promise<Set<number>> {
+  const database = await getDatabase();
+  const rows = await database.select<{ id: number }[]>(`SELECT id FROM ${table};`);
+
+  return new Set(rows.map((row) => row.id));
+}
+
+/** Puts a trashed commission back; null when that entry no longer exists (already restored). */
+export async function restoreTrash(trashId: number): Promise<string | null> {
+  const database = await getDatabase();
+
+  const [entry] = await database.select<{ label: string; payload: string }[]>(
+    `SELECT label, payload FROM trash WHERE id = ?;`,
+    [trashId],
   );
+
+  if (!entry) {
+    return null;
+  }
+
+  const snapshot = adaptCommission(JSON.parse(entry.payload) as Snapshot, {
+    clients: await existingIds("clients"),
+    templates: await existingIds("templates"),
+    tags: await existingIds("tags"),
+    characters: await existingIds("client_characters"),
+  });
+
+  for (const table of ["commissions", ...COMMISSION_CHILDREN]) {
+    for (const row of snapshot[table] ?? []) {
+      const [sql, params] = insertStatement(table, row);
+      await database.execute(sql, params);
+    }
+  }
+
+  await database.execute(`DELETE FROM trash WHERE id = ?;`, [trashId]);
+
+  return entry.label;
+}
+
+/** Ctrl+Z: restores the most recently deleted item; null when the trash is empty. */
+export async function restoreLastTrash(): Promise<string | null> {
+  const database = await getDatabase();
+  const [last] = await database.select<{ id: number }[]>(`SELECT id FROM trash ORDER BY id DESC LIMIT 1;`);
+
+  return last ? restoreTrash(last.id) : null;
 }
 
 export type Tag = {
@@ -1509,10 +1558,13 @@ export async function getAllUsedImagePaths(): Promise<string[]> {
     `SELECT avatar_url FROM clients WHERE avatar_url IS NOT NULL AND avatar_url NOT LIKE 'http%';`,
   );
 
+  const trashed = await database.select<{ payload: string }[]>(`SELECT payload FROM trash;`);
+
   return [
     ...characterRefs.map((row) => row.image_data_url),
     ...stageImages.map((row) => row.image_data_url),
     ...avatars.map((row) => row.avatar_url),
+    ...trashed.flatMap((row) => imagePathsOf(JSON.parse(row.payload) as Snapshot)),
   ];
 }
 const IMAGE_TABLES = ["character_references", "commission_stage_images"] as const;

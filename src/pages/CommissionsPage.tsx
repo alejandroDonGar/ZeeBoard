@@ -35,6 +35,7 @@ import {
   updateCommission,
   duplicateCommission,
   deleteCommission,
+  restoreTrash,
   getCommissionTags,
   replaceCommissionTags,
   getClients,
@@ -509,7 +510,7 @@ function CommissionsPage() {
     try {
         setDeletingCommission(true);
 
-        await deleteCommission(activeCommission.id);
+        const trashId = await deleteCommission(activeCommission.id);
 
         const data = await getCommissions();
 
@@ -518,7 +519,25 @@ function CommissionsPage() {
 
 
         setActiveCommissionId(null);
-        showToast("Commission deleted.", "success");
+        showToast("Commission deleted.", "success", {
+          label: "Undo",
+          onClick: () => {
+            restoreTrash(trashId)
+              .then(async (label) => {
+                if (label === null) {
+                  return;
+                }
+                const restored = await getCommissions();
+                setCommissions(restored);
+                await loadTagsForCommissions(restored);
+                showToast(t("Restored “{name}”.", { name: label }), "success");
+              })
+              .catch((error) => {
+                console.error(error);
+                showToast("Could not undo.", "error");
+              });
+          },
+        });
 
         setShowDeleteCommissionModal(false);
     } catch (error) {
@@ -1939,7 +1958,7 @@ function CommissionsPage() {
         <ConfirmModal
             eyebrow={t("Delete commission")}
             title={activeCommission?.title ?? ""}
-            message={t("This action cannot be undone.")}
+            message={t("You can undo it right after with Ctrl+Z.")}
             confirmLabel={t("Delete")}
             confirmingLabel={t("Deleting...")}
             isConfirming={deletingCommission}

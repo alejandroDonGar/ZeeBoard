@@ -1,6 +1,6 @@
 import "./App.css";
 import { useCallback, useEffect, useState } from "react";
-import { initializeDatabase, migrateLegacyImages, migratePaymentTags } from "./lib/database";
+import { initializeDatabase, migrateLegacyImages, migratePaymentTags, restoreLastTrash } from "./lib/database";
 import { initImageUrls } from "./lib/images";
 import CommissionsPage from "./pages/CommissionsPage";
 import ClientsPage from "./pages/ClientsPage";
@@ -83,6 +83,42 @@ function FormSync() {
 
     return () => clearInterval(timer);
   }, []);
+
+  return null;
+}
+
+/** Ctrl+Z outside text fields: restores the last deleted item and repaints the screen. */
+function UndoShortcut({ onRestored }: { onRestored: () => void }) {
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement;
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable;
+
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== "z" || typing) {
+        return;
+      }
+
+      event.preventDefault();
+      restoreLastTrash()
+        .then((label) => {
+          if (label === null) {
+            showToast("Nothing to undo.", "error");
+            return;
+          }
+          showToast(t("Restored “{name}”.", { name: label }), "success");
+          onRestored();
+        })
+        .catch((error) => {
+          console.error(error);
+          showToast("Could not undo.", "error");
+        });
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onRestored, showToast]);
 
   return null;
 }
@@ -227,6 +263,7 @@ function App() {
       <AutoBackup />
       <Reminders />
       <FormSync />
+      <UndoShortcut onRestored={() => setNavKey((key) => key + 1)} />
       {paletteOpen && <CommandPalette pages={navigationItems} onGo={go} onClose={closePalette} onShowShortcuts={showShortcuts} />}
       {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
       <div className="h-screen overflow-hidden bg-canvas text-ink">
@@ -296,7 +333,7 @@ function App() {
           <div className="mt-3 rounded-3xl border border-line bg-surface p-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-faint">{t("Shortcuts")}</p>
             <div className="mt-2 space-y-1.5 text-xs text-muted">
-              {([["Ctrl+K", "Search"], ["Ctrl+1…8", "Screens"], ["Ctrl+N", "New commission"]] as const).map(([keys, label]) => (
+              {([["Ctrl+K", "Search"], ["Ctrl+1…8", "Screens"], ["Ctrl+N", "New commission"], ["Ctrl+Z", "Undo delete"]] as const).map(([keys, label]) => (
                 <div key={keys} className="flex items-center justify-between">
                   <span>{t(label)}</span>
                   <kbd className="rounded-sm border border-line-strong bg-paper px-1.5 py-0.5 text-[11px] font-bold">{keys}</kbd>

@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -9,8 +10,10 @@ import { t } from "../lib/i18n";
 
 type ToastType = "success" | "error";
 
+type ToastAction = { label: string; onClick: () => void };
+
 type ToastContextValue = {
-  showToast: (message: string, type?: ToastType) => void;
+  showToast: (message: string, type?: ToastType, action?: ToastAction) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -18,14 +21,20 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<ToastType>("success");
+  const [toastAction, setToastAction] = useState<ToastAction | null>(null);
+  const timer = useRef<number>(0);
 
-  const showToast = useCallback((message: string, type: ToastType = "success") => {
+  const showToast = useCallback((message: string, type: ToastType = "success", action?: ToastAction) => {
     setToastType(type);
     setToastMessage(t(message));
+    setToastAction(action ?? null);
 
-    setTimeout(() => {
+    // The previous toast must not close this one early; one with an action stays longer
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
       setToastMessage("");
-    }, 2500);
+      setToastAction(null);
+    }, action ? 8000 : 2500);
   }, []);
 
   return (
@@ -41,6 +50,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           }
         >
           {toastMessage}
+          {toastAction && (
+            <button
+              type="button"
+              className="ml-4 rounded-sm bg-white/20 px-2 py-1 text-xs font-black uppercase tracking-wider hover:bg-white/30"
+              onClick={() => {
+                setToastMessage("");
+                setToastAction(null);
+                toastAction.onClick();
+              }}
+            >
+              {t(toastAction.label)}
+            </button>
+          )}
         </div>
       )}
     </ToastContext.Provider>

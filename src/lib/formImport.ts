@@ -154,7 +154,7 @@ export function parseTagAccount(
   return account.platform === "Email" ? null : account;
 }
 
-/** "Render Full Body + Simple Background" encaja con la plantilla "Rendered Full Body + Simple Background". */
+/** "Render Full Body + Simple Background" matches the template "Rendered Full Body + Simple Background". */
 export function matchTemplate<T extends { id: number; name: string }>(text: string, templates: T[]): T | null {
   const normalize = (value: string) => value.toLowerCase().replace(/rendered/g, "render").replace(/[^a-z0-9]/g, "");
 
@@ -165,10 +165,10 @@ const tagWords = (text: string) =>
   new Set(text.toLowerCase().replace(/rendered/g, "render").split(/[^a-z0-9]+/).filter(Boolean));
 
 /**
- * Las etiquetas que le tocan a una comisión recién aceptada:
- * - tipo ("Commission Type"): la más específica cuyas palabras están todas en el nombre de la plantilla
- *   ("Render + Complex Background" encaja con "Rendered Full Body + Complex Background"; "Sketch" no, si hay "Sketch + Background")
- * - personajes ("Characters"): la que dice "3 Characters" si pidió 3.
+ * The tags a newly accepted commission gets:
+ * - type ("Commission Type"): the most specific one whose words are all in the template name
+ *   ("Render + Complex Background" fits "Rendered Full Body + Complex Background"; "Sketch" doesn't if "Sketch + Background" exists)
+ * - characters ("Characters"): the one saying "3 Characters" if they asked for 3.
  */
 export function autoTagIds(
   templateName: string | null,
@@ -189,7 +189,7 @@ export function autoTagIds(
 }
 
 export type ImportedRequest = {
-  /** Identifica la respuesta para no importarla dos veces */
+  /** Identifies the response so it isn't imported twice */
   externalId: string;
   created_at: string;
   name: string;
@@ -198,13 +198,13 @@ export type ImportedRequest = {
   template_id: number | null;
   characters: number;
   email: string | null;
-  /** A quién etiquetar al publicar (null = a nadie) */
+  /** Whom to tag when posting (null = nobody) */
   tag_platform: string | null;
   tag_handle: string | null;
   details: string | null;
 };
 
-/** Convierte el CSV de la hoja de respuestas en solicitudes. Localiza las columnas por su título. */
+/** Turns the responses sheet CSV into requests. Finds the columns by their titles. */
 export function parseResponses<T extends { id: number; name: string }>(
   csv: string,
   templates: T[],
@@ -238,7 +238,7 @@ export function parseResponses<T extends { id: number; name: string }>(
       const contact = parseContact(row[contactColumn] ?? "");
       const template = matchTemplate(typeText, templates);
       const emailText = emailColumn >= 0 ? (row[emailColumn] ?? "").trim() : "";
-      // Solo se guarda como correo si lo parece (y en minúsculas, para poder emparejarlo luego); si no, queda en los detalles
+      // Stored as an email only if it looks like one (lowercased, to match later); otherwise it stays in the details
       const email = /^\S+@\S+\.\S+$/.test(emailText) ? emailText.toLowerCase() : null;
       const tag = tagColumn >= 0 ? parseTagAccount(row[tagColumn] ?? "", contact) : null;
       const referencesText = referencesColumn >= 0 ? (row[referencesColumn] ?? "").trim() : "";
@@ -255,12 +255,12 @@ export function parseResponses<T extends { id: number; name: string }>(
         platform: contact.platform,
         contact: contact.handle,
         template_id: template?.id ?? null,
-        // "3 Characters" → 3; sin esa pregunta (o sin número), 1
+        // "3 Characters" → 3; without that question (or without a number), 1
         characters: Math.max(1, Number((charactersColumn >= 0 ? row[charactersColumn] ?? "" : "").match(/\d+/)?.[0]) || 1),
         email,
         tag_platform: tag?.platform ?? null,
         tag_handle: tag?.handle ?? null,
-        // Lo que no encaja (un tipo desconocido, un correo raro) se conserva tal cual para revisarlo a mano
+        // What doesn't fit (an unknown type, an odd email) is kept as is to review by hand
         details: notes.length > 0 ? notes.join("\n") : null,
       };
     });

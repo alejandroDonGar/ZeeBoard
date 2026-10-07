@@ -80,6 +80,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [x] Logo propio (Z de rayas): menú lateral, pantalla de carga, iconos de la app y pestaña
 - [x] Buscador global (Ctrl+K) con acciones, atajos de teclado (Ctrl+1…8, Ctrl+N, ?) y leyenda en el menú
 - [x] Icono de Windows: solo la Z, sin fondo y a todo el tamaño
+- [x] Instalador de Windows (NSIS): nombre ZeeBoard, versión 0.2.0, README renovado y política de seguridad con el canal IPC
 - [x] Contador de revisiones incluidas (correcciones por etapa)
 - [ ] Origen del cliente (X, Instagram, Discord…)
 - [ ] Gastos y beneficio real

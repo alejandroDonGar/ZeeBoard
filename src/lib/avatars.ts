@@ -31,9 +31,15 @@ export function telegramImageFromHtml(html: string): string | null {
   return url && /^https:\/\/[^/]*(?:cdn-telegram\.org|telesco\.pe)\//.test(url) ? url : null;
 }
 
-// Las descargas las hace Rust (src-tauri/src/avatars.rs): solo habla con Bluesky y Telegram
-const download = (url: string) => invoke<ArrayBuffer>("fetch_avatar_resource", { url });
-const asText = (bytes: ArrayBuffer) => new TextDecoder().decode(bytes);
+// Downloads happen in Rust (src-tauri/src/avatars.rs), which only talks to Bluesky and Telegram.
+// The installed app can get the bytes back as a plain number array instead of an ArrayBuffer.
+async function download(url: string): Promise<Uint8Array> {
+  const reply = await invoke<ArrayBuffer | number[]>("fetch_avatar_resource", { url });
+
+  return reply instanceof ArrayBuffer ? new Uint8Array(reply) : Uint8Array.from(reply);
+}
+
+const asText = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
 async function blueskyPhotoUrl(handle: string): Promise<string | null> {
   const actor = blueskyActor(handle);
@@ -56,10 +62,12 @@ async function telegramPhotoUrl(handle: string): Promise<string | null> {
 }
 
 /**
- * Busca la foto de un cliente probando sus cuentas por orden (Bluesky y Telegram; Twitter no se puede de forma fiable).
- * La primera que sirve se guarda en tu disco una sola vez y se devuelve su ruta; si ninguna, null.
+ * Looks up a client's photo trying their accounts in order (Bluesky and Telegram; Twitter can't be done reliably).
+ * The first hit is saved to disk once and its path returned; null if none.
  */
 export async function fetchAvatar(accounts: Account[]): Promise<string | null> {
+  const errors: string[] = [];
+
   for (const account of accounts) {
     if (!account.handle) {
       continue;
@@ -77,9 +85,14 @@ export async function fetchAvatar(accounts: Account[]): Promise<string | null> {
         return (await importImageFromFile(new Blob([await download(photoUrl)]))).path;
       }
     } catch (error) {
-      // Cuenta privada, sin conexión, página que cambió… se pasa a la siguiente
+      // Private account, offline, page changed… try the next one
       console.error(`No photo from ${account.platform}`, error);
+      errors.push(`${account.platform}: ${error}`);
     }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(errors.join(" | "));
   }
 
   return null;

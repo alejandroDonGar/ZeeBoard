@@ -386,7 +386,7 @@ export const es: Record<string, string> = {
   "Fetching…": "Buscando…",
   "Photo updated.": "Foto actualizada.",
   "No public photo found. Drop an image on the avatar to set it yourself.": "No se encontró foto pública. Suelta una imagen sobre el avatar para ponerla tú.",
-  "Could not fetch the photo.": "No se pudo buscar la foto.",
+  "Could not fetch the photo: {error}": "No se pudo buscar la foto: {error}",
   "Could not set the photo: {error}": "No se pudo poner la foto: {error}",
   "{active} active · {done} done": "{active} activas · {done} hechas",
   Spent: "Gastado",

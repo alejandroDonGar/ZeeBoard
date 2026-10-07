@@ -341,7 +341,7 @@ function ClientsPage({
       showToast("Photo updated.", "success");
     } catch (error) {
       console.error(error);
-      showToast("Could not fetch the photo.", "error");
+      showToast(t("Could not fetch the photo: {error}", { error: error instanceof Error ? error.message : String(error) }), "error");
     } finally {
       setFetchingAvatar(false);
     }

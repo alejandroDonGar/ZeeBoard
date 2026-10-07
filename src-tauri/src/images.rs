@@ -210,7 +210,7 @@ pub async fn import_image_from_bytes(
         .map_err(|error| error.to_string())?
 }
 
-/// Borra archivos de imagen (versión para ver y miniatura).
+/// Deletes image files (viewing version and thumbnail).
 #[tauri::command]
 pub fn delete_image_files(app: AppHandle, paths: Vec<String>) -> Result<u32, String> {
     let base_dir = data_dir(&app)?;
@@ -225,7 +225,7 @@ pub fn delete_image_files(app: AppHandle, paths: Vec<String>) -> Result<u32, Str
     Ok(deleted)
 }
 
-/// Borra las imágenes y miniaturas que no aparecen en `used_paths`.
+/// Deletes the images and thumbnails not listed in `used_paths`.
 #[tauri::command]
 pub fn cleanup_orphan_images(app: AppHandle, used_paths: Vec<String>) -> Result<u32, String> {
     let base_dir = data_dir(&app)?;
@@ -250,7 +250,7 @@ pub fn cleanup_orphan_images(app: AppHandle, used_paths: Vec<String>) -> Result<
     Ok(deleted)
 }
 
-/// Espacio que ocupan las imágenes, las miniaturas y la base de datos.
+/// Space used by images, thumbnails and the database.
 #[tauri::command]
 pub fn storage_stats(app: AppHandle) -> Result<StorageStats, String> {
     let base_dir = data_dir(&app)?;

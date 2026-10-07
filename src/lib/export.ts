@@ -54,7 +54,7 @@ type Data = {
 const paymentsOf = (data: Data, commissionId: number) =>
   data.payments.filter((payment) => payment.commission_id === commissionId);
 
-/** Una fila por comisión. */
+/** One row per commission. */
 export function buildCommissionsCsv(data: Data): string {
   const rows = data.commissions.map((commission) => {
     const payments = paymentsOf(data, commission.id);
@@ -75,7 +75,7 @@ export function buildCommissionsCsv(data: Data): string {
       commission.price,
       commission.currency ?? "EUR",
       summary.paid,
-      // Lo recibido y las comisiones solo cuentan en los pagos donde ya lo apuntaste
+      // Received and fees only count on payments where you entered it
       payments.some((payment) => payment.received !== null) ? summary.received : null,
       payments.some((payment) => payment.received !== null) ? summary.fees : null,
       PAYMENT_STATUS_STYLE[summary.status].label,
@@ -90,7 +90,7 @@ export function buildCommissionsCsv(data: Data): string {
   );
 }
 
-/** Una fila por pago, con la moneda de su comisión. */
+/** One row per payment, in its commission's currency. */
 export function buildPaymentsCsv(data: Data): string {
   const rows = [...data.payments]
     .sort((a, b) => a.paid_at.localeCompare(b.paid_at))
@@ -118,8 +118,8 @@ export function quarterOf(day: string): string {
 }
 
 /**
- * Pagos agrupados por trimestre y moneda (nunca se suman monedas distintas),
- * según el día en que se cobraron.
+ * Payments grouped by quarter and currency (currencies are never added together),
+ * by the day they were received.
  */
 export function buildQuarterlyCsv(data: Data): string {
   const groups = new Map<string, { quarter: string; currency: string; payments: CommissionPayment[] }>();
@@ -154,7 +154,7 @@ export function buildQuarterlyCsv(data: Data): string {
 
 export type ExportKind = "commissions" | "payments" | "quarterly";
 
-/** Pide dónde guardar y escribe el CSV. Devuelve la ruta, o null si cancelaste. */
+/** Asks where to save and writes the CSV. Returns the path, or null if cancelled. */
 export async function exportCsv(kind: ExportKind): Promise<string | null> {
   const [commissions, payments, templates] = await Promise.all([getCommissions(), getAllPayments(), getTemplates()]);
   const stages = Object.fromEntries(
@@ -174,7 +174,7 @@ export async function exportCsv(kind: ExportKind): Promise<string | null> {
     return null;
   }
 
-  // El marcador inicial (BOM) hace que Excel lea bien los acentos y la ñ
+  // The leading BOM makes Excel read accents and the ñ correctly
   await invoke("write_text_file", { path, contents: `﻿${csv}` });
 
   return path;

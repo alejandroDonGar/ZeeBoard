@@ -100,7 +100,7 @@ assert.deepStrictEqual(withCharacters.requests.map((request) => request.characte
 assert.strictEqual(withoutEmail.requests[0].characters, 1);
 
 // References (links and descriptions) go to the details; their real title contains "Reference"
-const referencesTitle = "Reference links and a name or short description for the character/s";
+const referencesTitle = "Reference links and a name the character/s";
 const withReferences = parseResponses(
   `${header},"${referencesTitle}"\n"2026/10/06 10:00:00 a. m. CET","Full Colour","bsky -> @demo","https://drive.example.com/folder/abc\nthe blue fox has no name"\n"2026/10/06 10:05:00 a. m. CET","Full Colour","tg demo2",""\n`,
   templates,

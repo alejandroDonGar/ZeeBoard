@@ -45,10 +45,10 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 
 ## Fase 4 · Pulido y calidad
 - [x] Restaurar copias de seguridad
-- [ ] Atajos de teclado y buscador global
+- [x] Atajos de teclado y buscador global
 - [ ] Rendimiento con muchas comisiones
-- [ ] Icono, nombre e instalador
-- [ ] README con capturas
+- [x] Icono, nombre e instalador
+- [x] README con capturas
 
 ## Fase 5 · ZeeBoard en el iPad (por wifi, sin nube)
 - [ ] Servidor local en la app + código QR para abrirla desde el iPad
@@ -102,7 +102,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [ ] Comparador antes/después entre etapas
 
 **Comodidad**
-- [ ] Paleta de comandos (Ctrl+K)
+- [x] Paleta de comandos (Ctrl+K)
 - [x] Copias de seguridad automáticas
 - [x] Exportar los datos a CSV
-- [ ] App en español e inglés
+- [x] App en español e inglés

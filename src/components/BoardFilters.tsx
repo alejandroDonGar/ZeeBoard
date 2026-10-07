@@ -104,7 +104,7 @@ function BoardFilters({
                   : "border-line-strong bg-surface text-muted hover:text-ink"
               }`}
             >
-              Tags
+              {t("Tags")}
               {selectedMenuCount > 0 && (
                 <span className="rounded-sm bg-primary px-1.5 text-[11px] font-bold text-on-primary">
                   {selectedMenuCount}

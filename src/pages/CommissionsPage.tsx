@@ -685,8 +685,8 @@ function CommissionsPage() {
     : [];
 
   const pasteStage = workflowStages[currentStageIndex] ?? workflowStages[0] ?? null;
-  // Strip gap minus each stage's label
-  const stageImageHeight = Math.max(stripHeight - 36, 140);
+  // Strip gap minus each stage's label and corrections button
+  const stageImageHeight = Math.max(stripHeight - 64, 140);
 
   // Focus mode: all images from all stages, in order
   const focusImages = activeCommission

@@ -97,14 +97,14 @@ function CommissionPayments({
         <span>
           <span className="text-faint">{t("Client paid")} </span>
           <b>{formatMoney(summary.paid, currency)}</b>
-          {summary.remaining > 0 && <span className="text-faint"> · {formatMoney(summary.remaining, currency)} left</span>}
+          {summary.remaining > 0 && <span className="text-faint"> · {t("{amount} left", { amount: formatMoney(summary.remaining, currency) })}</span>}
         </span>
         <span>
           <span className="text-faint">{t("Received")} </span>
           <b className="text-green-700">{formatMoney(summary.received, currency)}</b>
-          {summary.pendingReceived > 0 && <span className="text-faint"> · {summary.pendingReceived} not entered</span>}
+          {summary.pendingReceived > 0 && <span className="text-faint"> · {t("{n} not entered", { n: summary.pendingReceived })}</span>}
         </span>
-        {summary.fees > 0 && <span className="text-faint">Fees {formatMoney(summary.fees, currency)}</span>}
+        {summary.fees > 0 && <span className="text-faint">{t("Fees {amount}", { amount: formatMoney(summary.fees, currency) })}</span>}
 
         <button
           type="button"

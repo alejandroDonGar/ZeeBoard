@@ -277,6 +277,9 @@ export const es: Record<string, string> = {
 
   // Payments strip
   "Client paid": "Pagó el cliente",
+  "{amount} left": "faltan {amount}",
+  "{n} not entered": "{n} sin apuntar",
+  "Fees {amount}": "Tarifas {amount}",
   Received: "Recibido",
   Date: "Fecha",
   "You received": "Recibiste",

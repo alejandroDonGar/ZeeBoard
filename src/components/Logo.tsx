@@ -1,4 +1,4 @@
-import mark from "../assets/zebra-z.png";
+import mark from "../assets/zebra-z.svg";
 
 function Logo({ className = "" }: { className?: string }) {
   return (

@@ -22,6 +22,19 @@ export async function loadStageImagesForCommissions(
   return Object.fromEntries(entries);
 }
 
+/** One stage's images grouped by alternative; each has its versions, oldest first (the last one is the current). */
+export function groupAlternatives(images: CommissionStageImage[]): { alt: number; versions: CommissionStageImage[] }[] {
+  const groups = new Map<number, CommissionStageImage[]>();
+
+  for (const image of images) {
+    groups.set(image.alt, [...(groups.get(image.alt) ?? []), image]);
+  }
+
+  return [...groups.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([alt, versions]) => ({ alt, versions: versions.sort((a, b) => a.version - b.version || a.id - b.id) }));
+}
+
 export function getCommissionCompletionPercentage(
   commission: Commission,
   templateStagesByTemplateId: Record<number, TemplateStage[]>,

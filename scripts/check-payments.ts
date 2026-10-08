@@ -1,7 +1,7 @@
 // Quick check of payments and prices: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { calculateCommissionPrice, deliveryDay, formatMoney, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
-import type { Commission } from "../src/lib/database";
+import { calculateCommissionPrice, deliveryDay, formatMoney, groupAlternatives, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
+import type { Commission, CommissionStageImage } from "../src/lib/database";
 import { HIDDEN, hide, setPrivate } from "../src/lib/privacy";
 
 // PayPal: the client pays 200, you receive 186.84
@@ -71,3 +71,16 @@ assert.strictEqual(deliveryDay({ ...base, stage_changed_at: "2026-06-15T12:00:00
 assert.strictEqual(deliveryDay(base), "2026-05-01");
 
 console.log("hourly rate ok");
+
+// ---- Alternatives and versions of a stage's images ----
+const image = (id: number, alt: number, version: number) => ({ id, alt, version }) as CommissionStageImage;
+// Alt 1 (with glasses) was retouched twice, Alt 2 (without) once; ids come in upload order, not by alternative
+const groups = groupAlternatives([image(1, 1, 1), image(2, 2, 1), image(3, 1, 2), image(4, 1, 3), image(5, 2, 2)]);
+assert.deepStrictEqual(groups.map((group) => [group.alt, group.versions.map((version) => version.id)]), [
+  [1, [1, 3, 4]],
+  [2, [2, 5]],
+]);
+assert.strictEqual(groups[0].versions[groups[0].versions.length - 1].version, 3, "the last one is the current version");
+assert.deepStrictEqual(groupAlternatives([]), []);
+
+console.log("versions ok");

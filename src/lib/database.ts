@@ -234,6 +234,19 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE clients ADD COLUMN tag_handle TEXT;`).catch(() => {});
   // When a commission last changed stage: counts as activity for the stalled alert
   await database.execute(`ALTER TABLE commissions ADD COLUMN stage_changed_at TEXT;`).catch(() => {});
+  // Alternatives and versions of a stage image (older rows: each one is its own alternative, version 1)
+  await database.execute(`ALTER TABLE commission_stage_images ADD COLUMN alt INTEGER;`).catch(() => {});
+  await database.execute(`ALTER TABLE commission_stage_images ADD COLUMN version INTEGER NOT NULL DEFAULT 1;`).catch(() => {});
+  await database.execute(`
+    UPDATE commission_stage_images
+    SET alt = (
+      SELECT COUNT(*) FROM commission_stage_images older
+      WHERE older.commission_id = commission_stage_images.commission_id
+        AND older.stage_id = commission_stage_images.stage_id
+        AND older.id <= commission_stage_images.id
+    )
+    WHERE alt IS NULL;
+  `);
   await database.execute(`ALTER TABLE commissions ADD COLUMN delivered_at TEXT;`).catch(() => {});
   await database.execute(`ALTER TABLE commissions ADD COLUMN hours REAL;`).catch(() => {});
   await database.execute(`ALTER TABLE commissions ADD COLUMN final_notes TEXT;`).catch(() => {});
@@ -1548,6 +1561,10 @@ export type CommissionStageImage = {
   id: number;
   commission_id: number;
   stage_id: number;
+  /** Which alternative of the stage (the client picks between alternatives) */
+  alt: number;
+  /** Which version of that alternative (retouched after corrections): 1, 2, 3… */
+  version: number;
   label: string;
   image_data_url: string;
   created_at: string;
@@ -1560,10 +1577,10 @@ export async function getCommissionStageImages(
 
   return await database.select<CommissionStageImage[]>(
     `
-    SELECT id, commission_id, stage_id, label, image_data_url, created_at
+    SELECT id, commission_id, stage_id, alt, version, label, image_data_url, created_at
     FROM commission_stage_images
     WHERE commission_id = ?
-    ORDER BY stage_id ASC, id ASC;
+    ORDER BY stage_id ASC, alt ASC, version ASC, id ASC;
     `,
     [commissionId],
   );
@@ -1576,9 +1593,9 @@ export async function createCommissionStageImage(
 ): Promise<void> {
   const database = await getDatabase();
 
-  const existingImages = await database.select<{ count: number }[]>(
+  const existingImages = await database.select<{ last: number }[]>(
     `
-    SELECT COUNT(*) as count
+    SELECT COALESCE(MAX(alt), 0) as last
     FROM commission_stage_images
     WHERE commission_id = ?
       AND stage_id = ?;
@@ -1586,7 +1603,7 @@ export async function createCommissionStageImage(
     [commissionId, stageId],
   );
 
-  const altNumber = existingImages[0].count + 1;
+  const altNumber = existingImages[0].last + 1;
   const label = `Alt ${altNumber}`;
 
   await database.execute(
@@ -1594,20 +1611,56 @@ export async function createCommissionStageImage(
     INSERT INTO commission_stage_images (
       commission_id,
       stage_id,
+      alt,
+      version,
       label,
       image_data_url,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, 1, ?, ?, ?);
     `,
     [
       commissionId,
       stageId,
+      altNumber,
       label,
       imagePath,
       new Date().toISOString(),
     ],
   );
+}
+
+/** A retouched version of an existing image: same stage and alternative, next version number. Returns its id. */
+export async function createImageVersion(imageId: number, imagePath: string): Promise<number> {
+  const database = await getDatabase();
+
+  const [source] = await database.select<{ commission_id: number; stage_id: number; alt: number; label: string }[]>(
+    `SELECT commission_id, stage_id, alt, label FROM commission_stage_images WHERE id = ?;`,
+    [imageId],
+  );
+
+  if (!source) {
+    throw new Error("Image not found");
+  }
+
+  const [latest] = await database.select<{ last: number }[]>(
+    `
+    SELECT COALESCE(MAX(version), 0) as last
+    FROM commission_stage_images
+    WHERE commission_id = ? AND stage_id = ? AND alt = ?;
+    `,
+    [source.commission_id, source.stage_id, source.alt],
+  );
+
+  const result = await database.execute(
+    `
+    INSERT INTO commission_stage_images (commission_id, stage_id, alt, version, label, image_data_url, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?);
+    `,
+    [source.commission_id, source.stage_id, source.alt, latest.last + 1, source.label, imagePath, new Date().toISOString()],
+  );
+
+  return Number(result.lastInsertId);
 }
 
 export async function deleteCommissionStageImage(

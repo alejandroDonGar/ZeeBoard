@@ -11,6 +11,7 @@ import CommissionPayments from "../components/CommissionPayments";
 import {
   loadStageImagesForCommissions as loadStageImagesForCommissionsHelper,
   getCommissionCompletionPercentage as getCommissionCompletionPercentageHelper,
+  groupAlternatives,
   isCommissionCompleted as isCommissionCompletedHelper,
   getDeadlineStatus,
   formatMoney,
@@ -40,6 +41,7 @@ import {
   replaceCommissionTags,
   getClients,
   createCommissionStageImage,
+  createImageVersion,
   deleteCommissionStageImage,
   getClientCharacters,
   getCharacterReferences,
@@ -608,6 +610,37 @@ function CommissionsPage() {
     },
   });
 
+  /** A retouched version of this image: asks for the file and adds it as the next version of that alternative. */
+  async function handleAddVersion(image: CommissionStageImage) {
+    if (importingStageId !== null) {
+      return;
+    }
+
+    const [source] = await pickImagePaths();
+
+    if (!source) {
+      return;
+    }
+
+    setImportingStageId(image.stage_id);
+
+    try {
+      const stored = await importImage(source);
+      const newId = await createImageVersion(image.id, stored.path);
+      // The focus view, if open, moves to the new version
+      setFocusImageId((current) => (current === null ? null : newId));
+    } catch (error) {
+      console.error("Could not add version", error);
+      showToast(t("Could not add image: {error}", { error: String(error) }), "error");
+    } finally {
+      setImportingStageId(null);
+    }
+
+    const data = await getCommissions();
+    setCommissions(data);
+    await loadStageImagesForCommissions(data);
+  }
+
   async function handleDeleteStageImage(imageId: number) {
     await deleteCommissionStageImage(imageId);
 
@@ -616,10 +649,23 @@ function CommissionsPage() {
     await loadStageImagesForCommissions(data);
   }
 
+  /** What a stage shows: the current (latest) version of each alternative */
   function getStageImages(commissionId: number, stageId: number) {
-    return (stageImagesByCommissionId[commissionId] ?? []).filter(
-      (image) => image.stage_id === stageId,
-    );
+    return groupAlternatives(
+      (stageImagesByCommissionId[commissionId] ?? []).filter((image) => image.stage_id === stageId),
+    ).map((group) => group.versions[group.versions.length - 1]);
+  }
+
+  /** All versions of the alternative this image belongs to, oldest first */
+  function getVersions(image: CommissionStageImage) {
+    return (stageImagesByCommissionId[image.commission_id] ?? [])
+      .filter((other) => other.stage_id === image.stage_id && other.alt === image.alt)
+      .sort((a, b) => a.version - b.version || a.id - b.id);
+  }
+
+  /** "v2", or "final" once the commission has moved past that stage */
+  function versionLabel(image: CommissionStageImage, versions: CommissionStageImage[], done: boolean) {
+    return done && image.id === versions[versions.length - 1].id ? t("final") : `v${image.version}`;
   }
 
   function getActiveStageImageIndex(stageId: number, images: CommissionStageImage[]) {
@@ -731,7 +777,8 @@ function CommissionsPage() {
         getStageImages(activeCommission.id, stage.id).map((image) => ({ image, stage })),
       )
     : [];
-  const focusIndex = focusImages.findIndex((item) => item.image.id === focusImageId);
+  // focusImageId can be an older version: the item is the one whose alternative contains it
+  const focusIndex = focusImages.findIndex((item) => getVersions(item.image).some((version) => version.id === focusImageId));
 
   useEffect(() => {
     if (focusIndex < 0) {
@@ -1132,6 +1179,12 @@ function CommissionsPage() {
                                   />
                                 </button>
 
+                                {getVersions(image).length > 1 && (
+                                  <span className="absolute left-2 top-2 rounded-sm bg-black/60 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                                    {versionLabel(image, getVersions(image), isDone)}
+                                  </span>
+                                )}
+
                                 {stageImages.length > 1 && (
                                   <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-sm bg-black/60 px-1.5 py-0.5 text-[11px] text-white">
                                     <button
@@ -1166,9 +1219,18 @@ function CommissionsPage() {
                                     title={t("Add an alt")}
                                     disabled={importingStageId !== null}
                                     onClick={() => handleAddStageImages(stage.id)}
-                                    className="flex h-7 w-7 items-center justify-center rounded-sm bg-black/60 text-white hover:bg-black/80"
+                                    className="flex h-7 items-center justify-center rounded-sm bg-black/60 px-2 text-[11px] font-bold text-white hover:bg-black/80"
                                   >
-                                    +
+                                    + Alt
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title={t("New version of this image (retouched)")}
+                                    disabled={importingStageId !== null}
+                                    onClick={() => handleAddVersion(image)}
+                                    className="flex h-7 items-center justify-center rounded-sm bg-black/60 px-2 text-[11px] font-bold text-white hover:bg-black/80"
+                                  >
+                                    + v
                                   </button>
                                   <button
                                     type="button"
@@ -2031,17 +2093,51 @@ function CommissionsPage() {
           className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-black/90"
           onClick={() => setFocusImageId(null)}
         >
-          <img
-            src={imageUrl(focusImages[focusIndex].image.image_data_url)}
-            alt=""
-            className="max-h-[88vh] max-w-[94vw] object-contain"
-          />
-          <p className="mt-3 text-sm text-white/80">
-            {focusImages[focusIndex].stage.name} · {focusImages[focusIndex].image.label}
-            <span className="ml-3 text-white/50">
-              {focusIndex + 1} / {focusImages.length} · ← → to move · Esc to close
-            </span>
-          </p>
+          {(() => {
+            const { image: current, stage } = focusImages[focusIndex];
+            const versions = getVersions(current);
+            const shown = versions.find((version) => version.id === focusImageId) ?? current;
+            const done = workflowStages.findIndex((item) => item.id === stage.id) < currentStageIndex;
+
+            return (
+              <>
+                <img
+                  src={imageUrl(shown.image_data_url)}
+                  alt=""
+                  className="max-h-[88vh] max-w-[94vw] object-contain"
+                />
+                <div className="mt-3 flex items-center gap-3 text-sm text-white/80" onClick={(event) => event.stopPropagation()}>
+                  <span>
+                    {stage.name} · {shown.label}
+                  </span>
+                  {versions.length > 1 &&
+                    versions.map((version) => (
+                      <button
+                        key={version.id}
+                        type="button"
+                        onClick={() => setFocusImageId(version.id)}
+                        className={`rounded-sm px-2 py-0.5 text-xs font-bold ${
+                          version.id === shown.id ? "bg-white text-black" : "bg-white/20 text-white hover:bg-white/30"
+                        }`}
+                      >
+                        {versionLabel(version, versions, done)}
+                      </button>
+                    ))}
+                  <button
+                    type="button"
+                    disabled={importingStageId !== null}
+                    onClick={() => handleAddVersion(shown)}
+                    className="rounded-sm bg-white/20 px-2 py-0.5 text-xs font-bold text-white hover:bg-white/30 disabled:opacity-50"
+                  >
+                    {t("+ New version")}
+                  </button>
+                  <span className="text-white/50">
+                    {focusIndex + 1} / {focusImages.length} · ← → to move · Esc to close
+                  </span>
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 

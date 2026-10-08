@@ -6,10 +6,12 @@ import {
   appSettings,
   getAllPayments,
   getCommissions,
+  getRequests,
   getTemplates,
   getTemplateStages,
   type Commission,
   type CommissionPayment,
+  type CommissionRequest,
   type Template,
   type TemplateStage,
 } from "../lib/database";
@@ -40,18 +42,19 @@ function StatisticsPage() {
   const [data, setData] = useState<{
     commissions: Commission[];
     payments: CommissionPayment[];
+    requests: CommissionRequest[];
     templates: Template[];
     stages: Record<number, TemplateStage[]>;
   } | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [commissions, payments, templates] = await Promise.all([getCommissions(), getAllPayments(), getTemplates()]);
+      const [commissions, payments, requests, templates] = await Promise.all([getCommissions(), getAllPayments(), getRequests(), getTemplates()]);
       const stages = Object.fromEntries(
         await Promise.all(templates.map(async (template) => [template.id, await getTemplateStages(template.id)] as const)),
       );
 
-      setData({ commissions, payments, templates, stages });
+      setData({ commissions, payments, requests, templates, stages });
     })().catch(console.error);
   }, []);
 
@@ -62,6 +65,7 @@ function StatisticsPage() {
 
   const monthFormatter = new Intl.DateTimeFormat(locale, { month: "short" });
   const maxMonth = Math.max(...(stats?.months.map((month) => month.total) ?? []), 1);
+  const maxRequests = Math.max(...(stats?.requests.months.map((month) => month.received) ?? []), 1);
   const noData = stats !== null && stats.current.pieces === 0 && stats.current.received === 0;
 
   const tiles = stats && [
@@ -177,6 +181,54 @@ function StatisticsPage() {
                   <span className="text-right text-muted">{row.avgHours ?? "—"}</span>
                   <span className="text-right text-muted">{row.avgDays ?? "—"}</span>
                   <span className="text-right font-bold">{row.rate === null ? "—" : `${formatMoney(row.rate)}/h`}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {stats && stats.requests.received > 0 && (
+          <section className={panel}>
+            <h3 className={heading}>{t("Requests")}</h3>
+
+            <p className="mb-4 text-sm text-muted">
+              <span className="text-2xl font-black text-ink">{stats.requests.received}</span> {t("received")}
+              {" · "}
+              <span className="font-bold text-green-600">{stats.requests.accepted}</span> {t("accepted")}
+              {" · "}
+              <span className="font-bold text-red-500">{stats.requests.declined}</span> {t("declined")}
+              {" · "}
+              <span className="font-bold text-ink">{stats.requests.waitlist}</span> {t("on the waitlist")}
+              {" · "}
+              <span className="font-bold text-ink">{stats.requests.open}</span> {t("unanswered")}
+              {stats.requests.rate !== null && (
+                <>
+                  {" · "}
+                  {t("{n} % of the decided ones were accepted", { n: stats.requests.rate })}
+                </>
+              )}
+            </p>
+
+            <div className="flex h-24 items-end gap-3 border-b border-line">
+              {stats.requests.months.map((month) => (
+                <div
+                  key={month.key}
+                  title={`${month.key}: ${t("{received} received · {accepted} accepted", { received: month.received, accepted: month.accepted })}`}
+                  className="flex h-full flex-1 flex-col justify-end"
+                >
+                  <div className="flex min-h-px flex-col justify-end" style={{ height: `${(month.received / maxRequests) * 100}%` }}>
+                    <div className="bg-line-strong" style={{ flex: month.received - month.accepted }} />
+                    <div className="rounded-t-sm bg-primary" style={{ flex: month.accepted }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-1 flex gap-3">
+              {stats.requests.months.map((month) => (
+                <div key={month.key} className="flex-1 text-center text-[11px] text-faint">
+                  {monthFormatter.format(new Date(`${month.key}-01T12:00:00`))}
+                  <span className="block font-semibold text-muted">{month.received}</span>
                 </div>
               ))}
             </div>

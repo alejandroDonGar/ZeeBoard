@@ -93,6 +93,36 @@ assert.strictEqual(clientStats.returningShare, 74);
 assert.strictEqual(computeStats({ commissions: [], payments: [], templates: [], stages, currency: "EUR", now }, "year").returningShare, null);
 assert.strictEqual(computeStats({ commissions: [], payments: [], templates: [], stages, currency: "EUR", now }, "year").fees.percent, null);
 
+// ---- Requests funnel ----
+const request = (status: "new" | "waitlist" | "accepted" | "declined", created_at: string) => ({ status, created_at });
+const funnel = [
+  request("accepted", "2026-02-10T09:00:00.000Z"),
+  request("accepted", "2026-03-05T09:00:00.000Z"),
+  request("declined", "2026-03-20T09:00:00.000Z"),
+  request("waitlist", "2026-04-02T09:00:00.000Z"),
+  request("new", "2026-10-01T09:00:00.000Z"),
+  request("accepted", "2025-11-01T09:00:00.000Z"), // last year
+];
+const requestStats = computeStats({ commissions: [], payments: [], templates: [], stages, requests: funnel, currency: "EUR", now }, "year").requests;
+
+assert.deepStrictEqual(
+  [requestStats.received, requestStats.accepted, requestStats.declined, requestStats.waitlist, requestStats.open],
+  [5, 2, 1, 1, 1],
+);
+// Of the decided ones (2 accepted, 1 declined)
+assert.strictEqual(requestStats.rate, 67);
+assert.deepStrictEqual(requestStats.months[1], { key: "2026-02", received: 1, accepted: 1 });
+assert.deepStrictEqual(requestStats.months[2], { key: "2026-03", received: 2, accepted: 1 });
+assert.deepStrictEqual(requestStats.months[9], { key: "2026-10", received: 1, accepted: 0 });
+
+const allRequests = computeStats({ commissions: [], payments: [], templates: [], stages, requests: funnel, currency: "EUR", now }, "12m").requests;
+assert.deepStrictEqual([allRequests.received, allRequests.rate], [6, 75]);
+assert.deepStrictEqual(allRequests.months[0], { key: "2025-11", received: 1, accepted: 1 });
+
+// No requests at all: nothing to divide
+const noRequests = computeStats({ commissions: [], payments: [], templates: [], stages, currency: "EUR", now }, "year").requests;
+assert.deepStrictEqual([noRequests.received, noRequests.rate], [0, null]);
+
 // ---- Change against the previous period ----
 assert.strictEqual(changePercent(112, 100), 12);
 assert.strictEqual(changePercent(95, 100), -5);

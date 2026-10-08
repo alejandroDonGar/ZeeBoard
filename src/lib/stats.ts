@@ -8,7 +8,7 @@ import {
   ratePerHour,
   round2,
 } from "./commissionHelpers";
-import type { Commission, CommissionPayment, TemplateStage } from "./database";
+import type { Commission, CommissionPayment, RequestStatus, TemplateStage } from "./database";
 
 export type Period = "year" | "12m" | "all";
 
@@ -45,6 +45,18 @@ export type Stats = {
   returningShare: number | null;
   /** Cash in the period: what the platforms kept, as a % of what clients paid (only payments with the net entered) */
   fees: { total: number; percent: number | null; pending: number };
+  /** Requests that came in during the period. Ones removed from the list are gone, so they don't count. */
+  requests: {
+    received: number;
+    accepted: number;
+    declined: number;
+    waitlist: number;
+    /** Not answered yet */
+    open: number;
+    /** accepted / (accepted + declined): of the ones already decided; null when none is */
+    rate: number | null;
+    months: { key: string; received: number; accepted: number }[];
+  };
 };
 
 export function periodRanges(period: Period, now: Date): { current: Range; previous: Range | null } {
@@ -85,6 +97,7 @@ export function computeStats(
     payments: CommissionPayment[];
     templates: { id: number; name: string }[];
     stages: Record<number, TemplateStage[]>;
+    requests?: { status: RequestStatus; created_at: string }[];
     /** Default currency: commissions without one count as this */
     currency: string;
     now: Date;
@@ -176,6 +189,14 @@ export function computeStats(
   const gross = withNet.reduce((sum, payment) => sum + payment.amount, 0);
   const feesTotal = round2(gross - withNet.reduce((sum, payment) => sum + (payment.received ?? 0), 0));
 
+  // Requests by the day they came in
+  const requests = input.requests ?? [];
+  const requestsIn = (range: Range) => requests.filter((request) => inRange(request.created_at.slice(0, 10), range));
+  const count = (list: typeof requests, status: RequestStatus) => list.filter((request) => request.status === status).length;
+  const inPeriod = requestsIn(current);
+  const accepted = count(inPeriod, "accepted");
+  const declined = count(inPeriod, "declined");
+
   return {
     excluded: input.commissions.length - included.length,
     current: summary(current),
@@ -198,6 +219,18 @@ export function computeStats(
       total: feesTotal,
       percent: gross > 0 ? Math.round((feesTotal / gross) * 1000) / 10 : null,
       pending: periodPayments.length - withNet.length,
+    },
+    requests: {
+      received: inPeriod.length,
+      accepted,
+      declined,
+      waitlist: count(inPeriod, "waitlist"),
+      open: count(inPeriod, "new"),
+      rate: accepted + declined > 0 ? Math.round((accepted / (accepted + declined)) * 100) : null,
+      months: months.map(({ key }) => {
+        const inMonth = requests.filter((request) => request.created_at.startsWith(key));
+        return { key, received: inMonth.length, accepted: count(inMonth, "accepted") };
+      }),
     },
   };
 }

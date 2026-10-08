@@ -86,7 +86,7 @@ Dividir cada pantalla en componentes y aplicar el nuevo diseño.
 - [ ] Gastos y beneficio real
 - [ ] Varias monedas
 - [x] Resumen de ingresos por trimestre (CSV)
-- [ ] Estadísticas
+- [x] Estadísticas: ingresos por mes y por tipo, clientes, tarifas, días hasta la entrega y embudo de solicitudes
 
 **Flujo de trabajo**
 - [x] Recordatorios de fechas de entrega (también aviso de comisiones paradas)

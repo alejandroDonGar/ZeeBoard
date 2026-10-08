@@ -14,6 +14,7 @@ import {
   type TemplateStage,
 } from "../lib/database";
 import { locale, t } from "../lib/i18n";
+import { hide } from "../lib/privacy";
 import { changePercent, computeStats, type Period } from "../lib/stats";
 
 const panel = "rounded-3xl border border-line bg-surface p-5 shadow-sm";
@@ -156,28 +157,76 @@ function StatisticsPage() {
           <section className={panel}>
             <h3 className={heading}>{t("By type of commission")}</h3>
 
-            <div className="grid grid-cols-[minmax(0,1fr)_70px_100px_100px_80px_110px] gap-4 px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-faint">
+            <div className="grid grid-cols-[minmax(0,1fr)_70px_100px_100px_80px_70px_110px] gap-4 px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-faint">
               <span>{t("Template")}</span>
               <span className="text-right">{t("Pieces")}</span>
               <span className="text-right">{t("Received")}</span>
               <span className="text-right">{t("Average")}</span>
               <span className="text-right">{t("Hours")}</span>
+              <span className="text-right">{t("Days")}</span>
               <span className="text-right">{t("Per hour")}</span>
             </div>
 
             <div className="divide-y divide-line border-y border-line">
               {stats.byTemplate.map((row) => (
-                <div key={row.name} className="grid grid-cols-[minmax(0,1fr)_70px_100px_100px_80px_110px] items-center gap-4 px-2 py-2 text-sm">
+                <div key={row.name} className="grid grid-cols-[minmax(0,1fr)_70px_100px_100px_80px_70px_110px] items-center gap-4 px-2 py-2 text-sm">
                   <span className="truncate font-bold">{row.name || t("No template")}</span>
                   <span className="text-right text-muted">{row.pieces}</span>
                   <span className="text-right font-bold">{formatMoney(row.net)}</span>
                   <span className="text-right text-muted">{formatMoney(row.avgNet)}</span>
                   <span className="text-right text-muted">{row.avgHours ?? "—"}</span>
+                  <span className="text-right text-muted">{row.avgDays ?? "—"}</span>
                   <span className="text-right font-bold">{row.rate === null ? "—" : `${formatMoney(row.rate)}/h`}</span>
                 </div>
               ))}
             </div>
           </section>
+        )}
+
+        {stats && (
+          <div className="grid grid-cols-2 items-start gap-5">
+            <section className={panel}>
+              <h3 className={heading}>{t("Top clients")}</h3>
+
+              {stats.topClients.length === 0 ? (
+                <p className="text-sm text-muted">{t("No delivered pieces with a client in this period.")}</p>
+              ) : (
+                <>
+                  <div className="divide-y divide-line">
+                    {stats.topClients.map((client) => (
+                      <div key={client.name} className="flex items-center justify-between gap-3 py-2 text-sm">
+                        <span className="truncate font-bold">{hide(client.name)}</span>
+                        <span className="shrink-0 text-muted">
+                          {t(client.pieces === 1 ? "{n} piece" : "{n} pieces", { n: client.pieces })} ·{" "}
+                          <span className="font-bold text-ink">{formatMoney(client.net)}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {stats.returningShare !== null && (
+                    <p className="mt-3 text-xs text-muted">
+                      {t("{n} % of this income comes from clients who come back.", { n: stats.returningShare })}
+                    </p>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className={panel}>
+              <h3 className={heading}>{t("Platform fees")}</h3>
+              <p className="text-3xl font-black text-red-500">{formatMoney(stats.fees.total)}</p>
+              <p className="mt-1 text-xs text-muted">
+                {stats.fees.percent === null
+                  ? t("No payments with the received amount entered in this period.")
+                  : t("{percent} % of what clients paid.", { percent: stats.fees.percent.toLocaleString(locale) })}
+              </p>
+              {stats.fees.pending > 0 && (
+                <p className="mt-1 text-xs text-faint">
+                  {t(stats.fees.pending === 1 ? "{n} payment without the received amount isn't included." : "{n} payments without the received amount aren't included.", { n: stats.fees.pending })}
+                </p>
+              )}
+            </section>
+          </div>
         )}
       </div>
     </div>

@@ -24,7 +24,11 @@ export type TemplateRow = {
   avgNet: number;
   avgHours: number | null;
   rate: number | null;
+  /** Average days from creating the commission to delivering it */
+  avgDays: number | null;
 };
+
+export type ClientRow = { name: string; pieces: number; net: number };
 
 export type Stats = {
   /** Commissions left out because they are in another currency (they are never added together) */
@@ -35,6 +39,12 @@ export type Stats = {
   /** 12 months of cash received: the year for "year", the last 12 months otherwise */
   months: { key: string; total: number }[];
   byTemplate: TemplateRow[];
+  /** The 5 clients that brought in the most from what was delivered in the period */
+  topClients: ClientRow[];
+  /** % of that income that comes from clients with 2 or more commissions; null with no clients to measure */
+  returningShare: number | null;
+  /** Cash in the period: what the platforms kept, as a % of what clients paid (only payments with the net entered) */
+  fees: { total: number; percent: number | null; pending: number };
 };
 
 export function periodRanges(period: Period, now: Date): { current: Range; previous: Range | null } {
@@ -62,6 +72,9 @@ export function periodRanges(period: Period, now: Date): { current: Range; previ
 }
 
 const inRange = (day: string, range: Range) => day >= range.from && day <= range.to;
+
+const daysBetween = (from: string, to: string) =>
+  Math.max(0, Math.round((new Date(`${to}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime()) / 86400000));
 
 /** What one payment brought in: the net where it is entered, else what the client paid */
 const paymentNet = (payment: CommissionPayment) => payment.received ?? payment.amount;
@@ -116,17 +129,52 @@ export function computeStats(
     };
   });
 
-  const byTemplate = new Map<string, { net: number; hours: number[]; entries: { net: number; hours: number | null }[] }>();
+  const byTemplate = new Map<string, { net: number; hours: number[]; days: number[]; entries: { net: number; hours: number | null }[] }>();
+  const delivered = piecesIn(current);
 
-  for (const { commission, net } of piecesIn(current)) {
+  for (const { commission, net } of delivered) {
     const name = input.templates.find((template) => template.id === commission.template_id)?.name ?? "";
-    const row = byTemplate.get(name) ?? { net: 0, hours: [], entries: [] };
+    const row = byTemplate.get(name) ?? { net: 0, hours: [], days: [], entries: [] };
 
     row.net += net;
+    row.days.push(daysBetween(commission.created_at.slice(0, 10), deliveryDay(commission)));
     row.entries.push({ net, hours: commission.hours });
     if (commission.hours !== null && commission.hours > 0) row.hours.push(commission.hours);
     byTemplate.set(name, row);
   }
+
+  // Clients: by id when there is one, else by name
+  const clientKey = (commission: Commission) =>
+    commission.client_id !== null ? `id:${commission.client_id}` : commission.client_name ? `name:${commission.client_name}` : null;
+  const commissionsPerClient = new Map<string, number>();
+
+  for (const commission of included) {
+    const key = clientKey(commission);
+    if (key) commissionsPerClient.set(key, (commissionsPerClient.get(key) ?? 0) + 1);
+  }
+
+  const perClient = new Map<string, ClientRow>();
+
+  for (const { commission, net } of delivered) {
+    const key = clientKey(commission);
+    if (!key) continue;
+    const row = perClient.get(key) ?? { name: commission.client_name ?? "", pieces: 0, net: 0 };
+
+    row.pieces += 1;
+    row.net = round2(row.net + net);
+    perClient.set(key, row);
+  }
+
+  const clientTotal = [...perClient.values()].reduce((sum, row) => sum + row.net, 0);
+  const returningTotal = [...perClient.entries()]
+    .filter(([key]) => (commissionsPerClient.get(key) ?? 0) >= 2)
+    .reduce((sum, [, row]) => sum + row.net, 0);
+
+  // Fees of the cash received in the period
+  const periodPayments = payments.filter((payment) => inRange(payment.paid_at, current));
+  const withNet = periodPayments.filter((payment) => payment.received !== null);
+  const gross = withNet.reduce((sum, payment) => sum + payment.amount, 0);
+  const feesTotal = round2(gross - withNet.reduce((sum, payment) => sum + (payment.received ?? 0), 0));
 
   return {
     excluded: input.commissions.length - included.length,
@@ -141,8 +189,16 @@ export function computeStats(
         avgNet: round2(row.net / row.entries.length),
         avgHours: row.hours.length > 0 ? round2(row.hours.reduce((sum, hours) => sum + hours, 0) / row.hours.length) : null,
         rate: ratePerHour(row.entries),
+        avgDays: Math.round(row.days.reduce((sum, days) => sum + days, 0) / row.days.length),
       }))
       .sort((a, b) => b.net - a.net),
+    topClients: [...perClient.values()].sort((a, b) => b.net - a.net).slice(0, 5),
+    returningShare: clientTotal > 0 ? Math.round((returningTotal / clientTotal) * 100) : null,
+    fees: {
+      total: feesTotal,
+      percent: gross > 0 ? Math.round((feesTotal / gross) * 1000) / 10 : null,
+      pending: periodPayments.length - withNet.length,
+    },
   };
 }
 

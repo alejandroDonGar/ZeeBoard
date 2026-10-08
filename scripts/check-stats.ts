@@ -61,10 +61,37 @@ assert.strictEqual(stats.months[0].key, "2026-01");
 assert.strictEqual(stats.months[7].total, 245); // August: 200 + 45
 assert.strictEqual(stats.months[3].total, 0, "the USD payment is not counted");
 
-assert.deepStrictEqual(stats.byTemplate, [{ name: "Flat", pieces: 2, net: 290, avgNet: 145, avgHours: 6, rate: 24.17 }]);
+// avgDays: created 1 Jan, delivered 10 Mar (68 days) and 20 Aug (231 days)
+assert.deepStrictEqual(stats.byTemplate, [{ name: "Flat", pieces: 2, net: 290, avgNet: 145, avgHours: 6, rate: 24.17, avgDays: 150 }]);
+
+// Fees of the cash in the year (EUR only): 10 on 100 and 5 on 50 have a net; the 200 one doesn't, so it is left out of the %
+assert.deepStrictEqual(stats.fees, { total: 15, percent: 10, pending: 1 });
 
 assert.strictEqual(computeStats({ commissions, payments, templates: [], stages, currency: "EUR", now }, "all").previous, null);
 assert.strictEqual(computeStats({ commissions: [], payments: [], templates: [], stages, currency: "EUR", now }, "year").current.rate, null);
+
+// ---- Clients: top and returning share ----
+// Ana has 2 commissions (returning), Dan only 1. Delivered in 2026: Ana 90 + 200, Dan 100; one piece has no client.
+const withClient = (id: number, client_id: number | null, client_name: string | null, extra: Partial<Commission> = {}) =>
+  commission(id, { client_id, client_name, delivered_at: "2026-05-01", ...extra });
+const clientCommissions = [
+  withClient(1, 1, "Ana"),
+  withClient(2, 1, "Ana", { price: 200 }),
+  withClient(3, 2, "Dan", { price: 100 }),
+  withClient(4, null, null),
+  withClient(5, 1, "Ana", { current_stage_id: 10, delivered_at: null }), // open: counts as a commission of Ana, not as income
+];
+const clientPayments = [payment(1, 1, 90, 90, "2026-05-02"), payment(2, 2, 200, 200, "2026-05-02"), payment(3, 3, 100, 100, "2026-05-02"), payment(4, 4, 999, 999, "2026-05-02")];
+const clientStats = computeStats({ commissions: clientCommissions, payments: clientPayments, templates: [], stages, currency: "EUR", now }, "year");
+
+assert.deepStrictEqual(clientStats.topClients, [
+  { name: "Ana", pieces: 2, net: 290 },
+  { name: "Dan", pieces: 1, net: 100 },
+]);
+// Ana (3 commissions) is returning, Dan (1) is not: 290 of 390
+assert.strictEqual(clientStats.returningShare, 74);
+assert.strictEqual(computeStats({ commissions: [], payments: [], templates: [], stages, currency: "EUR", now }, "year").returningShare, null);
+assert.strictEqual(computeStats({ commissions: [], payments: [], templates: [], stages, currency: "EUR", now }, "year").fees.percent, null);
 
 // ---- Change against the previous period ----
 assert.strictEqual(changePercent(112, 100), 12);

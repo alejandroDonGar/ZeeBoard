@@ -1,6 +1,6 @@
 // Quick check of payments and prices: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { calculateCommissionPrice, deliveryDay, effectiveCharacterCount, formatMoney, groupAlternatives, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
+import { calculateCommissionPrice, deliveryDay, effectiveCharacterCount, pinNumber, formatMoney, groupAlternatives, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
 import type { Commission, CommissionStageImage } from "../src/lib/database";
 import { HIDDEN, hide, setPrivate } from "../src/lib/privacy";
 
@@ -36,6 +36,16 @@ assert.strictEqual(effectiveCharacterCount(0, 0), 1);
 assert.strictEqual(effectiveCharacterCount(Number.NaN, 2), 2);
 assert.strictEqual(calculateCommissionPrice(110, effectiveCharacterCount(2, 1), 0.5), 165);
 console.log("prices ok");
+
+// Correction pins: numbered per image in the order they were added; plain corrections have no number
+const pinned = [
+  { id: 1, image_id: 10 },
+  { id: 2, image_id: null },
+  { id: 3, image_id: 10 },
+  { id: 4, image_id: 11 },
+];
+assert.deepStrictEqual(pinned.map((correction) => pinNumber(pinned, correction)), [1, null, 2, 1]);
+console.log("pins ok");
 
 // Platform fee: 3.4% + 0.35 on 200 → 192.85; never negative
 assert.strictEqual(receivedAfterFees(200, { percent: 3.4, fixed: 0.35 }), 192.85);

@@ -296,6 +296,10 @@ export async function initializeDatabase() {
       created_at TEXT NOT NULL
     );
   `);
+  // A pin on an image version: which image and where (x, y as 0..1 of its width and height)
+  await database.execute(`ALTER TABLE commission_corrections ADD COLUMN image_id INTEGER;`).catch(() => {});
+  await database.execute(`ALTER TABLE commission_corrections ADD COLUMN x REAL;`).catch(() => {});
+  await database.execute(`ALTER TABLE commission_corrections ADD COLUMN y REAL;`).catch(() => {});
 
   await database.execute(`
     CREATE TABLE IF NOT EXISTS template_stages (
@@ -1710,6 +1714,8 @@ export async function deleteCommissionStageImage(
     `,
     [imageId],
   );
+  // Its pins stay as plain corrections: the text is kept, the position means nothing now
+  await database.execute(`UPDATE commission_corrections SET image_id = NULL, x = NULL, y = NULL WHERE image_id = ?;`, [imageId]);
 
   if (images.length > 0) {
     await deleteImageIfUnused(images[0].image_data_url);
@@ -1932,17 +1938,26 @@ export type CommissionCorrection = {
   stage_id: number;
   text: string;
   created_at: string;
+  /** Set when the correction is a pin on an image version; x and y are 0..1 of the image */
+  image_id: number | null;
+  x: number | null;
+  y: number | null;
 };
 
 export async function getAllCorrections(): Promise<CommissionCorrection[]> {
   const database = await getDatabase();
 
   return await database.select<CommissionCorrection[]>(
-    `SELECT id, commission_id, stage_id, text, created_at FROM commission_corrections ORDER BY created_at ASC, id ASC;`,
+    `SELECT id, commission_id, stage_id, text, created_at, image_id, x, y FROM commission_corrections ORDER BY created_at ASC, id ASC;`,
   );
 }
 
-export async function addCorrection(commissionId: number, stageId: number, text: string): Promise<void> {
+export async function addCorrection(
+  commissionId: number,
+  stageId: number,
+  text: string,
+  pin?: { imageId: number; x: number; y: number },
+): Promise<void> {
   const database = await getDatabase();
   const cleanText = text.trim();
 
@@ -1951,8 +1966,8 @@ export async function addCorrection(commissionId: number, stageId: number, text:
   }
 
   await database.execute(
-    `INSERT INTO commission_corrections (commission_id, stage_id, text, created_at) VALUES (?, ?, ?, ?);`,
-    [commissionId, stageId, cleanText, new Date().toISOString()],
+    `INSERT INTO commission_corrections (commission_id, stage_id, text, created_at, image_id, x, y) VALUES (?, ?, ?, ?, ?, ?, ?);`,
+    [commissionId, stageId, cleanText, new Date().toISOString(), pin?.imageId ?? null, pin?.x ?? null, pin?.y ?? null],
   );
 }
 

@@ -204,6 +204,18 @@ export function effectiveCharacterCount(asked: number, linked: number): number {
   return Math.max(1, Math.floor(asked) || 1, linked);
 }
 
+/** Number of a correction pin on its image (1, 2, 3… in the order they were added); null when it has no pin */
+export function pinNumber(
+  corrections: { id: number; image_id: number | null }[],
+  correction: { id: number; image_id: number | null },
+): number | null {
+  if (correction.image_id === null) {
+    return null;
+  }
+
+  return corrections.filter((other) => other.image_id === correction.image_id && other.id <= correction.id).length;
+}
+
 /** What a payment nets after the platform fee: amount − (amount × % + fixed) */
 export function receivedAfterFees(amount: number, platform: { percent: number; fixed: number }): number {
   return round2(Math.max(amount - (amount * platform.percent) / 100 - platform.fixed, 0));

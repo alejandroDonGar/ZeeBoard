@@ -20,6 +20,7 @@ import {
   PAYMENT_STATUS_STYLE,
   calculateCommissionPrice,
   effectiveCharacterCount,
+  pinNumber,
   invoiceDescription,
 } from "../lib/commissionHelpers";
 import { autoTagIds } from "../lib/formImport";
@@ -112,6 +113,10 @@ function CommissionsPage() {
   // Stage whose corrections show under the strip; null = none
   const [correctionsStageId, setCorrectionsStageId] = useState<number | null>(null);
   const [correctionDraft, setCorrectionDraft] = useState("");
+  // Correction pins in focus mode: placing mode, the pin being written, the pin whose text is open
+  const [pinMode, setPinMode] = useState(false);
+  const [pinDraft, setPinDraft] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [openPinId, setOpenPinId] = useState<number | null>(null);
   const [stripHeight, setStripHeight] = useState(0);
   const stripObserver = useRef<ResizeObserver | null>(null);
   const stripRef = useCallback((node: HTMLDivElement | null) => {
@@ -670,6 +675,14 @@ function CommissionsPage() {
     await loadStageImagesForCommissions(data);
   }
 
+  async function removeCorrection(correction: CommissionCorrection) {
+    const trashId = await deleteCorrection(correction.id);
+
+    setCorrections(await getAllCorrections());
+    setOpenPinId(null);
+    undoToast(showToast, "Correction removed.", trashId);
+  }
+
   async function handleDeleteStageImage(imageId: number) {
     await deleteCommissionStageImage(imageId);
 
@@ -815,7 +828,20 @@ function CommissionsPage() {
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setFocusImageId(null);
+      if (event.key === "Escape") {
+        // First Esc leaves the pin tools; the next one closes the view
+        if (pinMode || pinDraft || openPinId !== null) {
+          setPinMode(false);
+          setPinDraft(null);
+          setOpenPinId(null);
+        } else {
+          setFocusImageId(null);
+        }
+        return;
+      }
+
+      // Arrows move the text cursor while writing a pin
+      if (event.target instanceof HTMLInputElement) return;
       if (event.key === "ArrowRight") setFocusImageId(focusImages[(focusIndex + 1) % focusImages.length].image.id);
       if (event.key === "ArrowLeft")
         setFocusImageId(focusImages[(focusIndex - 1 + focusImages.length) % focusImages.length].image.id);
@@ -824,6 +850,16 @@ function CommissionsPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
+
+  // Another image, or leaving focus mode: nothing of the pin tools stays open
+  useEffect(() => {
+    setPinDraft(null);
+    setOpenPinId(null);
+  }, [focusImageId]);
+
+  useEffect(() => {
+    if (focusIndex < 0) setPinMode(false);
+  }, [focusIndex]);
 
   // On opening a commission, the strip centers on the current stage
   useEffect(() => {
@@ -1345,26 +1381,40 @@ function CommissionsPage() {
 
                         {activeCorrections
                           .filter((correction) => correction.stage_id === correctionsStage.id)
-                          .map((correction) => (
-                            <div key={correction.id} className="group flex items-baseline gap-3 py-1 text-sm">
-                              <span className="w-14 shrink-0 text-xs text-faint">
-                                {new Date(correction.created_at).toLocaleDateString(locale, { day: "numeric", month: "short" })}
-                              </span>
-                              <span className="flex-1 whitespace-pre-wrap">{correction.text}</span>
-                              <button
-                                type="button"
-                                title={t("Remove correction")}
-                                onClick={async () => {
-                                  const trashId = await deleteCorrection(correction.id);
-                                  setCorrections(await getAllCorrections());
-                                  undoToast(showToast, "Correction removed.", trashId);
-                                }}
-                                className="text-faint opacity-0 transition hover:text-red-500 group-hover:opacity-100"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
+                          .map((correction) => {
+                            const pinImage =
+                              correction.image_id === null
+                                ? null
+                                : (stageImagesByCommissionId[activeCommission.id] ?? []).find((image) => image.id === correction.image_id);
+
+                            return (
+                              <div key={correction.id} className="group flex items-baseline gap-3 py-1 text-sm">
+                                <span className="w-14 shrink-0 text-xs text-faint">
+                                  {new Date(correction.created_at).toLocaleDateString(locale, { day: "numeric", month: "short" })}
+                                </span>
+                                {pinImage && (
+                                  <button
+                                    type="button"
+                                    title={t("Show on the image")}
+                                    onClick={() => setFocusImageId(pinImage.id)}
+                                    className="flex shrink-0 items-center gap-1 self-center rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-black text-black"
+                                  >
+                                    {pinNumber(activeCorrections, correction)}
+                                    <span className="font-semibold">· v{pinImage.version}</span>
+                                  </button>
+                                )}
+                                <span className="flex-1 whitespace-pre-wrap">{correction.text}</span>
+                                <button
+                                  type="button"
+                                  title={t("Remove correction")}
+                                  onClick={() => removeCorrection(correction)}
+                                  className="text-faint opacity-0 transition hover:text-red-500 group-hover:opacity-100"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })}
 
                         <input
                           autoFocus
@@ -1385,6 +1435,30 @@ function CommissionsPage() {
                           placeholder={t("What did the client ask to change? Enter to add")}
                           className="mt-2 w-full rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm outline-none focus:border-ink"
                         />
+
+                        {(() => {
+                          const alternatives = getStageImages(activeCommission.id, correctionsStage.id);
+
+                          return (
+                            alternatives.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {alternatives.map((image) => (
+                                  <button
+                                    key={image.id}
+                                    type="button"
+                                    disabled={importingStageId !== null}
+                                    onClick={() => handleAddVersion(image)}
+                                    className="rounded-sm border border-line-strong px-2.5 py-1 text-xs font-semibold text-muted transition hover:border-ink hover:text-ink disabled:opacity-50"
+                                  >
+                                    {alternatives.length > 1
+                                      ? t("Upload retouched version · {name}", { name: image.label })
+                                      : t("Upload retouched version")}
+                                  </button>
+                                ))}
+                              </div>
+                            )
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -2139,14 +2213,95 @@ function CommissionsPage() {
             const versions = getVersions(current);
             const shown = versions.find((version) => version.id === focusImageId) ?? current;
             const done = workflowStages.findIndex((item) => item.id === stage.id) < currentStageIndex;
+            const pins = activeCorrections.filter((correction) => correction.image_id === shown.id && correction.x !== null && correction.y !== null);
+            const openPin = pins.find((correction) => correction.id === openPinId) ?? null;
+            // Keeps the text box inside the image when a pin sits near an edge
+            const boxLeft = (x: number) => `${Math.min(Math.max(x, 0.15), 0.85) * 100}%`;
 
             return (
               <>
-                <img
-                  src={imageUrl(shown.image_data_url)}
-                  alt=""
-                  className="max-h-[88vh] max-w-[94vw] object-contain"
-                />
+                <div
+                  className={`relative ${pinMode ? "cursor-crosshair" : ""}`}
+                  onClick={(event) => {
+                    if (!pinMode) return;
+
+                    event.stopPropagation();
+                    const box = event.currentTarget.getBoundingClientRect();
+                    setOpenPinId(null);
+                    setPinDraft({ x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height, text: "" });
+                  }}
+                >
+                  <img
+                    src={imageUrl(shown.image_data_url)}
+                    alt=""
+                    className="block max-h-[88vh] max-w-[94vw] object-contain"
+                  />
+
+                  {pins.map((correction) => (
+                    <button
+                      key={correction.id}
+                      type="button"
+                      title={correction.text}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPinDraft(null);
+                        setOpenPinId(openPinId === correction.id ? null : correction.id);
+                      }}
+                      style={{ left: `${(correction.x ?? 0) * 100}%`, top: `${(correction.y ?? 0) * 100}%` }}
+                      className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-amber-400 text-xs font-black text-black shadow-lg ring-2 ring-white"
+                    >
+                      {pinNumber(activeCorrections, correction)}
+                    </button>
+                  ))}
+
+                  {openPin && (
+                    <div
+                      onClick={(event) => event.stopPropagation()}
+                      style={{ left: boxLeft(openPin.x ?? 0), top: `${(openPin.y ?? 0) * 100}%` }}
+                      className="absolute z-10 mt-4 w-60 -translate-x-1/2 rounded-md bg-surface p-2.5 text-sm text-ink shadow-2xl"
+                    >
+                      <p className="whitespace-pre-wrap">{openPin.text}</p>
+                      <button
+                        type="button"
+                        onClick={() => removeCorrection(openPin)}
+                        className="mt-1.5 text-xs text-faint hover:text-red-500"
+                      >
+                        {t("Remove correction")}
+                      </button>
+                    </div>
+                  )}
+
+                  {pinDraft && (
+                    <>
+                      <span
+                        style={{ left: `${pinDraft.x * 100}%`, top: `${pinDraft.y * 100}%` }}
+                        className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-amber-400/70 text-xs font-black text-black ring-2 ring-white"
+                      >
+                        {activeCorrections.filter((correction) => correction.image_id === shown.id).length + 1}
+                      </span>
+                      <input
+                        autoFocus
+                        value={pinDraft.text}
+                        onChange={(event) => setPinDraft({ ...pinDraft, text: event.target.value })}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={async (event) => {
+                          if (event.key !== "Enter" || !pinDraft.text.trim() || !activeCommission) return;
+
+                          try {
+                            await addCorrection(activeCommission.id, stage.id, pinDraft.text, { imageId: shown.id, x: pinDraft.x, y: pinDraft.y });
+                            setPinDraft(null);
+                            setCorrections(await getAllCorrections());
+                          } catch (error) {
+                            showToast(error instanceof Error ? error.message : `${error}`, "error");
+                          }
+                        }}
+                        placeholder={t("What should change here? Enter to add")}
+                        style={{ left: boxLeft(pinDraft.x), top: `${pinDraft.y * 100}%` }}
+                        className="absolute z-10 mt-4 w-64 -translate-x-1/2 rounded-md border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink shadow-2xl outline-none focus:border-ink"
+                      />
+                    </>
+                  )}
+                </div>
                 <div className="mt-3 flex items-center gap-3 text-sm text-white/80" onClick={(event) => event.stopPropagation()}>
                   <span>
                     {stage.name} · {shown.label}
@@ -2164,6 +2319,19 @@ function CommissionsPage() {
                         {versionLabel(version, versions, done)}
                       </button>
                     ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPinMode(!pinMode);
+                      setPinDraft(null);
+                      setOpenPinId(null);
+                    }}
+                    className={`rounded-sm px-2 py-0.5 text-xs font-bold ${
+                      pinMode ? "bg-amber-400 text-black" : "bg-white/20 text-white hover:bg-white/30"
+                    }`}
+                  >
+                    {pinMode ? t("Click the image to add a correction") : t("+ Correction pin")}
+                  </button>
                   <button
                     type="button"
                     disabled={importingStageId !== null}

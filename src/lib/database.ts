@@ -410,6 +410,22 @@ export async function initializeDatabase() {
     );
   `);
 
+  // How many characters each price is for. Older rows: what the request said, else the "N Characters" tag, else the linked ones.
+  await database.execute(`ALTER TABLE commissions ADD COLUMN character_count INTEGER;`).catch(() => {});
+  await database.execute(`
+    UPDATE commissions
+    SET character_count = MAX(
+      1,
+      COALESCE((SELECT r.characters FROM commission_requests r WHERE r.commission_id = commissions.id ORDER BY r.id DESC LIMIT 1), 0),
+      COALESCE((
+        SELECT CAST(t.name AS INTEGER) FROM commission_tags ct JOIN tags t ON t.id = ct.tag_id
+        WHERE ct.commission_id = commissions.id AND t.category = 'Characters' AND t.name GLOB '[0-9]*' LIMIT 1
+      ), 0),
+      (SELECT COUNT(*) FROM commission_characters cc WHERE cc.commission_id = commissions.id)
+    )
+    WHERE character_count IS NULL;
+  `);
+
   // PayPal, Ko-fi… fees: received = amount − (amount × % + fixed)
   await database.execute(`
     CREATE TABLE IF NOT EXISTS payment_platforms (
@@ -696,6 +712,8 @@ export type Commission = {
   delivered_at: string | null;
   hours: number | null;
   final_notes: string | null;
+  /** How many characters the price is for; the linked ones can be fewer (clients without a profile) */
+  character_count: number | null;
 };
 
 export async function getCommissions(): Promise<Commission[]> {
@@ -718,6 +736,7 @@ export async function createCommission(
   currency: string,
   deadline: string | null,
   notes: string,
+  characterCount: number,
 ): Promise<number> {
   const database = await getDatabase();
 
@@ -747,9 +766,10 @@ export async function createCommission(
       currency,
       deadline,
       notes,
+      character_count,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
     [
       cleanTitle,
@@ -762,6 +782,7 @@ export async function createCommission(
       currency,
       deadline,
       notes.trim() || null,
+      characterCount,
       new Date().toISOString(),
     ],
   );
@@ -813,6 +834,7 @@ export async function updateCommission(
   currency: string,
   deadline: string | null,
   notes: string,
+  characterCount: number,
 ): Promise<void> {
   const database = await getDatabase();
 
@@ -833,7 +855,8 @@ export async function updateCommission(
       price = ?,
       currency = ?,
       deadline = ?,
-      notes = ?
+      notes = ?,
+      character_count = ?
     WHERE id = ?;
     `,
     [
@@ -845,6 +868,7 @@ export async function updateCommission(
       currency,
       deadline,
       notes.trim() || null,
+      characterCount,
       commissionId,
     ],
   );
@@ -894,9 +918,10 @@ export async function duplicateCommission(
       currency,
       deadline,
       notes,
+      character_count,
       created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
     [
       copyTitle,
@@ -908,6 +933,7 @@ export async function duplicateCommission(
       commission.currency,
       commission.deadline,
       commission.notes,
+      commission.character_count,
       new Date().toISOString(),
     ],
   );

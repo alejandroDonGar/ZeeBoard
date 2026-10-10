@@ -19,6 +19,7 @@ import {
   paymentSummary,
   PAYMENT_STATUS_STYLE,
   calculateCommissionPrice,
+  effectiveCharacterCount,
   invoiceDescription,
 } from "../lib/commissionHelpers";
 import { autoTagIds } from "../lib/formImport";
@@ -78,6 +79,9 @@ function CommissionsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [charactersByClientId, setCharactersByClientId] = useState<Record<number, ClientCharacter[]>>({});
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<number[]>([]);
+  // What the price is for. Follows the linked characters until set by hand or loaded from a saved commission.
+  const [characterCount, setCharacterCount] = useState(1);
+  const [countIsFixed, setCountIsFixed] = useState(false);
   const [commissionCharactersById, setCommissionCharactersById] = useState<Record<number, number[]>>({});
   const [referencesByCharacterId, setReferencesByCharacterId] = useState<Record<number, CharacterReference[]>>({});
   const [platform, setPlatform] = useState("Discord");
@@ -235,6 +239,8 @@ function CommissionsPage() {
     setCommissionDeadline("");
     setCommissionNotes("");
     setSelectedCharacterIds([]);
+    setCharacterCount(1);
+    setCountIsFixed(false);
     setSelectedTagIds([]);
     setCharacterSearch("");
     setFormMode("new");
@@ -311,8 +317,27 @@ function CommissionsPage() {
     setSelectedTagIds((current) => [...current.filter((id) => !own(id)), ...auto]);
   }
 
+  /** Linking or unlinking characters: the count only goes up once it is fixed, else it follows them */
+  function changeLinkedCharacters(nextIds: number[]) {
+    const count = effectiveCharacterCount(countIsFixed ? characterCount : 0, nextIds.length);
+
+    setSelectedCharacterIds(nextIds);
+    setCharacterCount(count);
+    applyAutoPrice(selectedTemplateId, count);
+    applyAutoTags(selectedTemplateId, count);
+  }
+
+  function changeCharacterCount(value: number) {
+    const count = effectiveCharacterCount(value, selectedCharacterIds.length);
+
+    setCharacterCount(count);
+    setCountIsFixed(true);
+    applyAutoPrice(selectedTemplateId, count);
+    applyAutoTags(selectedTemplateId, count);
+  }
+
   const formTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
-  const extraCharacters = Math.max(selectedCharacterIds.length, 1) - 1;
+  const extraCharacters = characterCount - 1;
   // Chips: the chosen client's characters, plus those of other clients already chosen
   const formCharacterOptions = Object.values(charactersByClientId)
     .flat()
@@ -447,7 +472,10 @@ function CommissionsPage() {
     setCurrency(activeCommission.currency || "EUR");
     setCommissionDeadline(activeCommission.deadline || "");
     setCommissionNotes(activeCommission.notes || "");
-    setSelectedCharacterIds(commissionCharactersById[activeCommission.id] ?? []);
+    const linked = commissionCharactersById[activeCommission.id] ?? [];
+    setSelectedCharacterIds(linked);
+    setCharacterCount(effectiveCharacterCount(activeCommission.character_count ?? 1, linked.length));
+    setCountIsFixed(true);
     setSelectedTagIds((await getCommissionTags(activeCommission.id)).map((tag) => tag.id));
     setCharacterSearch("");
     setFormMode("edit");
@@ -472,7 +500,7 @@ function CommissionsPage() {
 
       if (formMode === "edit" && activeCommission) {
         commissionId = activeCommission.id;
-        await updateCommission(commissionId, ...fields, price, currency, deadline, commissionNotes);
+        await updateCommission(commissionId, ...fields, price, currency, deadline, commissionNotes, characterCount);
       } else {
         commissionId = await createCommission(
           ...fields,
@@ -481,6 +509,7 @@ function CommissionsPage() {
           currency,
           deadline,
           commissionNotes,
+          characterCount,
         );
       }
 
@@ -1818,7 +1847,23 @@ function CommissionsPage() {
               </div>
 
               <div>
-                <p className={formLabel}>{t("Characters")}</p>
+                <p className={formLabel}>
+                  {t("Characters")}
+                  <input
+                    type="number"
+                    min={1}
+                    value={characterCount}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      if (value >= 1) changeCharacterCount(value);
+                    }}
+                    title={t("How many characters the commission has; the price depends on it")}
+                    className="ml-3 w-14 rounded-sm border border-line-strong bg-surface px-1.5 py-0.5 text-center text-sm normal-case tracking-normal text-ink outline-none focus:border-ink"
+                  />
+                  <span className="ml-2 normal-case tracking-normal text-faint">
+                    {t("the price depends on this number")}
+                  </span>
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {formCharacterOptions.map((character) => {
                     const selected = selectedCharacterIds.includes(character.id);
@@ -1828,12 +1873,11 @@ function CommissionsPage() {
                         key={character.id}
                         type="button"
                         onClick={() => {
-                          const nextIds = selected
-                            ? selectedCharacterIds.filter((id) => id !== character.id)
-                            : [...selectedCharacterIds, character.id];
-                          setSelectedCharacterIds(nextIds);
-                          applyAutoPrice(selectedTemplateId, nextIds.length);
-                          applyAutoTags(selectedTemplateId, nextIds.length);
+                          changeLinkedCharacters(
+                            selected
+                              ? selectedCharacterIds.filter((id) => id !== character.id)
+                              : [...selectedCharacterIds, character.id],
+                          );
                         }}
                         className={
                           selected
@@ -1859,12 +1903,9 @@ function CommissionsPage() {
                       const option = allCharacterOptions.find((item) => item.label === event.target.value);
 
                       if (option) {
-                        const nextIds = selectedCharacterIds.includes(option.id)
-                          ? selectedCharacterIds
-                          : [...selectedCharacterIds, option.id];
-                        setSelectedCharacterIds(nextIds);
-                        applyAutoPrice(selectedTemplateId, nextIds.length);
-                          applyAutoTags(selectedTemplateId, nextIds.length);
+                        changeLinkedCharacters(
+                          selectedCharacterIds.includes(option.id) ? selectedCharacterIds : [...selectedCharacterIds, option.id],
+                        );
                         setCharacterSearch("");
                       } else {
                         setCharacterSearch(event.target.value);
@@ -1901,8 +1942,8 @@ function CommissionsPage() {
                         disabled={formMode === "edit"}
                         onClick={() => {
                           setSelectedTemplateId(template.id);
-                          applyAutoPrice(template.id, selectedCharacterIds.length);
-                          applyAutoTags(template.id, selectedCharacterIds.length);
+                          applyAutoPrice(template.id, characterCount);
+                          applyAutoTags(template.id, characterCount);
                         }}
                         className={`rounded-md border px-3 py-2 text-left transition disabled:cursor-default ${
                           selected
@@ -1986,7 +2027,7 @@ function CommissionsPage() {
                           {formatMoney(
                             calculateCommissionPrice(
                               formTemplate.base_price,
-                              selectedCharacterIds.length,
+                              characterCount,
                               appSettings().extra_character_rate,
                             ) -
                               formTemplate.base_price,

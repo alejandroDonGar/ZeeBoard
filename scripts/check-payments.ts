@@ -1,6 +1,6 @@
 // Quick check of payments and prices: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { calculateCommissionPrice, deliveryDay, formatMoney, groupAlternatives, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
+import { calculateCommissionPrice, deliveryDay, effectiveCharacterCount, formatMoney, groupAlternatives, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
 import type { Commission, CommissionStageImage } from "../src/lib/database";
 import { HIDDEN, hide, setPrivate } from "../src/lib/privacy";
 
@@ -29,6 +29,12 @@ assert.strictEqual(calculateCommissionPrice(160, 0, 0.5), 160);
 assert.strictEqual(calculateCommissionPrice(99.99, 2, 0.5), 149.99);
 // Fee changed in Settings
 assert.strictEqual(calculateCommissionPrice(160, 2, 0.6), 256);
+// Characters the price is for: the asked number wins unless more are linked (2 asked, 1 profile: still 2)
+assert.strictEqual(effectiveCharacterCount(2, 1), 2);
+assert.strictEqual(effectiveCharacterCount(2, 3), 3);
+assert.strictEqual(effectiveCharacterCount(0, 0), 1);
+assert.strictEqual(effectiveCharacterCount(Number.NaN, 2), 2);
+assert.strictEqual(calculateCommissionPrice(110, effectiveCharacterCount(2, 1), 0.5), 165);
 console.log("prices ok");
 
 // Platform fee: 3.4% + 0.35 on 200 → 192.85; never negative

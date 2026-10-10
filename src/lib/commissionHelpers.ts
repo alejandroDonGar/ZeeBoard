@@ -199,6 +199,11 @@ export function calculateCommissionPrice(basePrice: number, characterCount: numb
   return round2(basePrice * (1 + extraCharacterRate * extraCharacters));
 }
 
+/** Characters a price is for: the number asked for (or typed), never fewer than the ones linked, at least 1 */
+export function effectiveCharacterCount(asked: number, linked: number): number {
+  return Math.max(1, Math.floor(asked) || 1, linked);
+}
+
 /** What a payment nets after the platform fee: amount − (amount × % + fixed) */
 export function receivedAfterFees(amount: number, platform: { percent: number; fixed: number }): number {
   return round2(Math.max(amount - (amount * platform.percent) / 100 - platform.fixed, 0));

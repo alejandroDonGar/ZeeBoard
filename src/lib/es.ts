@@ -188,6 +188,8 @@ export const es: Record<string, string> = {
   "No base price": "Sin precio base",
   "No notes.": "Sin notas.",
   "No characters.": "Sin personajes.",
+  "How many characters the commission has; the price depends on it": "Cuántos personajes tiene la comisión; el precio depende de este número",
+  "the price depends on this number": "el precio depende de este número",
   "{n}d": "{n}d",
   "{n}d late": "{n}d de retraso",
   "Days since you accepted it": "Días desde que la aceptaste",

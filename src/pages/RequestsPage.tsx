@@ -181,6 +181,7 @@ function RequestsPage({ onOpenCommissionsPage }: { onOpenCommissionsPage: () => 
         settings.default_currency,
         null,
         request.details ?? "",
+        request.characters,
       );
 
       // Type and character-count tags, without touching them by hand

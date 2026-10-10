@@ -21,6 +21,7 @@ import {
   calculateCommissionPrice,
   effectiveCharacterCount,
   pinNumber,
+  pendingCorrectionsText,
   invoiceDescription,
 } from "../lib/commissionHelpers";
 import { autoTagIds } from "../lib/formImport";
@@ -34,6 +35,7 @@ import {
   getAllCorrections,
   addCorrection,
   deleteCorrection,
+  setCorrectionDone,
   updateCommissionStage,
   finishCommission,
   updateCommission,
@@ -673,6 +675,26 @@ function CommissionsPage() {
     const data = await getCommissions();
     setCommissions(data);
     await loadStageImagesForCommissions(data);
+  }
+
+  async function toggleCorrectionDone(correction: CommissionCorrection) {
+    await setCorrectionDone(correction.id, correction.done_at === null);
+    setCorrections(await getAllCorrections());
+    setOpenPinId(null);
+  }
+
+  function copyPendingCorrections(stageId: number) {
+    const text = pendingCorrectionsText(activeCorrections.filter((correction) => correction.stage_id === stageId));
+
+    if (!text) {
+      showToast("Nothing pending to copy.", "error");
+      return;
+    }
+
+    navigator.clipboard
+      .writeText(text)
+      .then(() => showToast("Corrections copied.", "success"))
+      .catch(() => showToast("Could not copy it.", "error"));
   }
 
   async function removeCorrection(correction: CommissionCorrection) {
@@ -1345,7 +1367,9 @@ function CommissionsPage() {
                             </p>
 
                             {(() => {
-                              const count = activeCorrections.filter((correction) => correction.stage_id === stage.id).length;
+                              const stageCorrections = activeCorrections.filter((correction) => correction.stage_id === stage.id);
+                              const count = stageCorrections.length;
+                              const pending = stageCorrections.filter((correction) => correction.done_at === null).length;
                               const open = correctionsStageId === stage.id;
 
                               return (
@@ -1356,7 +1380,7 @@ function CommissionsPage() {
                                     setCorrectionsStageId(open ? null : stage.id);
                                   }}
                                   className={`mt-1 self-start rounded-sm px-1.5 py-0.5 text-xs transition ${
-                                    count > 0
+                                    pending > 0
                                       ? "bg-amber-100 font-semibold text-amber-900"
                                       : open
                                         ? "text-ink"
@@ -1364,6 +1388,7 @@ function CommissionsPage() {
                                   }`}
                                 >
                                   {count > 0 ? t(count === 1 ? "{n} correction" : "{n} corrections", { n: count }) : t("+ correction")}
+                                  {count > 0 && pending === 0 ? " ✓" : ""}
                                   {open ? " ▴" : count > 0 ? " ▾" : ""}
                                 </button>
                               );
@@ -1375,9 +1400,18 @@ function CommissionsPage() {
 
                     {correctionsStage && (
                       <div className="shrink-0 rounded-md border border-line bg-paper p-3">
-                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-faint">
-                          Corrections · {correctionsStage.name}
-                        </p>
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-faint">
+                            Corrections · {correctionsStage.name}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => copyPendingCorrections(correctionsStage.id)}
+                            className="text-xs text-faint transition hover:text-ink"
+                          >
+                            {t("Copy corrections")}
+                          </button>
+                        </div>
 
                         {activeCorrections
                           .filter((correction) => correction.stage_id === correctionsStage.id)
@@ -1389,6 +1423,13 @@ function CommissionsPage() {
 
                             return (
                               <div key={correction.id} className="group flex items-baseline gap-3 py-1 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={correction.done_at !== null}
+                                  onChange={() => toggleCorrectionDone(correction)}
+                                  title={correction.done_at === null ? t("Mark as done") : t("Mark as not done")}
+                                  className="shrink-0 self-center"
+                                />
                                 <span className="w-14 shrink-0 text-xs text-faint">
                                   {new Date(correction.created_at).toLocaleDateString(locale, { day: "numeric", month: "short" })}
                                 </span>
@@ -1403,7 +1444,9 @@ function CommissionsPage() {
                                     <span className="font-semibold">· v{pinImage.version}</span>
                                   </button>
                                 )}
-                                <span className="flex-1 whitespace-pre-wrap">{correction.text}</span>
+                                <span className={`flex-1 whitespace-pre-wrap ${correction.done_at !== null ? "text-faint line-through" : ""}`}>
+                                  {correction.text}
+                                </span>
                                 <button
                                   type="button"
                                   title={t("Remove correction")}
@@ -2214,7 +2257,16 @@ function CommissionsPage() {
             const shown = versions.find((version) => version.id === focusImageId) ?? current;
             const done = workflowStages.findIndex((item) => item.id === stage.id) < currentStageIndex;
             const pins = activeCorrections.filter((correction) => correction.image_id === shown.id && correction.x !== null && correction.y !== null);
-            const openPin = pins.find((correction) => correction.id === openPinId) ?? null;
+            // Pending pins from earlier versions of this alternative show faded on the new one
+            const earlier = versions.filter((version) => version.version < shown.version);
+            const ghosts = activeCorrections.filter(
+              (correction) =>
+                correction.done_at === null &&
+                correction.x !== null &&
+                correction.y !== null &&
+                earlier.some((version) => version.id === correction.image_id),
+            );
+            const openPin = [...pins, ...ghosts].find((correction) => correction.id === openPinId) ?? null;
             // Keeps the text box inside the image when a pin sits near an edge
             const boxLeft = (x: number) => `${Math.min(Math.max(x, 0.15), 0.85) * 100}%`;
 
@@ -2237,6 +2289,23 @@ function CommissionsPage() {
                     className="block max-h-[88vh] max-w-[94vw] object-contain"
                   />
 
+                  {ghosts.map((correction) => (
+                    <button
+                      key={correction.id}
+                      type="button"
+                      title={correction.text}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPinDraft(null);
+                        setOpenPinId(openPinId === correction.id ? null : correction.id);
+                      }}
+                      style={{ left: `${(correction.x ?? 0) * 100}%`, top: `${(correction.y ?? 0) * 100}%` }}
+                      className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-dashed border-white bg-amber-400/50 text-xs font-black text-black"
+                    >
+                      {pinNumber(activeCorrections, correction)}
+                    </button>
+                  ))}
+
                   {pins.map((correction) => (
                     <button
                       key={correction.id}
@@ -2248,9 +2317,11 @@ function CommissionsPage() {
                         setOpenPinId(openPinId === correction.id ? null : correction.id);
                       }}
                       style={{ left: `${(correction.x ?? 0) * 100}%`, top: `${(correction.y ?? 0) * 100}%` }}
-                      className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-amber-400 text-xs font-black text-black shadow-lg ring-2 ring-white"
+                      className={`absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-black shadow-lg ring-2 ring-white ${
+                        correction.done_at === null ? "bg-amber-400 text-black" : "bg-green-500 text-white"
+                      }`}
                     >
-                      {pinNumber(activeCorrections, correction)}
+                      {correction.done_at === null ? pinNumber(activeCorrections, correction) : "✓"}
                     </button>
                   ))}
 
@@ -2260,14 +2331,20 @@ function CommissionsPage() {
                       style={{ left: boxLeft(openPin.x ?? 0), top: `${(openPin.y ?? 0) * 100}%` }}
                       className="absolute z-10 mt-4 w-60 -translate-x-1/2 rounded-md bg-surface p-2.5 text-sm text-ink shadow-2xl"
                     >
+                      {openPin.image_id !== shown.id && (
+                        <p className="mb-1 text-xs text-faint">
+                          {t("From v{n}", { n: versions.find((version) => version.id === openPin.image_id)?.version ?? "" })}
+                        </p>
+                      )}
                       <p className="whitespace-pre-wrap">{openPin.text}</p>
-                      <button
-                        type="button"
-                        onClick={() => removeCorrection(openPin)}
-                        className="mt-1.5 text-xs text-faint hover:text-red-500"
-                      >
-                        {t("Remove correction")}
-                      </button>
+                      <div className="mt-1.5 flex gap-3 text-xs">
+                        <button type="button" onClick={() => toggleCorrectionDone(openPin)} className="font-semibold hover:underline">
+                          {openPin.done_at === null ? t("Mark as done") : t("Mark as not done")}
+                        </button>
+                        <button type="button" onClick={() => removeCorrection(openPin)} className="text-faint hover:text-red-500">
+                          {t("Remove correction")}
+                        </button>
+                      </div>
                     </div>
                   )}
 

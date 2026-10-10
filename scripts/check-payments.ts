@@ -1,6 +1,6 @@
 // Quick check of payments and prices: npx tsx scripts/check-payments.ts
 import assert from "node:assert";
-import { calculateCommissionPrice, deliveryDay, effectiveCharacterCount, pinNumber, formatMoney, groupAlternatives, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
+import { calculateCommissionPrice, deliveryDay, effectiveCharacterCount, pendingCorrectionsText, pinNumber, formatMoney, groupAlternatives, invoiceDescription, netIncome, paymentSummary, ratePerHour, receivedAfterFees } from "../src/lib/commissionHelpers";
 import type { Commission, CommissionStageImage } from "../src/lib/database";
 import { HIDDEN, hide, setPrivate } from "../src/lib/privacy";
 
@@ -46,6 +46,18 @@ const pinned = [
 ];
 assert.deepStrictEqual(pinned.map((correction) => pinNumber(pinned, correction)), [1, null, 2, 1]);
 console.log("pins ok");
+
+// Corrections to paste: only the pending ones, numbered again from 1
+assert.strictEqual(
+  pendingCorrectionsText([
+    { text: "Bigger nose", done_at: null },
+    { text: "Fix the ear", done_at: "2026-10-10T10:00:00.000Z" },
+    { text: "Brighter eyes", done_at: null },
+  ]),
+  "1. Bigger nose\n2. Brighter eyes",
+);
+assert.strictEqual(pendingCorrectionsText([{ text: "x", done_at: "2026-10-10" }]), "");
+console.log("corrections text ok");
 
 // Platform fee: 3.4% + 0.35 on 200 → 192.85; never negative
 assert.strictEqual(receivedAfterFees(200, { percent: 3.4, fixed: 0.35 }), 192.85);

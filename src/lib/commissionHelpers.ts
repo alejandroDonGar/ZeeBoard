@@ -216,6 +216,14 @@ export function pinNumber(
   return corrections.filter((other) => other.image_id === correction.image_id && other.id <= correction.id).length;
 }
 
+/** The corrections still pending as a numbered list to paste to the client: "1. Make the nose bigger" */
+export function pendingCorrectionsText(corrections: { text: string; done_at: string | null }[]): string {
+  return corrections
+    .filter((correction) => correction.done_at === null)
+    .map((correction, index) => `${index + 1}. ${correction.text}`)
+    .join("\n");
+}
+
 /** What a payment nets after the platform fee: amount − (amount × % + fixed) */
 export function receivedAfterFees(amount: number, platform: { percent: number; fixed: number }): number {
   return round2(Math.max(amount - (amount * platform.percent) / 100 - platform.fixed, 0));

@@ -300,6 +300,8 @@ export async function initializeDatabase() {
   await database.execute(`ALTER TABLE commission_corrections ADD COLUMN image_id INTEGER;`).catch(() => {});
   await database.execute(`ALTER TABLE commission_corrections ADD COLUMN x REAL;`).catch(() => {});
   await database.execute(`ALTER TABLE commission_corrections ADD COLUMN y REAL;`).catch(() => {});
+  // When the client's request was dealt with (null = still pending)
+  await database.execute(`ALTER TABLE commission_corrections ADD COLUMN done_at TEXT;`).catch(() => {});
 
   await database.execute(`
     CREATE TABLE IF NOT EXISTS template_stages (
@@ -1942,13 +1944,15 @@ export type CommissionCorrection = {
   image_id: number | null;
   x: number | null;
   y: number | null;
+  /** When it was marked as done (ISO); null while pending */
+  done_at: string | null;
 };
 
 export async function getAllCorrections(): Promise<CommissionCorrection[]> {
   const database = await getDatabase();
 
   return await database.select<CommissionCorrection[]>(
-    `SELECT id, commission_id, stage_id, text, created_at, image_id, x, y FROM commission_corrections ORDER BY created_at ASC, id ASC;`,
+    `SELECT id, commission_id, stage_id, text, created_at, image_id, x, y, done_at FROM commission_corrections ORDER BY created_at ASC, id ASC;`,
   );
 }
 
@@ -1969,6 +1973,15 @@ export async function addCorrection(
     `INSERT INTO commission_corrections (commission_id, stage_id, text, created_at, image_id, x, y) VALUES (?, ?, ?, ?, ?, ?, ?);`,
     [commissionId, stageId, cleanText, new Date().toISOString(), pin?.imageId ?? null, pin?.x ?? null, pin?.y ?? null],
   );
+}
+
+export async function setCorrectionDone(correctionId: number, done: boolean): Promise<void> {
+  const database = await getDatabase();
+
+  await database.execute(`UPDATE commission_corrections SET done_at = ? WHERE id = ?;`, [
+    done ? new Date().toISOString() : null,
+    correctionId,
+  ]);
 }
 
 export async function deleteCorrection(correctionId: number): Promise<number> {

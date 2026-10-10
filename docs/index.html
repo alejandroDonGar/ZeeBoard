@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZeeBoard · Gestor de comisiones de arte</title>
+  <meta name="description" content="App de escritorio para llevar tus comisiones de arte: solicitudes, clientes, etapas con imágenes, pagos y estadísticas. Local, sin nube.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ZeeBoard · Gestor de comisiones de arte">
+  <meta property="og:description" content="Solicitudes, clientes, etapas con imágenes, pagos y estadísticas en una app local para Windows.">
+  <meta property="og:image" content="https://alejandrodongar.github.io/zeeboard/images/dashboard.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Manrope:wght@500;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="#"><img src="favicon.svg" alt="">ZeeBoard</a>
+      <a class="hide-sm" href="#funciones">Funciones</a>
+      <a class="hide-sm" href="#instalar">Instalar</a>
+      <a class="hide-sm" href="https://github.com/alejandroDonGar/ZeeBoard#contents">Documentación</a>
+      <a class="hide-sm" href="https://github.com/alejandroDonGar/ZeeBoard">GitHub</a>
+      <a class="btn primary small" href="#instalar">Descargar</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <h1>ZeeBoard</h1>
+        <p class="lead">Lleva tus comisiones de arte en un tablero que vive en tu ordenador: solicitudes, clientes, etapas con imágenes, pagos y fechas, sin depender de ninguna nube.</p>
+        <div class="buttons">
+          <span class="btn primary disabled" aria-disabled="true" title="Disponible con la versión 1.0">Disponible con la 1.0</span>
+          <a class="btn" href="https://github.com/alejandroDonGar/ZeeBoard">Ver el código</a>
+        </div>
+        <p class="hint">Gratis y de código abierto (MIT). Las capturas usan datos de ejemplo inventados.</p>
+      </div>
+      <img class="shot" src="images/dashboard.png" alt="Panel principal de ZeeBoard" width="1474" height="1253">
+    </section>
+
+    <div id="funciones">
+      <section class="row">
+        <div>
+          <p class="kicker">Seguimiento</p>
+          <h2>Cada comisión, etapa a etapa</h2>
+          <p>Alguien te la pide, la aceptas y la dibujas por etapas. El cliente revisa cada una y tú no pierdes el hilo.</p>
+          <ul>
+            <li><b>Etapas</b> a tu medida: boceto, línea, color, entrega…</li>
+            <li><b>Alternativas y versiones</b> de cada imagen, con retoques sin perder las anteriores.</li>
+            <li><b>Correcciones</b> del cliente anotadas en cada revisión.</li>
+          </ul>
+          <a class="more" href="https://github.com/alejandroDonGar/ZeeBoard#stages-and-images">Cómo funciona →</a>
+        </div>
+        <img class="shot" src="images/commission.png" alt="Una comisión con sus etapas" width="1484" height="960" loading="lazy">
+      </section>
+
+      <section class="row flip">
+        <div>
+          <p class="kicker">Dinero</p>
+          <h2>Sabe cuánto ganas de verdad</h2>
+          <p>Anticipos, comisión de la plataforma y lo que llega a tu bolsillo, con cifras claras por mes, por tipo y por hora.</p>
+          <ul>
+            <li><b>Pagos</b> parciales y la comisión que se queda cada plataforma.</li>
+            <li><b>Importación</b> de tus pagos de PayPal.</li>
+            <li><b>Estadísticas:</b> euros por hora, clientes que repiten y solicitudes aceptadas.</li>
+          </ul>
+          <a class="more" href="https://github.com/alejandroDonGar/ZeeBoard#payments">Cómo funciona →</a>
+        </div>
+        <img class="shot" src="images/statistics.png" alt="Estadísticas del negocio" width="1484" height="960" loading="lazy">
+      </section>
+
+      <section class="row">
+        <div>
+          <p class="kicker">Clientes</p>
+          <h2>Conoce a quien te encarga</h2>
+          <p>Su historial, sus personajes de referencia y cuánto te han traído, todo en un sitio.</p>
+          <ul>
+            <li><b>Solicitudes</b> en una bandeja: acepta, rechaza o deja en lista de espera.</li>
+            <li><b>Personajes</b> con sus imágenes de referencia.</li>
+            <li><b>Plantillas</b> con precio y revisiones incluidas.</li>
+          </ul>
+          <a class="more" href="https://github.com/alejandroDonGar/ZeeBoard#clients-and-characters">Cómo funciona →</a>
+        </div>
+        <img class="shot" src="images/clients.png" alt="Clientes y personajes" width="1484" height="960" loading="lazy">
+      </section>
+
+      <section class="row flip">
+        <div>
+          <p class="kicker">Tuyo y seguro</p>
+          <h2>Local, privado y sin sustos</h2>
+          <p>Tu base de datos y tus imágenes se quedan en tu ordenador. La app solo usa internet para algo opcional: las fotos de perfil.</p>
+          <ul>
+            <li><b>Papelera</b> de 30 días y Ctrl+Z para recuperar lo borrado.</li>
+            <li><b>Modo privado</b> que difumina nombres e importes al enseñar la pantalla.</li>
+            <li><b>Copias de seguridad</b> y exportación de tus datos cuando quieras.</li>
+          </ul>
+          <a class="more" href="https://github.com/alejandroDonGar/ZeeBoard#privacy-and-data">Cómo funciona →</a>
+        </div>
+        <img class="shot" src="images/private-mode.png" alt="Modo privado" width="1484" height="960" loading="lazy">
+      </section>
+    </div>
+
+    <section class="band">
+      <h2>A tu gusto</h2>
+      <p class="sub">En español o en inglés, y con tema claro, oscuro o el de tu sistema.</p>
+      <div class="pair">
+        <figure><img class="shot" src="images/spanish.png" alt="Interfaz en español" width="1484" height="960" loading="lazy"><figcaption>En español y en inglés</figcaption></figure>
+        <figure><img class="shot" src="images/light-theme.png" alt="Tema claro" width="1484" height="960" loading="lazy"><figcaption>Tema claro, oscuro o del sistema</figcaption></figure>
+      </div>
+    </section>
+
+    <section class="closing" id="instalar">
+      <h2>Pruébala</h2>
+      <p class="sub">Hecha con Tauri, React, TypeScript y SQLite. Se instala en un minuto y tus datos no salen de tu equipo.</p>
+      <div class="stack"><span>Tauri 2</span><span>React 19</span><span>TypeScript</span><span>Tailwind 4</span><span>SQLite</span></div>
+      <ol class="steps">
+        <li><b>Descarga</b> el instalador <code>ZeeBoard_x.y.z_x64-setup.exe</code> (disponible con la versión 1.0) y ejecútalo.</li>
+        <li>Si Windows avisa de que no está firmada, elige <b>Más información → Ejecutar de todas formas</b>.</li>
+        <li>Abre <b>ZeeBoard</b> desde el menú Inicio. Para actualizar, instala encima: tus datos se conservan.</li>
+      </ol>
+      <div class="buttons">
+        <span class="btn primary disabled" aria-disabled="true" title="Disponible con la versión 1.0">Disponible con la 1.0</span>
+        <a class="btn" href="https://github.com/alejandroDonGar/ZeeBoard">Ver el código</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">ZeeBoard · hecho por <a href="https://alejandrodongar.github.io/">Alejandro Donate</a> · <a href="https://github.com/alejandroDonGar/ZeeBoard">GitHub</a> · Licencia <a href="https://github.com/alejandroDonGar/ZeeBoard/blob/main/LICENSE">MIT</a></div>
+  </footer>
+</body>
+</html>

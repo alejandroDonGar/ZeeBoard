@@ -49,6 +49,7 @@ It works in **English and Spanish**, in light, dark or system theme, and it is b
 - [Privacy and data](#privacy-and-data)
 - [For developers](#for-developers)
 - [Roadmap](#roadmap)
+- [License](#license)
 
 ## Install
 
@@ -327,3 +328,7 @@ Text in the interface is written in English and translated through a dictionary 
 ## Roadmap
 
 What has been done and what could come next lives in [ROADMAP.md](ROADMAP.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Alejandro Donate García.
